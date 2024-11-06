@@ -38,11 +38,11 @@ interface PieData {
 // Update the exportToExcel function
 const exportToExcel = (
   lineChartData: ChartData[],
-  pieChartData?: PieData[],
-  comparisonPieChartData?: PieData[],
   cardTitle: string,
   timeframe: string,
-  comparisonType: 'Last year' | 'Budget' | 'No comparison'
+  comparisonType: 'Last year' | 'Budget' | 'No comparison',
+  comparisonPieChartData?: PieData[],
+  pieChartData?: PieData[],
 ) => {
   const wb = XLSX.utils.book_new();
 
@@ -59,7 +59,7 @@ const exportToExcel = (
   if (comparisonType !== 'No comparison') {
     fluctuationData[1].push('Comparison');
     fluctuationData.slice(2).forEach((row, index) => {
-      row.push(lineChartData[index].comparison);
+      row.push(lineChartData[index].comparison ?? 0);
     });
   }
 
@@ -207,11 +207,11 @@ export function CustomDialog({
                     variant="ghost"
                     onClick={() => exportToExcel(
                       data,
-                      pieChartData,
-                      comparisonPieChartData,
                       selectedCard,
                       selectedTimeframe,
-                      comparisonType
+                      comparisonType,
+                      comparisonPieChartData,
+                      pieChartData,
                     )}
                     className="flex items-center space-x-3 text-blue-600"
                   >

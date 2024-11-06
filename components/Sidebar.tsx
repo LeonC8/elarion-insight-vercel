@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { motion } from 'framer-motion'
-import { BarChart2Icon, HomeIcon, GlobeIcon, UsersIcon, BedDoubleIcon, MapPinIcon, UserIcon, LogOutIcon, CalendarIcon } from 'lucide-react'
+import { BarChart2Icon, HomeIcon, GlobeIcon, UsersIcon, BedDoubleIcon, MapPinIcon, UserIcon, LogOutIcon, CalendarIcon, TrendingUpIcon } from 'lucide-react'
 import { usePathname } from 'next/navigation'
 
 interface SidebarProps {
@@ -15,6 +15,7 @@ const sidebarLinks = [
   { name: "Geo Source", icon: MapPinIcon, path: "/geo-source" },
   { name: "Age Bucket", icon: UserIcon, path: "/age-bucket" },
   { name: "Pickup", icon: CalendarIcon, path: "/pickup" },
+  { name: "Pace", icon: TrendingUpIcon, path: "/pace" },
 ]
 
 export function Sidebar({ onLogout }: SidebarProps) {

@@ -35,6 +35,7 @@ import { ResponsivePie } from '@nivo/pie'
 import { ResponsiveBar, BarDatum } from '@nivo/bar'
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts'
 import { cn } from "@/lib/utils"
+import { DateRange as DayPickerDateRange } from "react-day-picker"
 
 // Add the COLORS constant
 const COLORS = ['rgba(59, 130, 246, 0.5)', 'rgba(34, 197, 94, 0.5)', 'rgba(234, 179, 8, 0.5)', 'rgba(239, 68, 68, 0.5)']
@@ -169,10 +170,7 @@ interface NumericalDataItem {
   icon: React.ElementType;
 }
 
-type DateRange = {
-  from: Date | undefined;
-  to: Date | undefined;
-};
+type DateRange = DayPickerDateRange;
 
 // Data
 const numericalData: NumericalDataItem[] = [
@@ -558,8 +556,8 @@ export function BookingChannelsDashboard() {
     setIsCalendarVisible(false);
   };
 
-  const handleDateRangeSelect = (range: { from: Date | undefined; to: Date | undefined } | undefined) => {
-    setTempDateRange(range ? { from: range.from, to: range.to } : undefined);
+  const handleDateRangeSelect = (range: DayPickerDateRange | undefined) => {
+    setTempDateRange(range);
   };
 
   const dropdownRef = useRef<HTMLDivElement | null>(null);
@@ -761,7 +759,7 @@ export function BookingChannelsDashboard() {
                 data={data.map((item, index) => ({
                   ...item,
                   comparisonValue: comparisonType !== 'No comparison' ? comparisonData[index].value : undefined
-                }))}
+                })) as any}
                 keys={comparisonType !== 'No comparison' ? ['value', 'comparisonValue'] : ['value']}
                 indexBy="id"
                 margin={{ 

@@ -171,7 +171,7 @@ interface NumericalDataItem {
 
 type DateRange = {
   from: Date | undefined;
-  to: Date | undefined;
+  to?: Date | undefined;
 };
 
 // Data
@@ -577,8 +577,15 @@ export function AgeBucketDashboard() {
     setIsCalendarVisible(false);
   };
 
-  const handleDateRangeSelect = (range: { from: Date | undefined; to: Date | undefined } | undefined) => {
-    setTempDateRange(range ? { from: range.from, to: range.to } : undefined);
+  const handleDateRangeSelect = (range: DateRange | undefined) => {
+    if (range?.from) {
+      setTempDateRange({
+        from: range.from,
+        to: range.to || range.from
+      });
+    } else {
+      setTempDateRange(undefined);
+    }
   };
 
   const dropdownRef = useRef<HTMLDivElement | null>(null);
@@ -779,7 +786,7 @@ export function AgeBucketDashboard() {
               <ResponsiveBar
                 data={data.map((item, index) => ({
                   ...item,
-                  comparisonValue: comparisonType !== 'No comparison' ? comparisonData[index].value : undefined
+                  comparisonValue: comparisonType !== 'No comparison' ? comparisonData[index].value : 0
                 }))}
                 keys={comparisonType !== 'No comparison' ? ['value', 'comparisonValue'] : ['value']}
                 indexBy="id"
