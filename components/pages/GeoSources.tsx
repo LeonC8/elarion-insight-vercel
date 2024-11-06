@@ -1106,7 +1106,7 @@ export function GeoSourcesDashboard() {
         <div className="flex flex-col mb-6">
           <div className="flex justify-between items-center">  
             <div className="flex items-center">
-              <h2 className="text-3xl font-bold text-gray-800">Geo Sources</h2>
+              <h2 className="text-3xl font-bold text-gray-800">Geo Sourcess</h2>
             </div>
             <div className="flex space-x-4 items-center">
               {/* Export button */}
