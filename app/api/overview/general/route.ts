@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { parseHotelCSV } from '../../utils/csvParser';
+import { parseHotelCSV } from '../../../utils/csvParser';
 
 export async function GET(request: Request) {
   try {
@@ -53,30 +53,21 @@ export async function GET(request: Request) {
       totalAvailableRooms: filteredData.reduce((sum, row) => sum + row.availableRooms, 0),
     };
 
-    // Calculate daily metrics first, then average them
-    const dailyMetrics = filteredData.map(row => ({
-      occupancy: row.availableRooms > 0 ? (row.roomsSold / row.availableRooms) * 100 : 0,
-      revPAR: row.availableRooms > 0 ? row.roomRevenue / row.availableRooms : 0,
-      trevPAR: row.availableRooms > 0 ? row.totalRevenue / row.availableRooms : 0
-    }));
-
-    // Calculate averages
-    const averageMetrics = {
-      occupancy: dailyMetrics.reduce((sum, day) => sum + day.occupancy, 0) / dailyMetrics.length,
-      revPAR: dailyMetrics.reduce((sum, day) => sum + day.revPAR, 0) / dailyMetrics.length,
-      trevPAR: dailyMetrics.reduce((sum, day) => sum + day.trevPAR, 0) / dailyMetrics.length
-    };
+    console.log(metrics.totalAvailableRooms)
     
-    // Calculate response with corrected metrics
+    // Calculate derived metrics
     const response = {
       soldRooms: metrics.soldRooms,
       totalRooms: metrics.totalRooms,
       roomRevenue: metrics.roomRevenue,
       fbRevenue: metrics.fbRevenue,
       adr: metrics.soldRooms > 0 ? metrics.roomRevenue / metrics.soldRooms : 0,
-      occupancy: averageMetrics.occupancy,
-      revPAR: averageMetrics.revPAR,
-      trevPAR: averageMetrics.trevPAR,
+      occupancy: metrics.totalAvailableRooms > 0 ? 
+        (metrics.soldRooms / metrics.totalAvailableRooms) * 100 : 0,
+      revPAR: metrics.totalAvailableRooms > 0 ? 
+        metrics.roomRevenue / metrics.totalAvailableRooms : 0,
+      trevPAR: metrics.totalAvailableRooms > 0 ? 
+        metrics.totalRevenue / metrics.totalAvailableRooms : 0,
     };
 
     return NextResponse.json(response);

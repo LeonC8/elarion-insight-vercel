@@ -28,11 +28,23 @@ import {
 import { CustomDialog } from '../NumericalCardDetails'
 import { DetailedDialog } from '../GraphCardDetails'
 import { Calendar } from "@/components/ui/calendar"
-import { format } from "date-fns"
+import { format, subDays } from "date-fns"
 import * as XLSX from 'xlsx'
 import { ResponsivePie } from '@nivo/pie'
 import { ResponsiveBar, BarDatum } from '@nivo/bar'
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts'
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { DatePickerDemo as DatePicker } from "@/components/ui/date-picker"
+import dynamic from 'next/dynamic'
+import { HorizontalBarChart } from "@/components/ui/HorizontalBarChart"
+import { TopProducers } from "@/components/ui/TopProducers"
 
 // Add the COLORS constant
 const COLORS = ['rgba(59, 130, 246, 0.5)', 'rgba(34, 197, 94, 0.5)', 'rgba(234, 179, 8, 0.5)', 'rgba(239, 68, 68, 0.5)']
@@ -234,6 +246,30 @@ const formatCurrency = (value: number): string => {
   }).format(value);
 }
 
+// Add this constant with other data constants
+const worldMapData = [
+  { country: "cn", value: 1389618778 }, // China
+  { country: "in", value: 1311559204 }, // India
+  { country: "us", value: 331883986 },  // United States
+  { country: "id", value: 264935824 },  // Indonesia
+  { country: "pk", value: 210797836 },  // Pakistan
+  { country: "br", value: 210301591 },  // Brazil
+  { country: "ng", value: 208679114 },  // Nigeria
+  { country: "bd", value: 161062905 },  // Bangladesh
+  { country: "ru", value: 141944641 },  // Russia
+  { country: "mx", value: 127318112 },  // Mexico
+];
+
+// Update the WorldMap import and add dynamic import with loading
+const WorldMap = dynamic(
+  () => import('react-svg-worldmap').then(mod => mod.default),
+  { ssr: false, loading: () => (
+    <div className="h-[500px] flex items-center justify-center">
+      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+    </div>
+  )}
+)
+
 export function OverviewDashboard() {
   const [selectedHotels, setSelectedHotels] = useState<string[]>(["Hotel 1"])
   const allHotels = ["Hotel 1", "Hotel 2", "Hotel 3"]
@@ -246,6 +282,32 @@ export function OverviewDashboard() {
     from: undefined,
     to: undefined,
   })
+
+  // Add new states for our tabs
+  const [timeframeType, setTimeframeType] = useState<'day' | 'month' | 'year'>('month')
+  const [viewType, setViewType] = useState<'actual' | 'otb' | 'projected'>('actual')
+  const [businessDate, setBusinessDate] = useState<Date | undefined>(new Date())
+
+  // Add state for occupancy date range
+  const [occupancyDateRange, setOccupancyDateRange] = useState<{
+    start: string;
+    end: string;
+  }>({
+    start: '',
+    end: ''
+  });
+
+  // Add state for the KPI data
+  const [kpiData, setKpiData] = useState<{
+    soldRooms: number;
+    totalRooms: number;
+    roomRevenue: number;
+    fbRevenue: number;
+    adr: number;
+    occupancy: number;
+    revPAR: number;
+    trevPAR: number;
+  } | null>(null);
 
   const toggleHotel = (hotel: string) => {
     setSelectedHotels(prev => 
@@ -963,17 +1025,150 @@ export function OverviewDashboard() {
   // First, add these new state variables near the top of the OverviewDashboard component
   const [selectedMetricCard, setSelectedMetricCard] = useState<string | null>(null);
 
+  // Function to calculate date range based on timeframe and view type
+  const calculateDateRange = (timeframe: string, view: string, businessDate: Date | undefined) => {
+    if (!businessDate) return { start: '', end: '' };
+
+    // Get start of month, end of month, start of year, end of year for the business date
+    const startOfMonth = new Date(businessDate.getFullYear(), businessDate.getMonth(), 1);
+    const endOfMonth = new Date(businessDate.getFullYear(), businessDate.getMonth() + 1, 0);
+    const startOfYear = new Date(businessDate.getFullYear(), 0, 1);
+    const endOfYear = new Date(businessDate.getFullYear(), 11, 31);
+    
+    // Format the business date for comparison
+    const businessDateStr = format(businessDate, 'yyyy-MM-dd');
+
+    if (timeframe === 'day') {
+      // For day, always return the business date for both start and end
+      return {
+        start: businessDateStr,
+        end: businessDateStr
+      };
+    }
+    
+    if (timeframe === 'month') {
+      switch (view) {
+        case 'actual':
+          // From start of month to business date
+          return {
+            start: format(startOfMonth, 'yyyy-MM-dd'),
+            end: format(subDays(businessDate, 1), 'yyyy-MM-dd')
+          };
+        case 'otb':
+          // From business date to end of month
+          return {
+            start: businessDateStr,
+            end: format(endOfMonth, 'yyyy-MM-dd')
+          };
+        case 'projected':
+          // Whole month
+          return {
+            start: format(startOfMonth, 'yyyy-MM-dd'),
+            end: format(endOfMonth, 'yyyy-MM-dd')
+          };
+      }
+    }
+    
+    if (timeframe === 'year') {
+      switch (view) {
+        case 'actual':
+          // From start of year to business date
+          return {
+            start: format(startOfYear, 'yyyy-MM-dd'),
+            end: format(subDays(businessDate, 1), 'yyyy-MM-dd')
+          };
+        case 'otb':
+          // From business date to end of year
+          return {
+            start: businessDateStr,
+            end: format(endOfYear, 'yyyy-MM-dd')
+          };
+        case 'projected':
+          // Whole years
+          return {
+            start: format(startOfYear, 'yyyy-MM-dd'),
+            end: format(endOfYear, 'yyyy-MM-dd')
+          };
+      }
+    }
+
+    return { start: '', end: '' };
+  };
+
+  // Update the effect to pass businessDate to calculateDateRange
+  useEffect(() => {
+    if (!businessDate) return;
+    
+    const newRange = calculateDateRange(timeframeType, viewType, businessDate);
+    setOccupancyDateRange(newRange);
+  }, [timeframeType, viewType, businessDate]); // Added businessDate as dependency
+
+  // Effect to fetch data when parameters change
+  useEffect(() => {
+    const fetchData = async () => {
+      if (!businessDate || !occupancyDateRange.start || !occupancyDateRange.end) return;
+
+      try {
+        const response = await fetch(
+          `/api/overview/general?` + 
+          `business_date=${format(businessDate, 'yyyy-MM-dd')}` +
+          `&occupancy_date_start=${occupancyDateRange.start}` +
+          `&occupancy_date_end=${occupancyDateRange.end}`
+        );
+
+        if (!response.ok) throw new Error('Failed to fetch data');
+
+        const data = await response.json();
+        setKpiData(data);
+      } catch (error) {
+        console.error('Error fetching data:', error);
+      }
+    };
+
+    fetchData();
+  }, [businessDate, occupancyDateRange]);
+
+  // Add date change handler
+  const handleDateChange = (newDate: Date | undefined) => {
+    setBusinessDate(newDate);
+  };
+
   // Add the new CustomDialog for metrics near the end of the component, alongside the existing dialogs
   return (
     <div className="flex-1 overflow-auto">
       <div className="p-8">
-
-        {/* Header */}
-        <div className="flex justify-between items-center mb-6">  
-          <div className="flex items-center">
+        {/* Modified Header */}
+        <div className="flex justify-between items-center mb-6">
+          <div className="flex items-center space-x-4">
             <h2 className="text-3xl font-bold text-gray-800">Overview</h2>
+            
+            {/* Time Frame Tabs */}
+            <Tabs defaultValue={timeframeType} onValueChange={(value) => setTimeframeType(value as 'day' | 'month' | 'year')}>
+              <TabsList>
+                <TabsTrigger value="day">Day</TabsTrigger>
+                <TabsTrigger value="month">Month</TabsTrigger>
+                <TabsTrigger value="year">Year</TabsTrigger>
+              </TabsList>
+            </Tabs>
           </div>
-          <div className="flex space-x-4 items-center">
+
+          <div className="flex items-center space-x-4">
+            {/* View Type Tabs */}
+            <Tabs defaultValue={viewType} onValueChange={(value) => setViewType(value as 'actual' | 'otb' | 'projected')}>
+              <TabsList>
+                <TabsTrigger value="actual">Actual</TabsTrigger>
+                <TabsTrigger value="otb">OTB</TabsTrigger>
+                <TabsTrigger value="projected">Projected</TabsTrigger>
+              </TabsList>
+            </Tabs>
+
+            {/* Update DatePicker with props */}
+            <DatePicker 
+              date={businessDate}
+              onDateChange={handleDateChange}
+            />
+
+            {/* Keep Export Button */}
             <Button 
               variant="ghost" 
               onClick={handleExportToExcel}
@@ -982,6 +1177,8 @@ export function OverviewDashboard() {
               <DownloadIcon className="h-4 w-4" />
               <span>Export to Excel</span>
             </Button>
+
+            {/* Keep Hotel Selector */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline">
@@ -1009,124 +1206,68 @@ export function OverviewDashboard() {
                 ))}
               </DropdownMenuContent>
             </DropdownMenu>
-                
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline">
-                  {selectedTimeframe.includes('-') ? selectedTimeframe : `${selectedTimeframe}`} <ChevronDownIcon className="ml-2 h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent ref={dropdownRef} className={`p-0 ${isCalendarVisible ? 'w-[500px]' : 'w-[250px]'}`}>
-                <div className="flex">
-                  <div className="w-full border-r pl-2 pt-2 pb-2">
-                    {timeframeOptions.map((group) => (
-                      <div key={group.label}>
-                        <div className="px-2 py-1.5 text-sm font-medium text-gray-900 border-gray-200">
-                          {group.label}
-                        </div>
-                        {group.type === 'dropdown' && group.options?.map((option) => (
-                          <DropdownMenuItem
-                            key={`${group.label}-${option.value}`}
-                            onSelect={() => {
-                              handleTimeframeSelect(option.value);
-                              setIsCalendarVisible(false);
-                            }}
-                            className="pl-4"
-                          >
-                            <span className='text-sm text-gray-500'>{option.label}</span>
-                          </DropdownMenuItem>
-                        ))}
-                        {group.type === 'calendar' && (
-                          <DropdownMenuItem
-                            onSelect={(e) => {
-                              e.preventDefault();
-                              group.onClick && group.onClick();
-                            }}
-                            className="pl-4 flex items-center"
-                          >
-                            <CalendarIcon className="mr-2 h-4 w-4 text-gray-500" />
-                            <span className='text-sm text-gray-500'>Choose dates</span>
-                          </DropdownMenuItem>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                  {isCalendarVisible && (
-                    <div className="w-[250px] p-2">
-                      <Calendar
-                        mode="range"
-                        selected={tempDateRange}
-                        onSelect={handleDateRangeSelect}
-                        numberOfMonths={1}
-                        className="w-full"
-                      />
-                      <div className="flex justify-between mt-2">
-                        <button onClick={hideCalendar} className="text-sm text-black bg-gray-100 border border-gray-300 px-3 py-1 rounded">Hide</button>
-                        <button onClick={applyDateRange} className="text-sm text-white bg-black px-3 py-1 rounded">Apply</button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </DropdownMenuContent>
-            </DropdownMenu>
-
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline">
-                  Compare with: {comparisonType} <ChevronDownIcon className="ml-2 h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent>
-                <DropdownMenuItem onSelect={() => setComparisonType('Last year')}>
-                  Last year
-                </DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => setComparisonType('Budget')}>
-                  Budget
-                </DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => setComparisonType('No comparison')}>
-                  No comparison
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
           </div>
         </div>
                   
         {/* Numerical Cards Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          {numericalData.map((item) => (
+          {kpiData && [
+            { 
+              title: "Sold Rooms", 
+              value: Math.round(kpiData.soldRooms),
+              icon: BedDoubleIcon 
+            },
+            { 
+              title: "Total Revenue", 
+              value: `$${Math.round(kpiData.roomRevenue + kpiData.fbRevenue).toLocaleString()}`,
+              icon: DollarSignIcon 
+            },
+            { 
+              title: "Rooms Revenue", 
+              value: `$${Math.round(kpiData.roomRevenue).toLocaleString()}`,
+              icon: DollarSignIcon 
+            },
+            { 
+              title: "F&B Revenue", 
+              value: `$${Math.round(kpiData.fbRevenue).toLocaleString()}`,
+              icon: UtensilsIcon 
+            },
+            { 
+              title: "ADR", 
+              value: `$${Math.round(kpiData.adr).toLocaleString()}`,
+              icon: TrendingUpIcon 
+            },
+            { 
+              title: "Occupancy", 
+              value: `${Math.round(kpiData.occupancy)}%`,
+              icon: PercentIcon 
+            },
+            { 
+              title: "RevPAR", 
+              value: `$${Math.round(kpiData.revPAR).toLocaleString()}`,
+              icon: BarChartIcon 
+            },
+            { 
+              title: "TrevPAR", 
+              value: `$${Math.round(kpiData.trevPAR).toLocaleString()}`,
+              icon: LineChartIcon 
+            }
+          ].map((item) => (
             <motion.div
               key={item.title}
-              whileHover={{ scale: 1.05, boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)" }}
+              whileHover={{ scale: 1.05 }}
               onClick={() => handleCardClick(item.title)}
               className="cursor-pointer"
             >
-              <Card className="bg-white shadow-lg rounded-lg overflow-hidden relative border border-gray-300">
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 bg-gray-0 py-3 pt-4">
-                  <div className="flex items-center mt-1">
-                    {/* <item.icon className="h-5 w-5 text-gray-500 mr-2" /> */}
-                    <CardTitle className="text-sm font-medium text-gray-600">
-                      {item.title}  
-                    </CardTitle>
-                  </div>
-                  <ArrowRightIcon className="h-4 w-4 text-gray-400" />
+              <Card className="bg-white shadow-lg rounded-lg overflow-hidden">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-0">
+                  <CardTitle className="text-sm font-medium text-gray-500">
+                    {item.title}
+                  </CardTitle>
+                  <item.icon className="h-4 w-4 text-gray-500" />
                 </CardHeader>
-                {/* <hr className="  border-gray-200"></hr> */}
-                <CardContent className="py-6">
-                  <div className="flex items-center justify-between">
-                    <div className="text-xl  font-bold text-gray-800">{item.value}</div>
-                    <div className={`flex items-center text-sm font-medium ${
-                      comparisonType === 'No comparison' 
-                        ? 'text-gray-400'
-                        : item.change >= 0 
-                          ? 'text-green-600' 
-                          : 'text-red-600'
-                    }`}>
-                      {comparisonType === 'No comparison' 
-                        ? '-'
-                        : `${item.change >= 0 ? '↑' : '↓'} ${Math.abs(item.change)}%`
-                      }
-                    </div>
-                  </div>
+                <CardContent className="pt-4">
+                  <div className="text-2xl font-bold">{item.value}</div>
                 </CardContent>
               </Card>
             </motion.div>
@@ -1161,6 +1302,103 @@ export function OverviewDashboard() {
             "#82ca9d", 
             false
           )}
+        </div>
+
+        {/* World Map */}
+        <div className="mt-8">
+          <Card className="bg-white shadow-lg rounded-lg overflow-hidden">
+            <CardHeader className="flex flex-col items-start">
+              <div className="flex w-full justify-between items-center">
+                <div>
+                  <CardTitle className="text-lg font-semibold text-gray-800">Global Revenue Distribution</CardTitle>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="h-[500px] flex justify-center items-center">
+                <WorldMap
+                  color="rgb(59, 130, 246)"
+                  title="Top 10 Populous Countries"
+                  value-suffix="people"
+                  size="lg"
+                  data={worldMapData}
+                />
+              </div>
+              <div className="flex justify-center mt-4">
+                <div className="flex items-center space-x-8">
+                  <div className="flex items-center">
+                    <div className="w-24 h-3 bg-gradient-to-r from-blue-100 to-blue-600"></div>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <span className="text-sm text-gray-500">Lower</span>
+                    <span className="text-sm text-gray-500">-</span>
+                    <span className="text-sm text-gray-500">Higher Revenue</span>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+            <div className="px-6 py-4">
+              <hr className="border-t border-gray-200 mb-4" />
+              <div className="flex justify-end">
+                <button
+                  className="text-blue-600 hover:text-blue-800 font-medium text-sm focus:outline-none"
+                  onClick={() => setSelectedDetailedChart('worldMap')}
+                >
+                  View Details
+                </button>
+              </div>
+            </div>
+          </Card>
+        </div>
+
+        {/* Add the new horizontal bar charts row */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mt-8">
+          <HorizontalBarChart 
+            title="Revenue by Department"
+            description="Last 6 months"
+            data={[
+              { name: "Rooms", value: 286 },
+              { name: "F&B", value: 234 },
+              { name: "Spa", value: 187 },
+              { name: "Events", value: 143 },
+              { name: "Other", value: 98 },
+            ]}
+          />
+          <HorizontalBarChart 
+            title="Bookings by Channel"
+            description="Last 6 months"
+            data={[
+              { name: "Direct", value: 245 },
+              { name: "Booking.com", value: 198 },
+              { name: "Expedia", value: 167 },
+              { name: "Travel Agents", value: 142 },
+              { name: "Other OTAs", value: 87 },
+            ]}
+          />
+        </div>
+
+        {/* Add the Top Producers section */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mt-8">
+          <TopProducers 
+            title="Top Producers - Room Revenue"
+            data={[
+              { name: "Campsite", value: 5, change: 1 },
+              { name: "Other", value: 4.8, change: -0.2 },
+              { name: "Kids offer", value: 4.5, change: 4.5 },
+              { name: "Staff & Service", value: 4.3, change: -0.3 },
+              { name: "Food", value: 4.3, change: -0.2 },
+            ]}
+          />
+          <TopProducers 
+            title="Top Producers - F&B Revenue"
+            data={[
+              { name: "Restaurant", value: 5.2, change: 0.8 },
+              { name: "Room Service", value: 4.9, change: -0.3 },
+              { name: "Bar", value: 4.7, change: 1.2 },
+              { name: "Banquet", value: 4.4, change: -0.4 },
+              { name: "Catering", value: 4.1, change: 0.5 },
+            ]}
+          />
         </div>
       </div>
 
