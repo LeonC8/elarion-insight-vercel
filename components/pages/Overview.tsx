@@ -44,7 +44,7 @@ import {
 import { DatePickerDemo as DatePicker } from "@/components/ui/date-picker"
 import dynamic from 'next/dynamic'
 import { HorizontalBarChart } from "@/components/ui/HorizontalBarChart"
-import { TopProducers } from "@/components/ui/TopProducers"
+import { TopFive } from "../new/TopFive"
 
 // Add the COLORS constant
 const COLORS = ['rgba(59, 130, 246, 0.5)', 'rgba(34, 197, 94, 0.5)', 'rgba(234, 179, 8, 0.5)', 'rgba(239, 68, 68, 0.5)']
@@ -1379,7 +1379,7 @@ export function OverviewDashboard() {
 
         {/* Add the Top Producers section */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mt-8">
-          <TopProducers 
+          <TopFive 
             title="Top Producers - Room Revenue"
             data={[
               { name: "Campsite", value: 5, change: 1 },
@@ -1389,7 +1389,7 @@ export function OverviewDashboard() {
               { name: "Food", value: 4.3, change: -0.2 },
             ]}
           />
-          <TopProducers 
+          <TopFive 
             title="Top Producers - F&B Revenue"
             data={[
               { name: "Restaurant", value: 5.2, change: 0.8 },

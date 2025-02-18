@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { motion } from 'framer-motion'
-import { BarChart2Icon, HomeIcon, GlobeIcon, UsersIcon, BedDoubleIcon, MapPinIcon, UserIcon, LogOutIcon, CalendarIcon, TrendingUpIcon } from 'lucide-react'
+import { BarChart2Icon, HomeIcon, GlobeIcon, UsersIcon, BedDoubleIcon, MapPinIcon, UserIcon, LogOutIcon, CalendarIcon, TrendingUpIcon, Settings } from 'lucide-react'
 import { usePathname } from 'next/navigation'
 
 interface SidebarProps {
@@ -58,13 +58,18 @@ export function Sidebar({ onLogout }: SidebarProps) {
           </ul>
         </nav>
       </div>
-      <div className="py-4 px-6">
+      <div className="py-4 px-6 flex gap-2">
+        <button
+          onClick={() => {}} // Settings button - no action for now
+          className="w-12 h-12 flex items-center justify-center rounded-lg bg-[#394756] transition duration-200 ease-in-out hover:bg-[#4a5a6b]"
+        >
+          <Settings className="h-5 w-5 text-white" />
+        </button>
         <button
           onClick={onLogout}
-          className="flex items-center py-2 px-4 pl-1 rounded transition duration-200 ease-in-out hover:bg-blue-900 text-white w-full"
+          className="w-12 h-12 flex items-center justify-center rounded-lg bg-[#394756] transition duration-200 ease-in-out hover:bg-[#4a5a6b]"
         >
-          <LogOutIcon className="h-5 w-5 mr-3 text-white" />
-          Logout
+          <LogOutIcon className="h-5 w-5 text-white" />
         </button>
       </div>
     </div>
