@@ -363,12 +363,12 @@ export function DataDetailsDialog({
                     >
                       <defs>
                         <linearGradient id="mainGradient" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor={mainKpiConfig.current.color} stopOpacity={0.2}/>
-                          <stop offset="95%" stopColor={mainKpiConfig.current.color} stopOpacity={0}/>
+                          <stop offset="0%" stopColor={mainKpiConfig.current.color} stopOpacity={0.1}/>
+                          <stop offset="100%" stopColor={mainKpiConfig.current.color} stopOpacity={0.1}/>
                         </linearGradient>
                         <linearGradient id="previousGradient" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor={mainKpiConfig.previous.color} stopOpacity={0.1}/>
-                          <stop offset="95%" stopColor={mainKpiConfig.previous.color} stopOpacity={0}/>
+                          <stop offset="0%" stopColor={mainKpiConfig.previous.color} stopOpacity={0.05}/>
+                          <stop offset="100%" stopColor={mainKpiConfig.previous.color} stopOpacity={0.05}/>
                         </linearGradient>
                       </defs>
                       <CartesianGrid strokeDasharray="3 3" vertical={false} />
@@ -559,7 +559,7 @@ export function DataDetailsDialog({
                       value={categoryChartMode}
                       onValueChange={(value: ChartDisplayMode) => setCategoryChartMode(value)}
                     >
-                      <SelectTrigger className="w-[140px]">
+                      <SelectTrigger className="w-[140px] bg-[#f2f8ff] hover:bg-[#f2f8ff] text-[#342630] rounded-full border-0">
                         <SelectValue placeholder="Select view" />
                       </SelectTrigger>
                       <SelectContent>
@@ -584,12 +584,12 @@ export function DataDetailsDialog({
                         {Object.keys(chartConfig).map((categoryKey) => (
                           <React.Fragment key={categoryKey}>
                             <linearGradient id={`gradient-${categoryKey}`} x1="0" y1="0" x2="0" y2="1">
-                              <stop offset="0%" stopColor={chartConfig[categoryKey].color} stopOpacity={0.15}/>
-                              <stop offset="25%" stopColor={chartConfig[categoryKey].color} stopOpacity={0}/>
+                              <stop offset="0%" stopColor={chartConfig[categoryKey].color} stopOpacity={0.1}/>
+                              <stop offset="100%" stopColor={chartConfig[categoryKey].color} stopOpacity={0.1}/>
                             </linearGradient>
                             <linearGradient id={`gradient-${categoryKey}-previous`} x1="0" y1="0" x2="0" y2="1">
-                              <stop offset="0%" stopColor={chartConfig[categoryKey].color} stopOpacity={0.08}/>
-                              <stop offset="25%" stopColor={chartConfig[categoryKey].color} stopOpacity={0}/>
+                              <stop offset="0%" stopColor={chartConfig[categoryKey].color} stopOpacity={0.05}/>
+                              <stop offset="100%" stopColor={chartConfig[categoryKey].color} stopOpacity={0.05}/>
                             </linearGradient>
                           </React.Fragment>
                         ))}
@@ -704,7 +704,7 @@ export function DataDetailsDialog({
               )}
 
               {/* Categories Distribution Over Time Section */}
-              {categoryTimeSeriesData && (
+              {/* {categoryTimeSeriesData && (
                 <div className="bg-white rounded-lg p-6 shadow-sm border border-gray-300">
                   <div className="flex justify-between items-center mb-4">
                     <h3 className="text-lg font-medium">Categories Distribution Over Time</h3>
@@ -765,7 +765,6 @@ export function DataDetailsDialog({
                           return null
                         }}
                       />
-                      {/* Only render areas for active categories */}
                       {Object.keys(chartConfig).map((categoryKey) => (
                         activeCategories.includes(categoryKey) && (
                           <Area
@@ -782,7 +781,6 @@ export function DataDetailsDialog({
                           />
                         )
                       ))}
-                      {/* Use the same legend as the previous chart */}
                       <ChartLegend 
                         content={() => (
                           <div className="flex flex-wrap justify-center gap-3 mt-4">
@@ -808,7 +806,7 @@ export function DataDetailsDialog({
                     </AreaChart>
                   </ChartContainer>
                 </div>
-              )}
+              )} */}
 
             </div>
           </div>

@@ -13,6 +13,10 @@ import {
   ChevronDownIcon, 
   DownloadIcon,
   Check,
+  DollarSign, 
+  Percent, 
+  Hotel, 
+  Building
 } from 'lucide-react'
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { DatePickerDemo as DatePicker } from "@/components/ui/date-picker"
@@ -972,15 +976,57 @@ const otherRevenueCategoryData = [
   }
 ]
 
-// Add this new constant for the reservations data
+// Update the reservationsByDayData constant with previous period data
 const reservationsByDayData = [
-  { dayOfWeek: "Monday", bookingsCreated: 145, staysStarting: 168 },
-  { dayOfWeek: "Tuesday", bookingsCreated: 132, staysStarting: 142 },
-  { dayOfWeek: "Wednesday", bookingsCreated: 156, staysStarting: 187 },
-  { dayOfWeek: "Thursday", bookingsCreated: 123, staysStarting: 145 },
-  { dayOfWeek: "Friday", bookingsCreated: 198, staysStarting: 210 },
-  { dayOfWeek: "Saturday", bookingsCreated: 208, staysStarting: 245 },
-  { dayOfWeek: "Sunday", bookingsCreated: 167, staysStarting: 189 },
+  { 
+    dayOfWeek: "Monday", 
+    bookingsCreated: 145, 
+    prevBookingsCreated: 125,
+    staysStarting: 168,
+    prevStaysStarting: 155
+  },
+  { 
+    dayOfWeek: "Tuesday", 
+    bookingsCreated: 132, 
+    prevBookingsCreated: 120,
+    staysStarting: 142,
+    prevStaysStarting: 130
+  },
+  { 
+    dayOfWeek: "Wednesday", 
+    bookingsCreated: 156, 
+    prevBookingsCreated: 140,
+    staysStarting: 187,
+    prevStaysStarting: 165
+  },
+  { 
+    dayOfWeek: "Thursday", 
+    bookingsCreated: 123, 
+    prevBookingsCreated: 115,
+    staysStarting: 145,
+    prevStaysStarting: 135
+  },
+  { 
+    dayOfWeek: "Friday", 
+    bookingsCreated: 198, 
+    prevBookingsCreated: 175,
+    staysStarting: 210,
+    prevStaysStarting: 190
+  },
+  { 
+    dayOfWeek: "Saturday", 
+    bookingsCreated: 208, 
+    prevBookingsCreated: 185,
+    staysStarting: 245,
+    prevStaysStarting: 220
+  },
+  { 
+    dayOfWeek: "Sunday", 
+    bookingsCreated: 167, 
+    prevBookingsCreated: 150,
+    staysStarting: 189,
+    prevStaysStarting: 170
+  },
 ]
 
 function TriangleDown({ className }: { className?: string }) {
@@ -1025,7 +1071,7 @@ export function OverviewCopy() {
         <div className="fixed top-0 left-[256px] right-0 z-30 flex justify-between items-center mb-6 bg-white py-6 px-12 border-b border-gray-300 shadow-sm">
           <div>
             <h2 className="text-xl font-bold text-gray-800 mb-1">Overview</h2>
-            <span className='text-gray-400 font-ligth mt-3 pt-2 text-sm'>Month OTB</span>
+            <span className='text-gray-400 font-ligth mt-3 pt-2 text-sm'>{`${selectedTimeFrame} ${selectedViewType}`}</span>
           </div>
 
           <div className="flex items-center space-x-8">
@@ -1042,38 +1088,53 @@ export function OverviewCopy() {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent className="w-56">
-                  <div className="px-2 py-1.5 text-sm font-semibold text-gray-500">Day</div>
-                  <DropdownMenuItem onSelect={() => { setSelectedTimeFrame("Day"); setSelectedViewType("Actual"); }}>
-                    Actual
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onSelect={() => { setSelectedTimeFrame("Day"); setSelectedViewType("OTB"); }}>
-                    OTB
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onSelect={() => { setSelectedTimeFrame("Day"); setSelectedViewType("Projected"); }}>
-                    Projected
-                  </DropdownMenuItem>
+                  {/* Day Group */}
+                  <div className="px-2 py-2 text-sm font-semibold text-gray-600 bg-gray-50 border-b border-gray-200">
+                    Day
+                  </div>
+                  <div className="p-1">
+                    <DropdownMenuItem onSelect={() => { setSelectedTimeFrame("Day"); setSelectedViewType("Actual"); }}>
+                      Actual
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => { setSelectedTimeFrame("Day"); setSelectedViewType("OTB"); }}>
+                      OTB
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => { setSelectedTimeFrame("Day"); setSelectedViewType("Projected"); }}>
+                      Projected
+                    </DropdownMenuItem>
+                  </div>
                   
-                  <div className="px-2 py-1.5 text-sm font-semibold text-gray-500 border-t">Month</div>
-                  <DropdownMenuItem onSelect={() => { setSelectedTimeFrame("Month"); setSelectedViewType("Actual"); }}>
-                    Actual
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onSelect={() => { setSelectedTimeFrame("Month"); setSelectedViewType("OTB"); }}>
-                    OTB
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onSelect={() => { setSelectedTimeFrame("Month"); setSelectedViewType("Projected"); }}>
-                    Projected
-                  </DropdownMenuItem>
+                  {/* Month Group */}
+                  <div className="px-2 py-2 text-sm font-semibold text-gray-600 bg-gray-50 border-y border-gray-200">
+                    Month
+                  </div>
+                  <div className="p-1">
+                    <DropdownMenuItem onSelect={() => { setSelectedTimeFrame("Month"); setSelectedViewType("Actual"); }}>
+                      Actual
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => { setSelectedTimeFrame("Month"); setSelectedViewType("OTB"); }}>
+                      OTB
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => { setSelectedTimeFrame("Month"); setSelectedViewType("Projected"); }}>
+                      Projected
+                    </DropdownMenuItem>
+                  </div>
                   
-                  <div className="px-2 py-1.5 text-sm font-semibold text-gray-500 border-t">Year</div>
-                  <DropdownMenuItem onSelect={() => { setSelectedTimeFrame("Year"); setSelectedViewType("Actual"); }}>
-                    Actual
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onSelect={() => { setSelectedTimeFrame("Year"); setSelectedViewType("OTB"); }}>
-                    OTB
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onSelect={() => { setSelectedTimeFrame("Year"); setSelectedViewType("Projected"); }}>
-                    Projected
-                  </DropdownMenuItem>
+                  {/* Year Group */}
+                  <div className="px-2 py-2 text-sm font-semibold text-gray-600 bg-gray-50 border-y border-gray-200">
+                    Year
+                  </div>
+                  <div className="p-1">
+                    <DropdownMenuItem onSelect={() => { setSelectedTimeFrame("Year"); setSelectedViewType("Actual"); }}>
+                      Actual
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => { setSelectedTimeFrame("Year"); setSelectedViewType("OTB"); }}>
+                      OTB
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => { setSelectedTimeFrame("Year"); setSelectedViewType("Projected"); }}>
+                      Projected
+                    </DropdownMenuItem>
+                  </div>
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
@@ -1174,6 +1235,7 @@ export function OverviewCopy() {
             valueColor="blue"
             distributionData={totalRevenueDistribution}
             categoryTimeSeriesData={totalRevenueCategoryData}
+            icon={DollarSign}
           />
           <KpiWithSubtleChart
             title="ADR"
@@ -1182,6 +1244,7 @@ export function OverviewCopy() {
             chartData={adrChartData}
             prefix="€"
             valueColor="blue"
+            icon={DollarSign}
           />
           <KpiWithSubtleChart
             title="Occupancy Rate"
@@ -1191,6 +1254,7 @@ export function OverviewCopy() {
             prefix=""
             suffix="%"
             valueColor="green"
+            icon={Percent}
           />
           <KpiWithSubtleChart
             title="Rooms Sold"
@@ -1198,9 +1262,8 @@ export function OverviewCopy() {
             percentageChange={-3.4}
             chartData={roomsSoldChartData}
             valueColor="green"
-            distributionData={roomsSoldDistribution}
-            categoryTimeSeriesData={roomsSoldCategoryData}
             chartConfig={roomTypesChartConfig}
+            icon={Hotel}
           />
         </div>
 
@@ -1214,8 +1277,6 @@ export function OverviewCopy() {
             prefix="€"
             color="green"
             mainTimeSeriesData={roomRevenueChartData}
-            distributionData={roomRevenueDistribution}
-            categoryTimeSeriesData={roomRevenueCategoryData}
           />
           <Kpi
             title="F&B Revenue"
@@ -1224,8 +1285,6 @@ export function OverviewCopy() {
             prefix="€"
             color="blue"
             mainTimeSeriesData={fnbRevenueChartData}
-            distributionData={fnbRevenueDistribution}
-            categoryTimeSeriesData={fnbRevenueCategoryData}
           />
           <Kpi
             title="Other Revenue"
@@ -1234,8 +1293,6 @@ export function OverviewCopy() {
             prefix="€"
             color="blue"
             mainTimeSeriesData={otherRevenueChartData}
-            distributionData={otherRevenueDistribution}
-            categoryTimeSeriesData={otherRevenueCategoryData}
           />
           <Kpi
             title="RevPAR"

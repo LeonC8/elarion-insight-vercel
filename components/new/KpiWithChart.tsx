@@ -12,7 +12,16 @@ import {
   ChartTooltipContent,
 } from "@/components/ui/chart"
 import { Button } from "@/components/ui/button"
-import { DataDetailsDialog } from "./DataDetailsDialog"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
+import { Dialog as FullScreenDialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { ArrowRight } from 'lucide-react'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -120,7 +129,7 @@ export function KpiWithChart({
   distributionData,
   categoryTimeSeriesData
 }: KpiWithChartProps) {
-  const [showDetails, setShowDetails] = React.useState(false)
+  const [fullScreenTable, setFullScreenTable] = React.useState(false)
   const [selectedMetric, setSelectedMetric] = React.useState(metrics[0].key)
   const [activeMainSeries, setActiveMainSeries] = React.useState<string[]>(['current', 'previous'])
   
@@ -142,157 +151,198 @@ export function KpiWithChart({
   const currentGradientColor = chartConfig.current.color
 
   return (
-    <Card className="border-gray-300">
-      <CardHeader>
-        <div className="flex justify-between items-center">
-          <CardTitle className="text-base mb-2 font-medium text-sm text-muted-foreground">
-            {title}
-          </CardTitle>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button 
-                variant="ghost" 
-                size="sm"
-                className="bg-[#f2f8ff] hover:bg-[#f2f8ff] text-[#342630] rounded-full px-4"
-              >
-                {currentMetricData.label} <TriangleDown className="ml-2" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent>
-              {metrics.map(metric => (
-                <DropdownMenuItem 
-                  key={metric.key}
-                  onClick={() => setSelectedMetric(metric.key)}
+    <>
+      <Card className="border-gray-300">
+        <CardHeader>
+          <div className="flex justify-between items-center">
+            <CardTitle className="text-base mb-2 font-medium text-sm text-muted-foreground">
+              {title}
+            </CardTitle>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button 
+                  variant="ghost" 
+                  size="sm"
+                  className="bg-[#f2f8ff] hover:bg-[#f2f8ff] text-[#342630] rounded-full px-4"
                 >
-                  {metric.label}
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-        <div className="flex items-end gap-3">
-          <span className="text-2xl font-bold leading-none">
-            {currentMetricData.prefix || prefix}{formattedValue}
-          </span>
-          <span className={`text-sm -translate-y-[1px] px-2 py-0.5 rounded ${
-            isPositive 
-              ? 'text-green-600 bg-green-100/50 border border-green-600' 
-              : 'text-red-600 bg-red-100/50 border border-red-600'
-          } leading-none`}>
-            {isPositive ? '+' : ''}{changePercent}% 
-          </span>
-        </div>
-      </CardHeader>
-      <CardContent className="pb-4 mt-3">
-        <ChartContainer config={chartConfig}>
-          <AreaChart
-            data={currentMetricData.data}
-            height={300}
-            margin={{
-              top: 10,
-              right: 10,
-              bottom: 20,
-              left: leftMargin,
-            }}
-          >
-            <defs>
-              <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor={currentGradientColor} stopOpacity={0.1}/>
-                <stop offset="100%" stopColor={currentGradientColor} stopOpacity={0.1}/>
-              </linearGradient>
-              <linearGradient id={`${gradientId}-previous`} x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor={chartConfig.previous.color} stopOpacity={0.05}/>
-                <stop offset="100%" stopColor={chartConfig.previous.color} stopOpacity={0.05}/>
-              </linearGradient>
-            </defs>
-            <CartesianGrid strokeDasharray="3 3" vertical={false} />
-            <XAxis
-              dataKey="date"
-              tickLine={false}
-              axisLine={false}
-              tickFormatter={(value) => value.slice(0, 3)}
-              tickMargin={8}
-            />
-            <YAxis
-              tickLine={false}
-              axisLine={false}
-              tickFormatter={(value) => `${Math.round(value).toLocaleString()}`}
-              tickMargin={8}
-              width={45}
-            />
-            <ChartTooltip content={<ChartTooltipContent />} />
-            {/* Conditionally render the areas based on activeMainSeries */}
-            {activeMainSeries.includes("previous") && (
-              <Area
-                type="monotone"
-                dataKey="previous"
-                stroke={chartConfig.previous.color}
-                strokeDasharray="4 4"
-                fill={`url(#${gradientId}-previous)`}
-                strokeWidth={2}
-                dot={false}
-              />
-            )}
-            {activeMainSeries.includes("current") && (
-              <Area
-                type="monotone"
-                dataKey="current"
-                stroke={currentGradientColor}
-                fill={`url(#${gradientId})`}
-                strokeWidth={2}
-                dot={false}
-              />
-            )}
-            {/* Replace existing ChartLegend with updated version */}
-            <ChartLegend 
-              className="mt-6" 
-              content={() => (
-                <div className="flex justify-center gap-3 pt-10 pb-0 mb-0">
-                  {Object.keys(chartConfig).map((key) => (
-                    <div
-                      key={key}
-                      onClick={() => {
-                        if (activeMainSeries.includes(key)) {
-                          setActiveMainSeries(activeMainSeries.filter(item => item !== key))
-                        } else {
-                          setActiveMainSeries([...activeMainSeries, key])
-                        }
-                      }}
-                      className={`cursor-pointer bg-[#f0f4fa] px-3 py-1.5 rounded-full border border-[#e5eaf3] flex items-center gap-2 ${
-                        activeMainSeries.includes(key) ? '' : 'opacity-50'
-                      }`}
-                    >
-                      <div style={{ backgroundColor: chartConfig[key].color }} className="w-2 h-2 rounded-full" />
-                      <span className="text-xs text-gray-500 font-medium">{chartConfig[key].label}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            />
-          </AreaChart>
-        </ChartContainer>
-        <div className="mt-3 pt-4 border-t border-gray-200">
-          <div className="flex justify-end">
-            <Button
-              variant="ghost"
-              className="text-blue-600 hover:text-blue-800 font-medium text-sm"
-              onClick={() => setShowDetails(true)}
-            >
-              View Details
-            </Button>
+                  {currentMetricData.label} <TriangleDown className="ml-2" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent>
+                {metrics.map(metric => (
+                  <DropdownMenuItem 
+                    key={metric.key}
+                    onClick={() => setSelectedMetric(metric.key)}
+                  >
+                    {metric.label}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
-        </div>
-      </CardContent>
-      <DataDetailsDialog 
-        open={showDetails}
-        onOpenChange={setShowDetails}
-        title={title}
-        currentValue={currentValue}
-        prefix={currentMetricData.prefix || prefix}
-        distributionData={distributionData}
-        categoryTimeSeriesData={categoryTimeSeriesData}
-        mainTimeSeriesData={currentMetricData.data}
-      />
-    </Card>
+          <div className="flex items-end gap-3">
+            <span className="text-2xl font-bold leading-none">
+              {currentMetricData.prefix || prefix}{formattedValue}
+            </span>
+            <span className={`text-sm -translate-y-[1px] px-2 py-0.5 rounded ${
+              isPositive 
+                ? 'text-green-600 bg-green-100/50 border border-green-600' 
+                : 'text-red-600 bg-red-100/50 border border-red-600'
+            } leading-none`}>
+              {isPositive ? '+' : ''}{changePercent}% 
+            </span>
+          </div>
+        </CardHeader>
+        <CardContent className="pb-4 mt-3">
+          <ChartContainer config={chartConfig}>
+            <AreaChart
+              data={currentMetricData.data}
+              height={300}
+              margin={{
+                top: 10,
+                right: 10,
+                bottom: 20,
+                left: leftMargin,
+              }}
+            >
+              <defs>
+                <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor={currentGradientColor} stopOpacity={0.1}/>
+                  <stop offset="100%" stopColor={currentGradientColor} stopOpacity={0.1}/>
+                </linearGradient>
+                <linearGradient id={`${gradientId}-previous`} x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor={chartConfig.previous.color} stopOpacity={0.05}/>
+                  <stop offset="100%" stopColor={chartConfig.previous.color} stopOpacity={0.05}/>
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} />
+              <XAxis
+                dataKey="date"
+                tickLine={false}
+                axisLine={false}
+                tickFormatter={(value) => value.slice(0, 3)}
+                tickMargin={8}
+              />
+              <YAxis
+                tickLine={false}
+                axisLine={false}
+                tickFormatter={(value) => `${Math.round(value).toLocaleString()}`}
+                tickMargin={8}
+                width={45}
+              />
+              <ChartTooltip content={<ChartTooltipContent />} />
+              {/* Conditionally render the areas based on activeMainSeries */}
+              {activeMainSeries.includes("previous") && (
+                <Area
+                  type="monotone"
+                  dataKey="previous"
+                  stroke={chartConfig.previous.color}
+                  strokeDasharray="4 4"
+                  fill={`url(#${gradientId}-previous)`}
+                  strokeWidth={2}
+                  dot={false}
+                />
+              )}
+              {activeMainSeries.includes("current") && (
+                <Area
+                  type="monotone"
+                  dataKey="current"
+                  stroke={currentGradientColor}
+                  fill={`url(#${gradientId})`}
+                  strokeWidth={2}
+                  dot={false}
+                />
+              )}
+              {/* Replace existing ChartLegend with updated version */}
+              <ChartLegend 
+                className="mt-6" 
+                content={() => (
+                  <div className="flex justify-center gap-3 pt-10 pb-0 mb-0">
+                    {Object.keys(chartConfig).map((key) => (
+                      <div
+                        key={key}
+                        onClick={() => {
+                          if (activeMainSeries.includes(key)) {
+                            setActiveMainSeries(activeMainSeries.filter(item => item !== key))
+                          } else {
+                            setActiveMainSeries([...activeMainSeries, key])
+                          }
+                        }}
+                        className={`cursor-pointer bg-[#f0f4fa] px-3 py-1.5 rounded-full border border-[#e5eaf3] flex items-center gap-2 ${
+                          activeMainSeries.includes(key) ? '' : 'opacity-50'
+                        }`}
+                      >
+                        <div style={{ backgroundColor: chartConfig[key].color }} className="w-2 h-2 rounded-full" />
+                        <span className="text-xs text-gray-500 font-medium">{chartConfig[key].label}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              />
+            </AreaChart>
+          </ChartContainer>
+          <div className="mt-3 pt-4 border-t border-gray-200">
+            <div className="flex justify-end">
+              <Button
+                variant="ghost"
+                className="text-blue-600 hover:text-blue-800 font-medium text-sm flex items-center gap-2"
+                onClick={() => setFullScreenTable(true)}
+              >
+                View Details
+                <ArrowRight className="w-4 h-4" />
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+      
+      <FullScreenDialog open={fullScreenTable} onOpenChange={setFullScreenTable}>
+        <DialogContent className="max-w-7xl min-h-fit max-h-[90vh]">
+          <DialogHeader className="pb-6">
+            <DialogTitle>{title}</DialogTitle>
+          </DialogHeader>
+          <div className="border rounded-lg bg-[#f0f4fa]/40 border-[#d0d7e3]">
+            <div className="overflow-y-auto max-h-[calc(90vh-120px)]">
+              <Table>
+                <TableHeader>
+                  <TableRow className="border-b border-[#d0d7e3] hover:bg-transparent">
+                    <TableHead className="bg-[#f0f4fa]/60 first:rounded-tl-lg text-left border-r border-[#d0d7e3]">
+                      Month
+                    </TableHead>
+                    <TableHead className="bg-[#f0f4fa]/60 text-left border-r border-[#d0d7e3]">
+                      Current Period
+                    </TableHead>
+                    <TableHead className="bg-[#f0f4fa]/60 text-left border-r border-[#d0d7e3]">
+                      Previous Period
+                    </TableHead>
+                    <TableHead className="bg-[#f0f4fa]/60 last:rounded-tr-lg text-left">
+                      Change
+                    </TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {currentMetricData.data.map((row, idx) => (
+                    <TableRow key={idx} className="border-b border-[#d0d7e3] last:border-0">
+                      <TableCell className="w-[25%] bg-[#f0f4fa]/40 border-r border-[#d0d7e3] text-left">
+                        {row.date}
+                      </TableCell>
+                      <TableCell className="w-[25%] text-left border-r border-[#d0d7e3]">
+                        {currentMetricData.prefix || prefix}{row.current.toLocaleString()}
+                      </TableCell>
+                      <TableCell className="w-[25%] text-left border-r border-[#d0d7e3]">
+                        {currentMetricData.prefix || prefix}{row.previous.toLocaleString()}
+                      </TableCell>
+                      <TableCell className={`w-[25%] text-left ${row.current > row.previous ? "text-emerald-500" : "text-red-500"}`}>
+                        {((row.current - row.previous) / row.previous * 100).toFixed(1)}%
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </div>
+        </DialogContent>
+      </FullScreenDialog>
+    </>
   )
 } 

@@ -3,7 +3,7 @@
 import * as React from "react"
 import { Area, AreaChart, ResponsiveContainer, XAxis } from "recharts"
 import { Card, CardHeader } from "@/components/ui/card"
-import { ChevronRight } from "lucide-react"
+import { ChevronRight, LucideIcon } from "lucide-react"
 import {
   ChartConfig,
   ChartContainer,
@@ -33,6 +33,7 @@ interface KpiWithSubtleChartProps {
   }[]
   categoryTimeSeriesData?: CategoryTimeSeriesData[]
   chartConfig?: ChartConfig
+  icon?: LucideIcon
 }
 
 export function KpiWithSubtleChart({ 
@@ -45,7 +46,8 @@ export function KpiWithSubtleChart({
   valueColor = "blue",
   distributionData,
   categoryTimeSeriesData,
-  chartConfig: categoryChartConfig
+  chartConfig: categoryChartConfig,
+  icon: Icon
 }: KpiWithSubtleChartProps) {
   const [showDetails, setShowDetails] = React.useState(false)
   const formattedValue = Math.round(currentValue).toLocaleString()
@@ -75,9 +77,14 @@ export function KpiWithSubtleChart({
         <CardHeader>
           <div className="flex justify-between items-start">
             <div className="flex flex-col space-y-3">
-              <p className="text-lg text-muted-foreground mb-2 text-gray-800">
+              <div className="flex items-center gap-2 text-lg text-muted-foreground mb-2 text-gray-800">
+                {Icon && (
+                  <div className="p-2 rounded-full bg-[#f5f8ff]">
+                    <Icon className="h-5 w-5 text-gray-500" />
+                  </div>
+                )}
                 {title}
-              </p>
+              </div>
               <div className="flex items-end gap-2">
                 <span className="text-2xl font-bold ">
                   {prefix}{formattedValue}{suffix}

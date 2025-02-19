@@ -9,25 +9,35 @@ import {
   ChartTooltip,
   ChartTooltipContent,
 } from "@/components/ui/chart"
+import { useState } from "react"
+import { Button } from "@/components/ui/button"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 
 interface ReservationsByDayChartProps {
   data: Array<{
     dayOfWeek: string
     bookingsCreated: number
+    prevBookingsCreated: number
     staysStarting: number
+    prevStaysStarting: number
   }>
   color?: 'green' | 'blue'
 }
 
-// Chart configuration with colors for each dataset
+// Updated chart configuration for current/previous period
 const chartConfig = {
-  bookingsCreated: {
-    label: "Bookings Created",
+  current: {
+    label: "Current Period",
     color: "hsl(221.2 83.2% 53.3%)",  // Blue
   },
-  staysStarting: {
-    label: "Stays Starting",
-    color: "#11b981",  // Updated Green
+  previous: {
+    label: "Previous Period",
+    color: "#93c5fd",  // Lighter Blue
   },
 } satisfies ChartConfig
 
@@ -54,28 +64,70 @@ const getLeftMargin = (data: Array<{ bookingsCreated: number; staysStarting: num
   return marginMap[numLength] || 42
 }
 
+function TriangleDown({ className }: { className?: string }) {
+  return (
+    <svg 
+      width="8" 
+      height="6" 
+      viewBox="0 0 8 6" 
+      fill="currentColor" 
+      className={className}
+    >
+      <path d="M4 6L0 0L8 0L4 6Z" />
+    </svg>
+  )
+}
+
 export function ReservationsByDayChart({ data, color = 'green' }: ReservationsByDayChartProps) {
+  const [dateType, setDateType] = useState<'book' | 'stay'>('book')
   const [activeSeries, setActiveSeries] = React.useState<string[]>([
-    'bookingsCreated',
-    'staysStarting'
+    'current',
+    'previous'
   ])
 
-  // Get color class from TopFive
-  const getColorClass = (type: 'bg') => {
-    return color === 'green' ? 'bg-emerald-500' : 'bg-blue-500'
-  }
+  // Get the appropriate data keys based on date type
+  const currentKey = dateType === 'book' ? 'bookingsCreated' : 'staysStarting'
+  const previousKey = dateType === 'book' ? 'prevBookingsCreated' : 'prevStaysStarting'
+
+  // Transform data for the selected date type
+  const chartData = data.map(item => ({
+    dayOfWeek: item.dayOfWeek,
+    current: item[currentKey],
+    previous: item[previousKey],
+  }))
 
   return (
     <Card className="border-gray-300">
       <CardHeader>
-        <CardTitle className="text-lg font-semibold text-gray-800">
-          Reservations by Day of Week
-        </CardTitle>
+        <div className="flex w-full justify-between items-center">
+          <CardTitle className="text-lg font-semibold text-gray-800">
+            Reservations by Day of Week
+          </CardTitle>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button 
+                variant="ghost" 
+                size="sm"
+                className="bg-[#f2f8ff] hover:bg-[#f2f8ff] text-[#342630] rounded-full px-4"
+              >
+                {dateType === 'book' ? 'Book Date' : 'Stay Date'} <TriangleDown className="ml-2" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent>
+              <DropdownMenuItem onClick={() => setDateType('book')}>
+                Book Date
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setDateType('stay')}>
+                Stay Date
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </CardHeader>
       <CardContent>
         <ChartContainer config={chartConfig}>
           <BarChart
-            data={data}
+            data={chartData}
             height={300}
             margin={{
               top: 10,
@@ -98,17 +150,17 @@ export function ReservationsByDayChart({ data, color = 'green' }: ReservationsBy
               tickMargin={8}
             />
             <ChartTooltip content={<ChartTooltipContent />} />
-            {activeSeries.includes('bookingsCreated') && (
+            {activeSeries.includes('current') && (
               <Bar
-                dataKey="bookingsCreated"
-                fill={chartConfig.bookingsCreated.color}
+                dataKey="current"
+                fill={chartConfig.current.color}
                 radius={[4, 4, 0, 0]}
               />
             )}
-            {activeSeries.includes('staysStarting') && (
+            {activeSeries.includes('previous') && (
               <Bar
-                dataKey="staysStarting"
-                fill={chartConfig.staysStarting.color}
+                dataKey="previous"
+                fill={chartConfig.previous.color}
                 radius={[4, 4, 0, 0]}
               />
             )}
