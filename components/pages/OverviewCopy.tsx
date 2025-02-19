@@ -28,6 +28,7 @@ import { KpiWithSubtleChart } from '../new/KpiWithSubtleChart'
 import { ChartConfig } from '@/components/ui/chart'
 import type { CategoryTimeSeriesData } from '@/components/new/DataDetailsDialog'
 import { ReservationsByDayChart } from '../new/ReservationsByDayChart'
+import { HorizontalBarChart } from '../new/HorizontalBarChart'
 
 // Dynamic import for WorldMap with loading state
 const WorldMap = dynamic(
@@ -1029,6 +1030,17 @@ const reservationsByDayData = [
   },
 ]
 
+// Add this constant with the other data constants at the top of the file
+const cancellationLeadTimeData = [
+  { range: "0-5 days", current: 45, previous: 52 },
+  { range: "6-10 days", current: 38, previous: 41 },
+  { range: "11-15 days", current: 32, previous: 35 },
+  { range: "16-20 days", current: 25, previous: 28 },
+  { range: "21-25 days", current: 18, previous: 20 },
+  { range: "26-30 days", current: 12, previous: 15 },
+  { range: ">30 days", current: 8, previous: 10 },
+]
+
 function TriangleDown({ className }: { className?: string }) {
   return (
     <svg 
@@ -1089,10 +1101,10 @@ export function OverviewCopy() {
                 </DropdownMenuTrigger>
                 <DropdownMenuContent className="w-56">
                   {/* Day Group */}
-                  <div className="px-2 py-2 text-sm font-semibold text-gray-600 bg-gray-50 border-b border-gray-200">
+                  <div className="px-2 py-2 text-sm font-semibold text-gray-800  border-b border-gray-300">
                     Day
                   </div>
-                  <div className="p-1">
+                  <div className="p-1 text-gray-600">
                     <DropdownMenuItem onSelect={() => { setSelectedTimeFrame("Day"); setSelectedViewType("Actual"); }}>
                       Actual
                     </DropdownMenuItem>
@@ -1105,10 +1117,10 @@ export function OverviewCopy() {
                   </div>
                   
                   {/* Month Group */}
-                  <div className="px-2 py-2 text-sm font-semibold text-gray-600 bg-gray-50 border-y border-gray-200">
+                  <div className="px-2 py-2 text-sm font-semibold text-gray-800  border-y border-gray-300">
                     Month
                   </div>
-                  <div className="p-1">
+                  <div className="p-1 text-gray-600">
                     <DropdownMenuItem onSelect={() => { setSelectedTimeFrame("Month"); setSelectedViewType("Actual"); }}>
                       Actual
                     </DropdownMenuItem>
@@ -1121,7 +1133,7 @@ export function OverviewCopy() {
                   </div>
                   
                   {/* Year Group */}
-                  <div className="px-2 py-2 text-sm font-semibold text-gray-600 bg-gray-50 border-y border-gray-200">
+                  <div className="px-2 py-2 text-sm font-semibold text-gray-800  border-y border-gray-300">
                     Year
                   </div>
                   <div className="p-1">
@@ -1552,6 +1564,15 @@ export function OverviewCopy() {
             ]}
             color="blue"
           />
+        </div>
+
+        {/* Horizontal Bar Chart */}
+        <div className="grid grid-cols-2 gap-8 mt-8">
+          <HorizontalBarChart 
+            title="Cancellation Lead Time Distribution"
+            data={cancellationLeadTimeData}
+          />
+          <div></div> {/* Empty div for the other half */}
         </div>
 
       </div>
