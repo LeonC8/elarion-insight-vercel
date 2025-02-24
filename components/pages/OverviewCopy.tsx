@@ -18,7 +18,7 @@ import {
   Hotel, 
   Building
 } from 'lucide-react'
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { DatePickerDemo as DatePicker } from "@/components/ui/date-picker"
 import dynamic from 'next/dynamic'
 import { TopFive } from '../new/TopFive'
@@ -29,6 +29,10 @@ import { ChartConfig } from '@/components/ui/chart'
 import type { CategoryTimeSeriesData } from '@/components/new/DataDetailsDialog'
 import { ReservationsByDayChart } from '../new/ReservationsByDayChart'
 import { HorizontalBarChart } from '../new/HorizontalBarChart'
+import { HotelSelector } from '../new/HotelSelector'
+import { HorizontalBarChartMultipleDatasets } from "../new/HorizontalBarChartMultipleDatasets"
+import { PieChartWithLabels } from "@/components/new/PieChartWithLabels"
+import { addDays } from "date-fns"
 
 // Dynamic import for WorldMap with loading state
 const WorldMap = dynamic(
@@ -756,7 +760,7 @@ const roomRevenueCategoryData = [
       standard: { current: 1734, previous: 1445 }
     }
   }
-]
+] satisfies CategoryTimeSeriesData[]
 
 // Add rooms sold distribution data
 const roomsSoldDistribution = [
@@ -1041,6 +1045,58 @@ const cancellationLeadTimeData = [
   { range: ">30 days", current: 8, previous: 10 },
 ]
 
+// Add these constants near the top where other data is defined
+const hotelsByRegion = {
+  "Europe": ["Hotel Paris", "Hotel London", "Hotel Berlin", "Hotel Madrid"],
+  "North America": ["Hotel New York", "Hotel Miami", "Hotel Toronto"],
+  "Asia": ["Hotel Tokyo", "Hotel Singapore", "Hotel Bangkok"]
+}
+
+const hotelsByBrand = {
+  "Luxury Collection": ["Hotel Paris", "Hotel New York", "Hotel Tokyo"],
+  "Premium Hotels": ["Hotel London", "Hotel Miami", "Hotel Singapore"],
+  "Boutique Series": ["Hotel Berlin", "Hotel Madrid", "Hotel Bangkok", "Hotel Toronto"]
+}
+
+// Add this constant with the other data constants
+const leadTimeData = [
+  { 
+    range: "0-7 days", 
+    current: 245,
+    previous: 220
+  },
+  { 
+    range: "8-14 days", 
+    current: 312,
+    previous: 280
+  },
+  { 
+    range: "15-30 days", 
+    current: 456,
+    previous: 410
+  },
+  { 
+    range: "31-60 days", 
+    current: 323,
+    previous: 290
+  },
+  { 
+    range: "61-90 days", 
+    current: 198,
+    previous: 175
+  },
+  { 
+    range: "91-180 days", 
+    current: 148,
+    previous: 125
+  },
+  { 
+    range: ">180 days", 
+    current: 87,
+    previous: 75
+  },
+]
+
 function TriangleDown({ className }: { className?: string }) {
   return (
     <svg 
@@ -1056,6 +1112,9 @@ function TriangleDown({ className }: { className?: string }) {
 }
 
 export function OverviewCopy() {
+  // Add date state
+  const [date, setDate] = useState<Date>(new Date())
+  
   // Basic state for hotel selection
   const [selectedHotels, setSelectedHotels] = useState<string[]>(["Hotel 1"])
   const [selectedTimeFrame, setSelectedTimeFrame] = useState("Month")
@@ -1075,6 +1134,53 @@ export function OverviewCopy() {
     setSelectedHotels(prev => 
       prev.length === allHotels.length ? [] : [...allHotels]
     )
+  }
+
+  const toggleRegion = (regionHotels: string[], e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    
+    const allSelected = regionHotels.every(hotel => selectedHotels.includes(hotel))
+    if (allSelected) {
+      setSelectedHotels(prev => prev.filter(h => !regionHotels.includes(h)))
+    } else {
+      setSelectedHotels(prev => [...new Set([...prev, ...regionHotels])])
+    }
+  }
+
+  const toggleBrand = (brandHotels: string[], e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    
+    const allSelected = brandHotels.every(hotel => selectedHotels.includes(hotel))
+    if (allSelected) {
+      setSelectedHotels(prev => prev.filter(h => !brandHotels.includes(h)))
+    } else {
+      setSelectedHotels(prev => [...new Set([...prev, ...brandHotels])])
+    }
+  }
+
+  // Prepare the datasets for the HorizontalBarChartMultipleDatasets
+  const barChartDatasets = [
+    {
+      key: "leadtime",
+      title: "Lead Time Distribution",
+      data: leadTimeData // Your existing leadTimeData
+    },
+    {
+      key: "cancellation",
+      title: "Cancellation Lead Time Distribution",
+      data: cancellationLeadTimeData // Your existing cancellationLeadTimeData
+    }
+  ]
+
+  // Add date change handler
+  const handleDateChange = (newDate: Date | undefined) => {
+    if (newDate) {
+      setDate(newDate)
+      // Here you can add any additional logic needed when the date changes
+      // For example, fetching new data for the selected date
+    }
   }
 
   return (
@@ -1183,42 +1289,19 @@ export function OverviewCopy() {
             {/* Date Picker with Label */}
             <div className="flex flex-col">
               <span className="text-xs text-gray-500 mb-2">Business date</span>
-              <DatePicker />
+              <DatePicker 
+                date={date} 
+                onDateChange={handleDateChange}
+              />
             </div>
 
             {/* Hotel Selector with Label */}
             <div className="flex flex-col">
               <span className="text-xs text-gray-500 mb-2">Property</span>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button 
-                    variant="ghost" 
-                    className="bg-[#f2f8ff] hover:bg-[#f2f8ff] text-[#342630] rounded-full px-4"
-                  >
-                    {selectedHotels.length === 1 ? selectedHotels[0] : `${selectedHotels.length} Hotels`} <TriangleDown className="ml-2" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent>
-                  <DropdownMenuItem onSelect={toggleAllHotels}>
-                    <div className="flex items-center">
-                      <div className={`mr-2 h-4 w-4 border rounded-sm flex items-center justify-center ${selectedHotels.length === allHotels.length ? 'bg-primary border-primary' : 'border-input'}`}>
-                        {selectedHotels.length === allHotels.length && <Check className="h-3 w-3 text-primary-foreground" />}
-                      </div>
-                      Select All
-                    </div>
-                  </DropdownMenuItem>
-                  {allHotels.map((hotel) => (
-                    <DropdownMenuItem key={hotel} onSelect={() => toggleHotel(hotel)}>
-                      <div className="flex items-center">
-                        <div className={`mr-2 h-4 w-4 border rounded-sm flex items-center justify-center ${selectedHotels.includes(hotel) ? 'bg-primary border-primary' : 'border-input'}`}>
-                          {selectedHotels.includes(hotel) && <Check className="h-3 w-3 text-primary-foreground" />}
-                        </div>
-                        {hotel}
-                      </div>  
-                    </DropdownMenuItem>
-                  ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
+              <HotelSelector 
+                selectedHotels={selectedHotels}
+                setSelectedHotels={setSelectedHotels}
+              />
             </div>
 
             {/* Export Button */}
@@ -1245,9 +1328,18 @@ export function OverviewCopy() {
             chartData={totalRevenueChartData}
             prefix="€"
             valueColor="blue"
-            distributionData={totalRevenueDistribution}
-            categoryTimeSeriesData={totalRevenueCategoryData}
+            
             icon={DollarSign}
+          />
+          <KpiWithSubtleChart
+            title="Rooms Sold"
+            currentValue={1850}
+            percentageChange={-3.4}
+            chartData={roomsSoldChartData}
+            valueColor="blue"
+            prefix=""
+            chartConfig={roomTypesChartConfig}
+            icon={Hotel}
           />
           <KpiWithSubtleChart
             title="ADR"
@@ -1255,7 +1347,7 @@ export function OverviewCopy() {
             percentageChange={10.8}
             chartData={adrChartData}
             prefix="€"
-            valueColor="blue"
+            valueColor="green"
             icon={DollarSign}
           />
           <KpiWithSubtleChart
@@ -1267,15 +1359,6 @@ export function OverviewCopy() {
             suffix="%"
             valueColor="green"
             icon={Percent}
-          />
-          <KpiWithSubtleChart
-            title="Rooms Sold"
-            currentValue={1850}
-            percentageChange={-3.4}
-            chartData={roomsSoldChartData}
-            valueColor="green"
-            chartConfig={roomTypesChartConfig}
-            icon={Hotel}
           />
         </div>
 
@@ -1322,6 +1405,43 @@ export function OverviewCopy() {
             color="blue"
             mainTimeSeriesData={trevparChartData}
           />
+        </div>
+
+        {/* Top Producers and Demographics */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mt-8">
+          <TopFive 
+            title="Top Producers Performance"
+            color="blue"
+            metrics={[
+              {
+                key: 'revenue',
+                label: 'Revenue',
+                prefix: '€',
+                data: [
+                  { name: "Booking.com", value: 125000, change: 16500 },
+                  { name: "Direct Website", value: 98000, change: 18000 },
+                  { name: "Corporate Partners", value: 85000, change: -7500 },
+                  { name: "Travel Agencies", value: 76000, change: 8000 },
+                  { name: "Expedia", value: 72000, change: -4000 },
+                ]
+              },
+              {
+                key: 'rooms',
+                label: 'Rooms Sold',
+                data: [
+                  { name: "Booking.com", value: 850, change: 110 },
+                  { name: "Direct Website", value: 720, change: 150 },
+                  { name: "Corporate Partners", value: 580, change: -50 },
+                  { name: "Travel Agencies", value: 510, change: 60 },
+                  { name: "Expedia", value: 490, change: -35 },
+                ]
+              }
+            ]}
+            distributionData={producersDistributionData}
+            categoryTimeSeriesData={producersTimeSeriesData}
+            chartConfig={producersChartConfig}
+          />
+          <PieChartWithLabels />
         </div>
 
         {/* World Map */}
@@ -1415,43 +1535,6 @@ export function OverviewCopy() {
               </div>
             </CardContent>
           </Card>
-        </div>
-
-        {/* Top Producers and Demographics */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mt-8">
-          <TopFive 
-            title="Top Producers Performance"
-            color="blue"
-            metrics={[
-              {
-                key: 'revenue',
-                label: 'Revenue',
-                prefix: '€',
-                data: [
-                  { name: "Booking.com", value: 125000, change: 16500 },
-                  { name: "Direct Website", value: 98000, change: 18000 },
-                  { name: "Corporate Partners", value: 85000, change: -7500 },
-                  { name: "Travel Agencies", value: 76000, change: 8000 },
-                  { name: "Expedia", value: 72000, change: -4000 },
-                ]
-              },
-              {
-                key: 'rooms',
-                label: 'Rooms Sold',
-                data: [
-                  { name: "Booking.com", value: 850, change: 110 },
-                  { name: "Direct Website", value: 720, change: 150 },
-                  { name: "Corporate Partners", value: 580, change: -50 },
-                  { name: "Travel Agencies", value: 510, change: 60 },
-                  { name: "Expedia", value: 490, change: -35 },
-                ]
-              }
-            ]}
-            distributionData={producersDistributionData}
-            categoryTimeSeriesData={producersTimeSeriesData}
-            chartConfig={producersChartConfig}
-          />
-          <ReservationsByDayChart data={reservationsByDayData} />
         </div>
 
         {/* Market Segments and Room Types */}
@@ -1551,7 +1634,7 @@ export function OverviewCopy() {
           />
           <KpiWithChart
             title="No-Show Rate"
-            currentValue={3}
+            initialValue={3}
             percentageChange={-40}
             chartData={noShowsChartData}
             metrics={[
@@ -1566,13 +1649,13 @@ export function OverviewCopy() {
           />
         </div>
 
-        {/* Horizontal Bar Chart */}
-        <div className="grid grid-cols-2 gap-8 mt-8">
-          <HorizontalBarChart 
-            title="Cancellation Lead Time Distribution"
-            data={cancellationLeadTimeData}
+        {/* Horizontal Bar Chart and Reservations by Day */}
+        <div className="grid gap-4 grid-cols-2 pt-8">
+          <HorizontalBarChartMultipleDatasets 
+            datasets={barChartDatasets}
+            defaultDataset="leadtime"
           />
-          <div></div> {/* Empty div for the other half */}
+          <ReservationsByDayChart data={reservationsByDayData} />
         </div>
 
       </div>

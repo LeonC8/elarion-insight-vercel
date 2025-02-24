@@ -16,29 +16,33 @@ import {
 interface DatePickerProps {
   date?: Date;
   onDateChange?: (date: Date | undefined) => void;
-  placeholder?: string;
 }
 
-export function DatePickerDemo({ date, onDateChange, placeholder = "Business Date" }: DatePickerProps) {
+export function DatePickerDemo({ date, onDateChange }: DatePickerProps) {
+  const [isOpen, setIsOpen] = React.useState(false)
+
   return (
-    <Popover>
+    <Popover open={isOpen} onOpenChange={setIsOpen}>
       <PopoverTrigger asChild>
         <Button
           variant="ghost"
           className={cn(
-            "bg-[#f2f8ff] hover:bg-[#f2f8ff] text-[#342630] rounded-full px-4 font-normal",
-            !date && "text-[#342630]"
+            "bg-[#f2f8ff] hover:bg-[#f2f8ff] text-[#342630] rounded-full px-4",
+            !date && "text-muted-foreground"
           )}
         >
           <CalendarIcon className="mr-2 h-4 w-4" />
-          {date ? format(date, "PPP") : <span>{placeholder}</span>}
+          {date ? format(date, "PPP") : <span>Pick a date</span>}
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-auto p-0" align="start">
         <Calendar
           mode="single"
           selected={date}
-          onSelect={onDateChange}
+          onSelect={(newDate) => {
+            onDateChange?.(newDate)
+            setIsOpen(false)
+          }}
           initialFocus
         />
       </PopoverContent>

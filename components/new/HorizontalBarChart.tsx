@@ -9,6 +9,17 @@ import {
   ChartTooltip,
   ChartTooltipContent,
 } from "@/components/ui/chart"
+import { Button } from "@/components/ui/button"
+import { ArrowRight } from 'lucide-react'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 
 interface HorizontalBarChartProps {
   data: Array<{
@@ -36,87 +47,151 @@ export function HorizontalBarChart({ data, title }: HorizontalBarChartProps) {
     'current',
     'previous'
   ])
+  const [fullScreenTable, setFullScreenTable] = React.useState(false)
 
   return (
-    <Card className="border-gray-300">
-      <CardHeader>
-        <CardTitle className="text-lg font-semibold text-gray-800">
-          {title}
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        <ChartContainer config={chartConfig}>
-          <BarChart
-            data={data}
-            layout="vertical"
-            height={300}
-            margin={{
-              top: 10,
-              right: 10,
-              bottom: 20,
-              left: -10,
-            }}
-          >
-            <CartesianGrid strokeDasharray="3 3" horizontal={false} />
-            <XAxis
-              type="number"
-              tickLine={false}
-              axisLine={false}
-              tickFormatter={(value) => `${Math.round(value).toLocaleString()}`}
-              tickMargin={8}
-            />
-            <YAxis
-              dataKey="range"
-              type="category"
-              tickLine={false}
-              axisLine={false}
-              tickMargin={8}
-            />
-            <ChartTooltip content={<ChartTooltipContent />} />
-            {activeSeries.includes('current') && (
-              <Bar
-                dataKey="current"
-                fill={chartConfig.current.color}
-                radius={[0, 4, 4, 0]}
-              />
-            )}
-            {activeSeries.includes('previous') && (
-              <Bar
-                dataKey="previous"
-                fill={chartConfig.previous.color}
-                radius={[0, 4, 4, 0]}
-              />
-            )}
-          </BarChart>
-        </ChartContainer>
-
-        {/* Clickable Legend */}
-        <div className="flex justify-center gap-3 mt-6">
-          {Object.entries(chartConfig).map(([key, config]) => (
-            <div
-              key={key}
-              onClick={() => {
-                if (activeSeries.includes(key)) {
-                  setActiveSeries(activeSeries.filter(item => item !== key))
-                } else {
-                  setActiveSeries([...activeSeries, key])
-                }
+    <>
+      <Card className="border-gray-300">
+        <CardHeader>
+          <CardTitle className="text-lg font-semibold text-gray-800">
+            {title}
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <ChartContainer config={chartConfig}>
+            <BarChart
+              data={data}
+              layout="vertical"
+              height={300}
+              margin={{
+                top: 10,
+                right: 10,
+                bottom: 20,
+                left: -10,
               }}
-              className={`cursor-pointer bg-[#f0f4fa] px-3 py-1.5 rounded-full border border-[#e5eaf3] flex items-center gap-2 ${
-                activeSeries.includes(key) ? '' : 'opacity-50'
-              }`}
             >
-              <div 
-                style={{ backgroundColor: config.color }} 
-                className="w-2 h-2 rounded-full" 
+              <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+              <XAxis
+                type="number"
+                tickLine={false}
+                axisLine={false}
+                tickFormatter={(value) => `${Math.round(value).toLocaleString()}`}
+                tickMargin={8}
               />
-              <span className="text-xs text-gray-500 font-medium">
-                {config.label}
-              </span>
+              <YAxis
+                dataKey="range"
+                type="category"
+                tickLine={false}
+                axisLine={false}
+                tickMargin={8}
+              />
+              <ChartTooltip content={<ChartTooltipContent />} />
+              {activeSeries.includes('current') && (
+                <Bar
+                  dataKey="current"
+                  fill={chartConfig.current.color}
+                  radius={[0, 4, 4, 0]}
+                />
+              )}
+              {activeSeries.includes('previous') && (
+                <Bar
+                  dataKey="previous"
+                  fill={chartConfig.previous.color}
+                  radius={[0, 4, 4, 0]}
+                />
+              )}
+            </BarChart>
+          </ChartContainer>
+
+          {/* Clickable Legend */}
+          <div className="flex justify-center gap-3 mt-6">
+            {Object.entries(chartConfig).map(([key, config]) => (
+              <div
+                key={key}
+                onClick={() => {
+                  if (activeSeries.includes(key)) {
+                    setActiveSeries(activeSeries.filter(item => item !== key))
+                  } else {
+                    setActiveSeries([...activeSeries, key])
+                  }
+                }}
+                className={`cursor-pointer bg-[#f0f4fa] px-3 py-1.5 rounded-full border border-[#e5eaf3] flex items-center gap-2 ${
+                  activeSeries.includes(key) ? '' : 'opacity-50'
+                }`}
+              >
+                <div 
+                  style={{ backgroundColor: config.color }} 
+                  className="w-2 h-2 rounded-full" 
+                />
+                <span className="text-xs text-gray-500 font-medium">
+                  {config.label}
+                </span>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-8 pt-4 border-t border-gray-200">
+            <div className="flex justify-end">
+              <Button
+                variant="ghost"
+                className="text-blue-600 hover:text-blue-800 font-medium text-sm flex items-center gap-2"
+                onClick={() => setFullScreenTable(true)}
+              >
+                View Details
+                <ArrowRight className="w-4 h-4" />
+              </Button>
             </div>
-          ))}
-        </div>
-      </CardContent>
-    </Card>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Dialog open={fullScreenTable} onOpenChange={setFullScreenTable}>
+        <DialogContent className="max-w-7xl min-h-fit max-h-[90vh]">
+          <DialogHeader className="pb-6">
+            <DialogTitle>{title}</DialogTitle>
+          </DialogHeader>
+          <div className="border rounded-lg bg-[#f0f4fa]/40 border-[#d0d7e3]">
+            <div className="overflow-y-auto max-h-[calc(90vh-120px)]">
+              <Table>
+                <TableHeader>
+                  <TableRow className="border-b border-[#d0d7e3] hover:bg-transparent">
+                    <TableHead className="bg-[#f0f4fa]/60 first:rounded-tl-lg text-left border-r border-[#d0d7e3]">
+                      Range
+                    </TableHead>
+                    <TableHead className="bg-[#f0f4fa]/60 text-left border-r border-[#d0d7e3]">
+                      Current Period
+                    </TableHead>
+                    <TableHead className="bg-[#f0f4fa]/60 text-left border-r border-[#d0d7e3]">
+                      Previous Period
+                    </TableHead>
+                    <TableHead className="bg-[#f0f4fa]/60 last:rounded-tr-lg text-left">
+                      Change
+                    </TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {data.map((row, idx) => (
+                    <TableRow key={idx} className="border-b border-[#d0d7e3] last:border-0">
+                      <TableCell className="w-[25%] bg-[#f0f4fa]/40 border-r border-[#d0d7e3] text-left">
+                        {row.range}
+                      </TableCell>
+                      <TableCell className="w-[25%] text-left border-r border-[#d0d7e3]">
+                        {row.current.toLocaleString()}
+                      </TableCell>
+                      <TableCell className="w-[25%] text-left border-r border-[#d0d7e3]">
+                        {row.previous.toLocaleString()}
+                      </TableCell>
+                      <TableCell className={`w-[25%] text-left ${row.current > row.previous ? "text-emerald-500" : "text-red-500"}`}>
+                        {((row.current - row.previous) / row.previous * 100).toFixed(1)}%
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
   )
 } 
