@@ -67,7 +67,7 @@ const DialogHeader = ({
   <div
     className={cn(
       "flex flex-col text-center sm:text-left",
-      showBorder && "border-b border-gray-300 shadow-md !pb-6",
+      showBorder && "!border-b !border-gray-300 !shadow-lg !pb-6",
       className
     )}
     {...props}

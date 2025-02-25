@@ -1643,7 +1643,7 @@ export function OverviewCopy() {
                 label: 'Number of No-Shows',
                 data: noShowsChartData,
                 prefix: ''
-              }
+              } 
             ]}
             color="blue"
           />
