@@ -156,7 +156,7 @@ export function KpiWithChart({
         <CardHeader>
           <div className="flex justify-between items-center">
             <CardTitle className="text-base mb-2 font-medium text-sm text-muted-foreground">
-              {title}
+              {currentMetricData.label}
             </CardTitle>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>

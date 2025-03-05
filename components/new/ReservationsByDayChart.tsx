@@ -37,6 +37,10 @@ interface ReservationsByDayChartProps {
     prevStaysStarting: number
   }>
   color?: 'green' | 'blue'
+  categories?: Array<{
+    key: string
+    label: string
+  }>
 }
 
 // Updated chart configuration for current/previous period
@@ -88,13 +92,16 @@ function TriangleDown({ className }: { className?: string }) {
   )
 }
 
-export function ReservationsByDayChart({ data, color = 'green' }: ReservationsByDayChartProps) {
+export function ReservationsByDayChart({ data, color = 'green', categories }: ReservationsByDayChartProps) {
   const [dateType, setDateType] = useState<'book' | 'stay'>('book')
   const [activeSeries, setActiveSeries] = React.useState<string[]>([
     'current',
     'previous'
   ])
   const [fullScreenTable, setFullScreenTable] = React.useState(false)
+  const [selectedCategory, setSelectedCategory] = React.useState<string>(
+    categories && categories.length > 0 ? categories[0].key : ''
+  )
 
   // Get the appropriate data keys based on date type
   const currentKey = dateType === 'book' ? 'bookingsCreated' : 'staysStarting'
@@ -115,25 +122,51 @@ export function ReservationsByDayChart({ data, color = 'green' }: ReservationsBy
             <CardTitle className="text-lg font-semibold text-gray-800">
               Reservations by Day of Week
             </CardTitle>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button 
-                  variant="ghost" 
-                  size="sm"
-                  className="bg-[#f2f8ff] hover:bg-[#f2f8ff] text-[#342630] rounded-full px-4"
-                >
-                  {dateType === 'book' ? 'Book Date' : 'Stay Date'} <TriangleDown className="ml-2" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent>
-                <DropdownMenuItem onClick={() => setDateType('book')}>
-                  Book Date
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setDateType('stay')}>
-                  Stay Date
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <div className="flex space-x-2">
+              {categories && categories.length > 0 && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button 
+                      variant="ghost" 
+                      size="sm"
+                      className="bg-[#f2f8ff] hover:bg-[#f2f8ff] text-[#342630] rounded-full px-4"
+                    >
+                      {categories.find(c => c.key === selectedCategory)?.label || categories[0].label} <TriangleDown className="ml-2" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent>
+                    {categories.map(category => (
+                      <DropdownMenuItem 
+                        key={category.key} 
+                        onClick={() => setSelectedCategory(category.key)}
+                      >
+                        {category.label}
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
+              
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button 
+                    variant="ghost" 
+                    size="sm"
+                    className="bg-[#f2f8ff] hover:bg-[#f2f8ff] text-[#342630] rounded-full px-4"
+                  >
+                    {dateType === 'book' ? 'Book Date' : 'Stay Date'} <TriangleDown className="ml-2" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent>
+                  <DropdownMenuItem onClick={() => setDateType('book')}>
+                    Book Date
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setDateType('stay')}>
+                    Stay Date
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           </div>
         </CardHeader>
         <CardContent>

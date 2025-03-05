@@ -3,7 +3,7 @@
 import * as React from "react"
 import { Card, CardHeader, CardTitle } from "@/components/ui/card"
 import { ChevronRight } from "lucide-react"
-import { DataDetailsDialog } from "./DataDetailsDialog"
+import { MainTimeSeriesDialog } from "./dialogs/MainTimeSeriesDialog"
 
 interface KpiProps {
   title: string
@@ -12,21 +12,6 @@ interface KpiProps {
   prefix?: string
   suffix?: string
   color?: 'green' | 'blue'
-  distributionData?: Array<{
-    name: string
-    value: number
-    percentage: number
-    fill: string
-  }>
-  categoryTimeSeriesData?: Array<{
-    date: string
-    categories: {
-      [key: string]: {
-        current: number
-        previous: number
-      }
-    }
-  }>
   mainTimeSeriesData?: Array<{
     date: string
     current: number
@@ -41,8 +26,6 @@ export function Kpi({
   prefix = "€",
   suffix,
   color = 'green',
-  distributionData,
-  categoryTimeSeriesData,
   mainTimeSeriesData
 }: KpiProps) {
   const [showDetails, setShowDetails] = React.useState(false)
@@ -79,16 +62,18 @@ export function Kpi({
           </div>
         </CardHeader>
       </Card>
-      <DataDetailsDialog 
-        open={showDetails}
-        onOpenChange={setShowDetails}
-        title={title}
-        currentValue={currentValue}
-        prefix={prefix}
-        distributionData={distributionData}
-        categoryTimeSeriesData={categoryTimeSeriesData}
-        mainTimeSeriesData={mainTimeSeriesData}
-      />
+      
+      {mainTimeSeriesData && (
+        <MainTimeSeriesDialog 
+          open={showDetails}
+          onOpenChange={setShowDetails}
+          title={title}
+          currentValue={currentValue}
+          prefix={prefix}
+          suffix={suffix}
+          mainTimeSeriesData={mainTimeSeriesData}
+        />
+      )}
     </>
   )
 } 

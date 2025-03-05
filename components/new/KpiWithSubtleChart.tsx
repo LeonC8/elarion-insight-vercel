@@ -10,8 +10,7 @@ import {
   ChartTooltip,
   ChartTooltipContent,
 } from "@/components/ui/chart"
-import { DataDetailsDialog } from "./DataDetailsDialog"
-import type { CategoryTimeSeriesData } from '@/components/new/DataDetailsDialog'
+import { MainTimeSeriesDialog } from "./dialogs/MainTimeSeriesDialog"
 
 interface KpiWithSubtleChartProps {
   title: string
@@ -25,14 +24,6 @@ interface KpiWithSubtleChartProps {
   prefix?: string
   suffix?: string
   valueColor?: "blue" | "green" | "red"
-  distributionData?: {
-    name: string
-    value: number
-    percentage: number
-    fill: string
-  }[]
-  categoryTimeSeriesData?: CategoryTimeSeriesData[]
-  chartConfig?: ChartConfig
   icon?: LucideIcon
 }
 
@@ -44,9 +35,6 @@ export function KpiWithSubtleChart({
   prefix = "€",
   suffix,
   valueColor = "blue",
-  distributionData,
-  categoryTimeSeriesData,
-  chartConfig: categoryChartConfig,
   icon: Icon
 }: KpiWithSubtleChartProps) {
   const [showDetails, setShowDetails] = React.useState(false)
@@ -165,17 +153,15 @@ export function KpiWithSubtleChart({
           </ChartContainer>
         </div>
       </Card>
-      <DataDetailsDialog 
+      
+      <MainTimeSeriesDialog 
         open={showDetails}
         onOpenChange={setShowDetails}
         title={title}
         currentValue={currentValue}
         prefix={prefix}
         suffix={suffix}
-        distributionData={distributionData}
-        categoryTimeSeriesData={categoryTimeSeriesData}
         mainTimeSeriesData={chartData}
-        chartConfig={categoryChartConfig}
       />
     </>
   )

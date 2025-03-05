@@ -52,25 +52,25 @@ const WorldMap = dynamic(
   }
 )
 
-const BOOKING_CHANNELS = {
-  direct: {
-    label: "Direct Bookings",
+const ROOM_TYPES = {
+  standard: {
+    label: "Standard Room",
     color: "#18b0cc"
   },
-  booking_com: {
-    label: "Booking.com",
+  deluxe: {
+    label: "Deluxe Room", 
     color: "#1eb09a"
   },
-  expedia: {
-    label: "Expedia",
+  suite: {
+    label: "Suite",
     color: "#3b56de"
   },
-  gds: {
-    label: "GDS",
+  family: {
+    label: "Family Room",
     color: "#713ddd"
   },
-  wholesalers: {
-    label: "Wholesalers",
+  executive: {
+    label: "Executive Room",
     color: "#22a74f"
   }
 } as const;
@@ -92,35 +92,35 @@ const countryData = [
 
 // Add country distribution data for each booking channel
 const countryDistributionByChannel = {
-  direct: [
+  standard: [
     { name: "United States", value: 95000, percentage: 32.5, fill: "hsl(246, 60%, 60%)" },
     { name: "United Kingdom", value: 75000, percentage: 25.5, fill: "hsl(180, 75%, 35%)" },
     { name: "Germany", value: 48000, percentage: 16.0, fill: "hsl(322, 65%, 55%)" },
     { name: "France", value: 42000, percentage: 14.0, fill: "hsl(15, 75%, 50%)" },
     { name: "Spain", value: 35000, percentage: 12.0, fill: "hsl(45, 90%, 45%)" },
   ],
-  booking_com: [
+  deluxe: [
     { name: "United States", value: 85000, percentage: 29.0, fill: "hsl(246, 60%, 60%)" },
     { name: "United Kingdom", value: 65000, percentage: 22.5, fill: "hsl(180, 75%, 35%)" },
     { name: "Germany", value: 58000, percentage: 20.0, fill: "hsl(322, 65%, 55%)" },
     { name: "France", value: 45000, percentage: 15.5, fill: "hsl(15, 75%, 50%)" },
     { name: "Spain", value: 38000, percentage: 13.0, fill: "hsl(45, 90%, 45%)" },
   ],
-  expedia: [
+  suite: [
     { name: "United States", value: 75000, percentage: 35.0, fill: "hsl(246, 60%, 60%)" },
     { name: "United Kingdom", value: 42000, percentage: 19.5, fill: "hsl(180, 75%, 35%)" },
     { name: "Germany", value: 38000, percentage: 17.5, fill: "hsl(322, 65%, 55%)" },
     { name: "France", value: 32000, percentage: 15.0, fill: "hsl(15, 75%, 50%)" },
     { name: "Spain", value: 28000, percentage: 13.0, fill: "hsl(45, 90%, 45%)" },
   ],
-  gds: [
+  family: [
     { name: "United States", value: 55000, percentage: 30.0, fill: "hsl(246, 60%, 60%)" },
     { name: "United Kingdom", value: 38000, percentage: 21.0, fill: "hsl(180, 75%, 35%)" },
     { name: "Germany", value: 35000, percentage: 19.0, fill: "hsl(322, 65%, 55%)" },
     { name: "France", value: 30000, percentage: 16.0, fill: "hsl(15, 75%, 50%)" },
     { name: "Spain", value: 25000, percentage: 14.0, fill: "hsl(45, 90%, 45%)" },
   ],
-  wholesalers: [
+  executive: [
     { name: "United States", value: 45000, percentage: 28.0, fill: "hsl(246, 60%, 60%)" },
     { name: "United Kingdom", value: 35000, percentage: 22.0, fill: "hsl(180, 75%, 35%)" },
     { name: "Germany", value: 32000, percentage: 20.0, fill: "hsl(322, 65%, 55%)" },
@@ -131,7 +131,7 @@ const countryDistributionByChannel = {
 
 // Add country time series data for each booking channel
 const countryTimeSeriesByChannel = {
-  direct: [
+  standard: [
     { 
       date: "January",
       categories: {
@@ -164,7 +164,7 @@ const countryTimeSeriesByChannel = {
       }
     }
   ],
-  booking_com: [
+  deluxe: [
     // Similar structure for booking.com
     { 
       date: "January",
@@ -189,7 +189,7 @@ const countryTimeSeriesByChannel = {
     }
   ],
   // Add similar data for expedia, gds, and wholesalers
-  expedia: [
+  suite: [
     { 
       date: "January",
       categories: {
@@ -212,7 +212,7 @@ const countryTimeSeriesByChannel = {
       }
     }
   ],
-  gds: [
+  family: [
     { 
       date: "January",
       categories: {
@@ -235,7 +235,7 @@ const countryTimeSeriesByChannel = {
       }
     }
   ],
-  wholesalers: [
+  executive: [
     { 
       date: "January",
       categories: {
@@ -262,7 +262,7 @@ const countryTimeSeriesByChannel = {
 
 // Add metrics by channel
 const countryMetricsByChannel = {
-  direct: [
+  standard: [
     {
       key: 'revenue',
       label: 'Revenue',
@@ -287,7 +287,7 @@ const countryMetricsByChannel = {
       ]
     }
   ],
-  booking_com: [
+  deluxe: [
     // Similar structure for other channels
     {
       key: 'revenue',
@@ -313,7 +313,7 @@ const countryMetricsByChannel = {
       ]
     }
   ],
-  expedia: [
+  suite: [
     {
       key: 'revenue',
       label: 'Revenue',
@@ -338,7 +338,7 @@ const countryMetricsByChannel = {
       ]
     }
   ],
-  gds: [
+  family: [
     {
       key: 'revenue',
       label: 'Revenue',
@@ -363,7 +363,7 @@ const countryMetricsByChannel = {
       ]
     }
   ],
-  wholesalers: [  
+  executive: [  
     {
       key: 'revenue',
       label: 'Revenue',
@@ -430,7 +430,7 @@ function TriangleDown({ className }: { className?: string }) {
 
 // Add this data near the top where other data is defined
 const lengthOfStayByChannelData = {
-  direct: [
+  standard: [
     { range: "1 night", current: 210, previous: 185 },
     { range: "2 nights", current: 345, previous: 310 },
     { range: "3 nights", current: 420, previous: 380 },
@@ -439,7 +439,7 @@ const lengthOfStayByChannelData = {
     { range: "6 nights", current: 95, previous: 80 },
     { range: "7+ nights", current: 120, previous: 105 }
   ],
-  booking_com: [
+  deluxe: [
     { range: "1 night", current: 230, previous: 205 },
     { range: "2 nights", current: 360, previous: 325 },
     { range: "3 nights", current: 395, previous: 355 },
@@ -448,7 +448,7 @@ const lengthOfStayByChannelData = {
     { range: "6 nights", current: 85, previous: 70 },
     { range: "7+ nights", current: 105, previous: 90 }
   ],
-  expedia: [
+  suite: [
     { range: "1 night", current: 245, previous: 220 },
     { range: "2 nights", current: 375, previous: 340 },
     { range: "3 nights", current: 380, previous: 340 },
@@ -457,7 +457,7 @@ const lengthOfStayByChannelData = {
     { range: "6 nights", current: 75, previous: 60 },
     { range: "7+ nights", current: 90, previous: 75 }
   ],
-  gds: [
+  family: [
     { range: "1 night", current: 190, previous: 165 },
     { range: "2 nights", current: 320, previous: 285 },
     { range: "3 nights", current: 450, previous: 410 },
@@ -466,7 +466,7 @@ const lengthOfStayByChannelData = {
     { range: "6 nights", current: 115, previous: 100 },
     { range: "7+ nights", current: 140, previous: 125 }
   ],
-  wholesalers: [
+  executive: [
     { range: "1 night", current: 180, previous: 155 },
     { range: "2 nights", current: 325, previous: 290 },
     { range: "3 nights", current: 435, previous: 395 },
@@ -479,7 +479,7 @@ const lengthOfStayByChannelData = {
 
 // Add lead time data by channel
 const leadTimeByChannelData = {
-  direct: [
+  standard: [
     { range: "0-7 days", current: 245, previous: 220 },
     { range: "8-14 days", current: 312, previous: 280 },
     { range: "15-30 days", current: 456, previous: 410 },
@@ -488,7 +488,7 @@ const leadTimeByChannelData = {
     { range: "91-180 days", current: 148, previous: 125 },
     { range: ">180 days", current: 87, previous: 75 }
   ],
-  booking_com: [
+  deluxe: [
     { range: "0-7 days", current: 265, previous: 240 },
     { range: "8-14 days", current: 332, previous: 300 },
     { range: "15-30 days", current: 436, previous: 390 },
@@ -497,7 +497,7 @@ const leadTimeByChannelData = {
     { range: "91-180 days", current: 128, previous: 105 },
     { range: ">180 days", current: 67, previous: 55 }
   ],
-  expedia: [
+  suite: [
     { range: "0-7 days", current: 275, previous: 250 },
     { range: "8-14 days", current: 342, previous: 310 },
     { range: "15-30 days", current: 426, previous: 380 },
@@ -506,7 +506,7 @@ const leadTimeByChannelData = {
     { range: "91-180 days", current: 118, previous: 95 },
     { range: ">180 days", current: 57, previous: 45 }
   ],
-  gds: [
+  family: [
     { range: "0-7 days", current: 225, previous: 200 },
     { range: "8-14 days", current: 292, previous: 260 },
     { range: "15-30 days", current: 476, previous: 430 },
@@ -515,7 +515,7 @@ const leadTimeByChannelData = {
     { range: "91-180 days", current: 168, previous: 145 },
     { range: ">180 days", current: 107, previous: 95 }
   ],
-  wholesalers: [
+  executive: [
     { range: "0-7 days", current: 215, previous: 190 },
     { range: "8-14 days", current: 282, previous: 250 },
     { range: "15-30 days", current: 466, previous: 420 },
@@ -528,7 +528,7 @@ const leadTimeByChannelData = {
 
 // Add cancellation lead time data by channel near the other data definitions
 const cancellationLeadTimeByChannelData = {
-  direct: [
+  standard: [
     { range: "0-5 days", current: 45, previous: 52 },
     { range: "6-10 days", current: 38, previous: 41 },
     { range: "11-15 days", current: 32, previous: 35 },
@@ -537,7 +537,7 @@ const cancellationLeadTimeByChannelData = {
     { range: "26-30 days", current: 12, previous: 15 },
     { range: ">30 days", current: 8, previous: 10 }
   ],
-  booking_com: [
+  deluxe: [
     { range: "0-5 days", current: 50, previous: 57 },
     { range: "6-10 days", current: 42, previous: 45 },
     { range: "11-15 days", current: 36, previous: 39 },
@@ -546,7 +546,7 @@ const cancellationLeadTimeByChannelData = {
     { range: "26-30 days", current: 15, previous: 18 },
     { range: ">30 days", current: 10, previous: 12 }
   ],
-  expedia: [
+  suite: [
     { range: "0-5 days", current: 52, previous: 59 },
     { range: "6-10 days", current: 45, previous: 48 },
     { range: "11-15 days", current: 38, previous: 41 },
@@ -555,7 +555,7 @@ const cancellationLeadTimeByChannelData = {
     { range: "26-30 days", current: 16, previous: 19 },
     { range: ">30 days", current: 11, previous: 13 }
   ],
-  gds: [
+  family: [
     { range: "0-5 days", current: 40, previous: 47 },
     { range: "6-10 days", current: 35, previous: 38 },
     { range: "11-15 days", current: 29, previous: 32 },
@@ -564,7 +564,7 @@ const cancellationLeadTimeByChannelData = {
     { range: "26-30 days", current: 9, previous: 12 },
     { range: ">30 days", current: 6, previous: 8 }
   ],
-  wholesalers: [
+  executive: [
     { range: "0-5 days", current: 38, previous: 45 },
     { range: "6-10 days", current: 32, previous: 35 },
     { range: "11-15 days", current: 27, previous: 30 },
@@ -628,7 +628,7 @@ const reservationsByDayData = [
   },
 ]
 
-export function BookingChannelsCopy() {
+export function RoomTypesCopy() {
   // Add date state
   const [date, setDate] = useState<Date>(new Date())
   
@@ -688,11 +688,11 @@ export function BookingChannelsCopy() {
 
   // Add sample data for the TopFiveMultiple component
   const bookingChannelCategories = [
-    { key: 'direct', label: 'Direct Bookings' },
-    { key: 'booking_com', label: 'Booking.com' },
-    { key: 'expedia', label: 'Expedia' },
-    { key: 'gds', label: 'GDS' },
-    { key: 'wholesalers', label: 'Wholesalers' },
+    { key: 'standard', label: 'Standard Room' },
+    { key: 'deluxe', label: 'Deluxe Room' },
+    { key: 'suite', label: 'Suite' },
+    { key: 'family', label: 'Family Room' },
+    { key: 'executive', label: 'Executive Room' },
   ]
 
   // Sample metrics for producers by booking channel
@@ -765,7 +765,7 @@ export function BookingChannelsCopy() {
   ]
 
   // Add new state for selected booking channel
-  const [selectedBookingChannel, setSelectedBookingChannel] = useState<keyof typeof BOOKING_CHANNELS>('direct');
+  const [selectedRoomType, setSelectedRoomType] = useState<keyof typeof ROOM_TYPES>('standard');
 
   return (
     <div className="flex-1 overflow-auto bg-[#f5f8ff]">
@@ -904,9 +904,10 @@ export function BookingChannelsCopy() {
           {/* Add the existing CategoriesDetailContent component */}
           <div className="mb-8">
             <CategoriesDetailContent
-              title="Booking Channels Analysis"
-              categories={BOOKING_CHANNELS}
+              title="Room Types Analysis"
+              categories={ROOM_TYPES}
               prefix="€"
+              apiUrl="/api/room-types/categories-detail"
             />
           </div>
           
@@ -914,7 +915,7 @@ export function BookingChannelsCopy() {
           <div className="mb-8 grid grid-cols-2 gap-6">
             <TopFive 
               title="Top Producers"
-              subtitle="by Booking Channel"
+              subtitle="by Room Type"
               color="blue"
               categories={bookingChannelCategories}
               metrics={producerMetrics}
@@ -929,18 +930,18 @@ export function BookingChannelsCopy() {
                   {
                     key: "lengthOfStay",
                     title: "Length of Stay",
-                    data: lengthOfStayByChannelData[selectedBookingChannel]
+                    data: lengthOfStayByChannelData[selectedRoomType]
                   }
                 ]}
                 defaultDataset="lengthOfStay"
                 categories={[
-                  { key: "direct", label: "Direct Bookings" },
-                  { key: "booking_com", label: "Booking.com" },
-                  { key: "expedia", label: "Expedia" },
-                  { key: "gds", label: "GDS" },
-                  { key: "wholesalers", label: "Wholesalers" }
+                  { key: "standard", label: "Standard Room" },
+                  { key: "deluxe", label: "Deluxe Room" },
+                  { key: "suite", label: "Suite" },
+                  { key: "family", label: "Family Room" },
+                  { key: "executive", label: "Executive Room" }
                 ]}
-                defaultCategory={selectedBookingChannel}
+                defaultCategory={selectedRoomType}
               />
             </div>
           </div>
@@ -951,7 +952,7 @@ export function BookingChannelsCopy() {
               <CardHeader className="flex flex-col items-start">
                 <div className="flex w-full justify-between items-center">
                   <div>
-                    <CardTitle className="text-lg font-semibold text-gray-800 mb-3">Global Distribution by Booking Channel</CardTitle>
+                    <CardTitle className="text-lg font-semibold text-gray-800 mb-3">Global Distribution by Room Type</CardTitle>
                   </div>
                 </div>
               </CardHeader>
@@ -985,16 +986,16 @@ export function BookingChannelsCopy() {
                     </div>
                   </div>
 
-                  {/* TopFiveMultiple by Booking Channel Side */}
+                  {/* TopFiveMultiple by Room Type Side */}
                   <div className="border-l border-gray-100 pl-8">
                     <TopFive 
                       title="Top Countries Performance"
                       color="blue"
                       withBorder={false}
                       categories={bookingChannelCategories}
-                      metrics={countryMetricsByChannel[selectedBookingChannel]}
-                      distributionData={countryDistributionByChannel[selectedBookingChannel]}
-                      categoryTimeSeriesData={countryTimeSeriesByChannel[selectedBookingChannel]}
+                      metrics={countryMetricsByChannel[selectedRoomType]}
+                      distributionData={countryDistributionByChannel[selectedRoomType]}
+                      categoryTimeSeriesData={countryTimeSeriesByChannel[selectedRoomType]}
                     />
                   </div>
                 </div>
@@ -1011,34 +1012,34 @@ export function BookingChannelsCopy() {
                 {
                   key: "cancellation",
                   title: "Cancellation Lead Time",
-                  data: cancellationLeadTimeByChannelData[selectedBookingChannel]
+                  data: cancellationLeadTimeByChannelData[selectedRoomType]
                 },
                 {
                   key: "leadTime",
                   title: "Lead Time",
-                  data: leadTimeByChannelData[selectedBookingChannel]
+                  data: leadTimeByChannelData[selectedRoomType]
                 }
               ]}
               defaultDataset="cancellation"
               categories={[
-                { key: "direct", label: "Direct Bookings" },
-                { key: "booking_com", label: "Booking.com" },
-                { key: "expedia", label: "Expedia" },
-                { key: "gds", label: "GDS" },
-                { key: "wholesalers", label: "Wholesalers" }
+                { key: "standard", label: "Standard Room" },
+                { key: "deluxe", label: "Deluxe Room" },
+                { key: "suite", label: "Suite" },
+                { key: "family", label: "Family Room" },
+                { key: "executive", label: "Executive Room" }
               ]}
-              defaultCategory={selectedBookingChannel}
+              defaultCategory={selectedRoomType}
             />
           </div>
           <ReservationsByDayChart 
             data={reservationsByDayData} 
             color="blue"
             categories={[
-              { key: "direct", label: "Direct Bookings" },
-              { key: "booking_com", label: "Booking.com" },
-              { key: "expedia", label: "Expedia" },
-              { key: "gds", label: "GDS" },
-              { key: "wholesalers", label: "Wholesalers" }
+              { key: "standard", label: "Standard Room" },
+              { key: "deluxe", label: "Deluxe Room" },
+              { key: "suite", label: "Suite" },
+              { key: "family", label: "Family Room" },
+              { key: "executive", label: "Executive Room" }
             ]}
           />
         </div>

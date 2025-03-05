@@ -125,7 +125,7 @@ export function HotelSelector({ selectedHotels, setSelectedHotels }: HotelSelect
           <DialogTitle className="text-lg font-semibold text-gray-800">Select Hotels</DialogTitle>
         </DialogHeader>
         
-        <div className="flex items-center space-x-4 mb-2">
+        <div className="flex items-center space-x-4 mb-2 py-3">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button 

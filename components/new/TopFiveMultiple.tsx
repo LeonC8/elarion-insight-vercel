@@ -31,13 +31,13 @@ interface CategoryOption {
   key: string
 }
 
-interface TopFiveProps {
+interface TopFiveMultipleProps {
   title: string
   subtitle?: string // New optional subtitle prop
   metrics: MetricOption[]
-  categories?: CategoryOption[] // New optional prop for category options
+  categories: CategoryOption[] // New prop for category options
   defaultMetric?: string
-  defaultCategory?: string // New optional default category prop
+  defaultCategory?: string // New default category prop
   color?: 'green' | 'blue'
   withBorder?: boolean
   distributionData?: Array<{
@@ -81,23 +81,23 @@ function TriangleDown({ className }: { className?: string }) {
   )
 }
 
-export function TopFive({ 
+export function TopFiveMultiple({ 
   title, 
   subtitle,
   metrics,
   categories,
   defaultMetric = metrics[0]?.key,
-  defaultCategory,
+  defaultCategory = categories[0]?.key,
   color = 'green',
   withBorder = true,
   distributionData,
   categoryTimeSeriesData,
   chartConfig,
-}: TopFiveProps) {
+}: TopFiveMultipleProps) {
   const [showPercentage, setShowPercentage] = useState(false)
   const [filterType, setFilterType] = useState<FilterType>('top')
   const [selectedMetric, setSelectedMetric] = useState(defaultMetric)
-  const [selectedCategory, setSelectedCategory] = useState(defaultCategory || categories?.[0]?.key)
+  const [selectedCategory, setSelectedCategory] = useState(defaultCategory)
   const [showDetails, setShowDetails] = useState(false)
   
   // Get current metric data
@@ -146,8 +146,8 @@ export function TopFive({
     return color === 'green' ? 'bg-emerald-500' : 'bg-blue-500'
   }
 
-  // Get current category label if categories exist
-  const currentCategoryLabel = categories?.find(c => c.key === selectedCategory)?.label
+  // Get current category label
+  const currentCategoryLabel = categories.find(c => c.key === selectedCategory)?.label || categories[0].label
 
   return (
     <>
@@ -161,30 +161,27 @@ export function TopFive({
           
           {/* Controls bundled at top right */}
           <div className="flex items-center space-x-2 mt-0">
-            {/* Only render the category dropdown if categories are provided */}
-            {categories && categories.length > 0 && (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button 
-                    variant="ghost" 
-                    size="sm"
-                    className="bg-[#f2f8ff] hover:bg-[#f2f8ff] text-[#342630] rounded-full px-4 font-semibold"
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button 
+                  variant="ghost" 
+                  size="sm"
+                  className="bg-[#f2f8ff] hover:bg-[#f2f8ff] text-[#342630] rounded-full px-4 font-semibold"
+                >
+                  {currentCategoryLabel} <TriangleDown className="ml-2" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent>
+                {categories.map(category => (
+                  <DropdownMenuItem 
+                    key={category.key}
+                    onClick={() => setSelectedCategory(category.key)}
                   >
-                    {currentCategoryLabel} <TriangleDown className="ml-2" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent>
-                  {categories.map(category => (
-                    <DropdownMenuItem 
-                      key={category.key}
-                      onClick={() => setSelectedCategory(category.key)}
-                    >
-                      {category.label}
-                    </DropdownMenuItem>
-                  ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
-            )}
+                    {category.label}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
             
             <Button
               variant="ghost"
@@ -304,7 +301,7 @@ export function TopFive({
       <CategoriesDetailsDialog 
         open={showDetails}
         onOpenChange={setShowDetails}
-        title={categories && selectedCategory ? `${title} - ${currentCategoryLabel}` : title}
+        title={`${title} - ${currentCategoryLabel}`}
         prefix={currentMetric.prefix || ''}
       />
     </>

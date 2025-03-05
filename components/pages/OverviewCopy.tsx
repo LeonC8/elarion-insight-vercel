@@ -26,7 +26,7 @@ import { KpiWithChart } from '../new/KpiWithChart'
 import { Kpi } from '../new/Kpi'
 import { KpiWithSubtleChart } from '../new/KpiWithSubtleChart'
 import { ChartConfig } from '@/components/ui/chart'
-import type { CategoryTimeSeriesData } from '@/components/new/DataDetailsDialog'
+import type { CategoryTimeSeriesData } from '@/components/new/CategoriesDetailsDialog'
 import { ReservationsByDayChart } from '../new/ReservationsByDayChart'
 import { HorizontalBarChart } from '../new/HorizontalBarChart'
 import { HotelSelector } from '../new/HotelSelector'
@@ -1097,6 +1097,130 @@ const leadTimeData = [
   },
 ]
 
+// Add this constant with the other data constants at the top of the file
+const lengthOfStayData = [
+  { 
+    range: "1 night", 
+    current: 210,
+    previous: 185
+  },
+  { 
+    range: "2 nights", 
+    current: 345,
+    previous: 310
+  },
+  { 
+    range: "3 nights", 
+    current: 420,
+    previous: 380
+  },
+  { 
+    range: "4 nights", 
+    current: 285,
+    previous: 250
+  },
+  { 
+    range: "5 nights", 
+    current: 175,
+    previous: 155
+  },
+  { 
+    range: "6 nights", 
+    current: 95,
+    previous: 80
+  },
+  { 
+    range: "7+ nights", 
+    current: 120,
+    previous: 105
+  },
+]
+
+// Add booking channels chart config with distinct colors
+const bookingChannelsChartConfig = {
+  direct: {
+    label: "Direct Booking",
+    color: "hsl(215, 85%, 50%)",      // Bright Blue
+  },
+  booking: {
+    label: "Booking.com",
+    color: "hsl(350, 75%, 55%)",      // Crimson Red
+  },
+  expedia: {
+    label: "Expedia",
+    color: "hsl(180, 70%, 45%)",      // Teal
+  },
+} satisfies ChartConfig
+
+// Add distribution data for booking channels
+const bookingChannelsDistributionData = [
+  { name: "Direct Booking", value: 165000, percentage: 31.2, fill: "hsl(215, 85%, 50%)" },
+  { name: "Booking.com", value: 142000, percentage: 26.8, fill: "hsl(350, 75%, 55%)" },
+  { name: "Expedia", value: 98000, percentage: 18.5, fill: "hsl(180, 70%, 45%)" },
+  { name: "Hotels.com", value: 76000, percentage: 14.4, fill: "hsl(120, 65%, 50%)" },
+  { name: "Airbnb", value: 48000, percentage: 9.1, fill: "hsl(45, 90%, 55%)" },
+]
+
+// Add time series data for booking channels
+const bookingChannelsTimeSeriesData = [
+  { 
+    date: "January",
+    categories: {
+      direct: { current: 165000, previous: 145000 },
+      booking: { current: 142000, previous: 125000 },
+      expedia: { current: 98000, previous: 85000 }
+    }
+  },
+  { 
+    date: "February",
+    categories: {
+      direct: { current: 167000, previous: 147000 },
+      booking: { current: 144000, previous: 127000 },
+      expedia: { current: 100000, previous: 87000 }
+    }
+  },
+  { 
+    date: "March",
+    categories: {
+      direct: { current: 163000, previous: 143000 },
+      booking: { current: 140000, previous: 123000 },
+      expedia: { current: 96000, previous: 83000 }
+    }
+  },
+  { 
+    date: "April",
+    categories: {
+      direct: { current: 166000, previous: 146000 },
+      booking: { current: 143000, previous: 126000 },
+      expedia: { current: 99000, previous: 86000 }
+    }
+  },
+  { 
+    date: "May",
+    categories: {
+      direct: { current: 169000, previous: 149000 },
+      booking: { current: 146000, previous: 129000 },
+      expedia: { current: 102000, previous: 89000 }
+    }
+  },
+  { 
+    date: "June",
+    categories: {
+      direct: { current: 172000, previous: 152000 },
+      booking: { current: 149000, previous: 132000 },
+      expedia: { current: 105000, previous: 92000 }
+    }
+  },
+  { 
+    date: "July",
+    categories: {
+      direct: { current: 165000, previous: 145000 },
+      booking: { current: 142000, previous: 125000 },
+      expedia: { current: 98000, previous: 85000 }
+    }
+  }
+]
+
 function TriangleDown({ className }: { className?: string }) {
   return (
     <svg 
@@ -1144,7 +1268,7 @@ export function OverviewCopy() {
     if (allSelected) {
       setSelectedHotels(prev => prev.filter(h => !regionHotels.includes(h)))
     } else {
-      setSelectedHotels(prev => [...new Set([...prev, ...regionHotels])])
+      setSelectedHotels(prev => [...Array.from(new Set([...prev, ...regionHotels]))])
     }
   }
 
@@ -1156,7 +1280,7 @@ export function OverviewCopy() {
     if (allSelected) {
       setSelectedHotels(prev => prev.filter(h => !brandHotels.includes(h)))
     } else {
-      setSelectedHotels(prev => [...new Set([...prev, ...brandHotels])])
+      setSelectedHotels(prev => [...Array.from(new Set([...prev, ...brandHotels]))])
     }
   }
 
@@ -1410,7 +1534,7 @@ export function OverviewCopy() {
         {/* Top Producers and Demographics */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mt-8">
           <TopFive 
-            title="Top Producers Performance"
+            title="Top Producers"
             color="blue"
             metrics={[
               {
@@ -1487,7 +1611,7 @@ export function OverviewCopy() {
                 {/* Top Five Countries Side */}
                 <div className="border-l border-gray-100 pl-8">
                   <TopFive 
-                    title="Top Countries Performance"
+                    title="Top Countries "
                     color="blue"
                     withBorder={false}
                     metrics={[
@@ -1538,9 +1662,9 @@ export function OverviewCopy() {
         </div>
 
         {/* Market Segments and Room Types */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mt-8">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-8">
           <TopFive 
-            title="Market Segments Performance"
+            title="Market Segments "
             color="blue"
             metrics={[
               {
@@ -1572,7 +1696,39 @@ export function OverviewCopy() {
             chartConfig={segmentsChartConfig}
           />
           <TopFive 
-            title="Room Types Performance"
+            title="Booking Channels"
+            color="purple"
+            metrics={[
+              {
+                key: 'revenue',
+                label: 'Revenue',
+                prefix: '€',
+                data: [
+                  { name: "Direct Booking", value: 165000, change: 20000 },
+                  { name: "Booking.com", value: 142000, change: 17000 },
+                  { name: "Expedia", value: 98000, change: -5000 },
+                  { name: "Hotels.com", value: 76000, change: 8500 },
+                  { name: "Airbnb", value: 48000, change: 6200 },
+                ]
+              },
+              {
+                key: 'rooms',
+                label: 'Rooms Sold',
+                data: [
+                  { name: "Direct Booking", value: 1100, change: 150 },
+                  { name: "Booking.com", value: 950, change: 120 },
+                  { name: "Expedia", value: 680, change: -40 },
+                  { name: "Hotels.com", value: 520, change: 60 },
+                  { name: "Airbnb", value: 320, change: 45 },
+                ]
+              }
+            ]}
+            distributionData={bookingChannelsDistributionData}
+            categoryTimeSeriesData={bookingChannelsTimeSeriesData}
+            chartConfig={bookingChannelsChartConfig}
+          />
+          <TopFive 
+            title="Room Types"
             color="green"
             metrics={[
               {
@@ -1608,15 +1764,21 @@ export function OverviewCopy() {
         {/* New KPIs - moved outside the previous grid */}
         <div className="grid grid-cols-2 gap-6 mt-8">
           <KpiWithChart
-            title="Cancellation Rate"
+            title="Booking Status"
             initialValue={12}
             initialPercentageChange={-40}
             chartData={cancellationsChartData}
             metrics={[
               {
                 key: 'cancellations',
-                label: 'Number of Cancellations',
+                label: 'Cancellation Rate',
                 data: cancellationsChartData,
+                prefix: ''
+              },
+              {
+                key: 'noshows',
+                label: 'No-Show Rate',
+                data: noShowsChartData,
                 prefix: ''
               },
               {
@@ -1632,20 +1794,15 @@ export function OverviewCopy() {
             ]}
             color="blue"
           />
-          <KpiWithChart
-            title="No-Show Rate"
-            initialValue={3}
-            percentageChange={-40}
-            chartData={noShowsChartData}
-            metrics={[
+          <HorizontalBarChartMultipleDatasets 
+            datasets={[
               {
-                key: 'noshows',
-                label: 'Number of No-Shows',
-                data: noShowsChartData,
-                prefix: ''
-              } 
+                key: "lengthOfStay",
+                title: "Length of Stay Distribution",
+                data: lengthOfStayData
+              }
             ]}
-            color="blue"
+            defaultDataset="lengthOfStay"
           />
         </div>
 

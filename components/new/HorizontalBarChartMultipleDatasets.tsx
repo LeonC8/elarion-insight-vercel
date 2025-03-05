@@ -29,22 +29,57 @@ export interface DataSet {
   }>
 }
 
+export interface CategoryOption {
+  label: string
+  key: string
+}
+
 interface HorizontalBarChartMultipleDatasetsProps {
   datasets: DataSet[]
   defaultDataset?: string
+  categories?: CategoryOption[]
+  defaultCategory?: string
 }
 
 export function HorizontalBarChartMultipleDatasets({ 
   datasets,
-  defaultDataset = datasets[0]?.key 
+  defaultDataset = datasets[0]?.key,
+  categories,
+  defaultCategory = categories?.[0]?.key
 }: HorizontalBarChartMultipleDatasetsProps) {
   const [selectedDataset, setSelectedDataset] = useState(defaultDataset)
+  const [selectedCategory, setSelectedCategory] = useState(defaultCategory)
   
   const currentDataset = datasets.find(d => d.key === selectedDataset) || datasets[0]
+  const currentCategory = categories?.find(c => c.key === selectedCategory) || categories?.[0]
 
   return (
     <div className="relative">
-      <div className="absolute right-8 top-8 z-10">
+      <div className="absolute right-8 top-6 z-10 flex space-x-2">
+        {categories && categories.length > 0 && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button 
+                variant="ghost" 
+                size="sm"
+                className="bg-[#f2f8ff] hover:bg-[#f2f8ff] text-[#342630] rounded-full px-4"
+              >
+                {currentCategory?.label || "All"} <TriangleDown className="ml-2" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent>
+              {categories.map(category => (
+                <DropdownMenuItem 
+                  key={category.key}
+                  onClick={() => setSelectedCategory(category.key)}
+                >
+                  {category.label}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
+        
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button 
