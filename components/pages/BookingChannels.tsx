@@ -1,453 +1,643 @@
 "use client"
 
-import { useState, useRef, useEffect } from 'react'
+import { useState } from 'react'
 import {
   DropdownMenu,
-  DropdownMenuContent,  
+  DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { motion } from 'framer-motion'
 import { 
-  CalendarIcon, 
   ChevronDownIcon, 
-  ArrowRightIcon, 
-  BedDoubleIcon, 
-  DollarSignIcon, 
-  UtensilsIcon, 
-  TrendingUpIcon, 
-  PercentIcon, 
-  BarChartIcon, 
-  LineChartIcon,
-  PieChartIcon,
-  Check,
   DownloadIcon,
-  XIcon,
+  Check,
+  DollarSign, 
+  Percent, 
+  Hotel, 
+  Building
 } from 'lucide-react'
-import { CustomDialog } from '../NumericalCardDetails'
-import { DetailedDialog } from '../GraphCardDetails'
-import { Calendar } from "@/components/ui/calendar"
-import { format } from "date-fns"
-import * as XLSX from 'xlsx'
-import { ResponsivePie } from '@nivo/pie'
-import { ResponsiveBar, BarDatum } from '@nivo/bar'
-import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts'
-import { cn } from "@/lib/utils"
-import { DateRange as DayPickerDateRange } from "react-day-picker"
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
+import { DatePickerDemo as DatePicker } from "@/components/ui/date-picker"
+import dynamic from 'next/dynamic'
+import { TopFive } from '../new/TopFive'
+import { KpiWithChart } from '../new/KpiWithChart'
+import { Kpi } from '../new/Kpi'
+import { KpiWithSubtleChart } from '../new/KpiWithSubtleChart'
+import { ChartConfig } from '@/components/ui/chart'
+import type { CategoryTimeSeriesData } from '@/components/new/CategoriesDetailsDialog'
+import { ReservationsByDayChart } from '../new/ReservationsByDayChart'
+import { HorizontalBarChart } from '../new/HorizontalBarChart'
+import { HotelSelector } from '../new/HotelSelector'
+import { HorizontalBarChartMultipleDatasets } from "../new/HorizontalBarChartMultipleDatasets"
+import { PieChartWithLabels } from "@/components/new/PieChartWithLabels"
+import { addDays } from "date-fns"
+import { DistributionChart } from '../new/DistributionChart'
+import { CategoriesOverTimeChart } from '../new/CategoriesOverTimeChart'
+import { ArrowUpIcon } from 'lucide-react'
+import { CategoriesDetailContent } from '../new/CategoriesDetailContent'
+import { TopFiveMultiple } from '../new/TopFiveMultiple'
 
-// Add the COLORS constant
-const COLORS = ['rgba(59, 130, 246, 0.5)', 'rgba(34, 197, 94, 0.5)', 'rgba(234, 179, 8, 0.5)', 'rgba(239, 68, 68, 0.5)']
+// Dynamic import for WorldMap with loading state
+const WorldMap = dynamic(
+  () => import('react-svg-worldmap').then(mod => mod.default),
+  { 
+    ssr: false, 
+    loading: () => (
+      <div className="h-[500px] flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+      </div>
+    )
+  }
+)
 
-// Add the graph data constants
-const marketSegments = [
-  { id: "Personal", value: 450000 },
-  { id: "Business", value: 350000 },
-  { id: "Corporate", value: 280000 },
-  { id: "Government", value: 150000 },
-  { id: "Other", value: 70000 },
-]
-
-const roomTypes = [
-  { id: "Standard", value: 300000 },
-  { id: "Deluxe", value: 250000 },
-  { id: "Suite", value: 180000 },
-  { id: "Executive", value: 120000 },
-  { id: "Family", value: 90000 },
-]
-
-const bookingChannels = [
-  { id: "Direct", value: 280000 },
-  { id: "OTA", value: 350000 },
-  { id: "Travel Agent", value: 180000 },
-  { id: "Corporate", value: 90000 },
-  { id: "Wholesaler", value: 60000 },
-]
-
-const geoSources = [
-  { id: "Domestic", value: 520000 },
-  { id: "Europe", value: 180000 },
-  { id: "Asia", value: 130000 },
-  { id: "North America", value: 100000 },
-  { id: "Other", value: 70000 },
-]
-
-// Add the theme constant
-const modernTheme = {
-  fontFamily: "'Geist Sans', sans-serif",
-  fontSize: 11,
-  text: {
-    fontFamily: "'Geist Sans', sans-serif",
-    fontSize: 11,
-    fontWeight: 500,
-    letterSpacing: 0.15,
-    fill: '#7d8694'
+const BOOKING_CHANNELS = {
+  direct: {
+    label: "Direct Bookings",
+    color: "#18b0cc"
   },
-  labels: {
-    text: {
-      fontFamily: "'Geist Sans', sans-serif",
-      fontSize: 11,
-      fontWeight: 500,
-      letterSpacing: 0.15,
-      fill: '#7d8694'
-    }
+  booking_com: {
+    label: "Booking.com",
+    color: "#1eb09a"
   },
-  axis: {
-    legend: {
-      text: {
-        fontFamily: "'Geist Sans', sans-serif",
-        fontSize: 11,
-        fontWeight: 500,
-        letterSpacing: 0.15,
-        fill: '#7d8694'
+  expedia: {
+    label: "Expedia",
+    color: "#3b56de"
+  },
+  gds: {
+    label: "GDS",
+    color: "#713ddd"
+  },
+  wholesalers: {
+    label: "Wholesalers",
+    color: "#22a74f"
+  }
+} as const;
+
+// Add this constant for country data near the top of your file with other constants
+const countryData = [
+  { country: "us", value: 285000 }, // United States
+  { country: "gb", value: 195000 }, // United Kingdom
+  { country: "de", value: 168000 }, // Germany
+  { country: "fr", value: 142000 }, // France
+  { country: "es", value: 125000 }, // Spain
+  // Add more countries with lower values to show contrast
+  { country: "it", value: 98000 },  // Italy
+  { country: "nl", value: 85000 },  // Netherlands
+  { country: "ch", value: 75000 },  // Switzerland
+  { country: "se", value: 65000 },  // Sweden
+  { country: "be", value: 55000 },  // Belgium
+];
+
+// Add country distribution data for each booking channel
+const countryDistributionByChannel = {
+  direct: [
+    { name: "United States", value: 95000, percentage: 32.5, fill: "hsl(246, 60%, 60%)" },
+    { name: "United Kingdom", value: 75000, percentage: 25.5, fill: "hsl(180, 75%, 35%)" },
+    { name: "Germany", value: 48000, percentage: 16.0, fill: "hsl(322, 65%, 55%)" },
+    { name: "France", value: 42000, percentage: 14.0, fill: "hsl(15, 75%, 50%)" },
+    { name: "Spain", value: 35000, percentage: 12.0, fill: "hsl(45, 90%, 45%)" },
+  ],
+  booking_com: [
+    { name: "United States", value: 85000, percentage: 29.0, fill: "hsl(246, 60%, 60%)" },
+    { name: "United Kingdom", value: 65000, percentage: 22.5, fill: "hsl(180, 75%, 35%)" },
+    { name: "Germany", value: 58000, percentage: 20.0, fill: "hsl(322, 65%, 55%)" },
+    { name: "France", value: 45000, percentage: 15.5, fill: "hsl(15, 75%, 50%)" },
+    { name: "Spain", value: 38000, percentage: 13.0, fill: "hsl(45, 90%, 45%)" },
+  ],
+  expedia: [
+    { name: "United States", value: 75000, percentage: 35.0, fill: "hsl(246, 60%, 60%)" },
+    { name: "United Kingdom", value: 42000, percentage: 19.5, fill: "hsl(180, 75%, 35%)" },
+    { name: "Germany", value: 38000, percentage: 17.5, fill: "hsl(322, 65%, 55%)" },
+    { name: "France", value: 32000, percentage: 15.0, fill: "hsl(15, 75%, 50%)" },
+    { name: "Spain", value: 28000, percentage: 13.0, fill: "hsl(45, 90%, 45%)" },
+  ],
+  gds: [
+    { name: "United States", value: 55000, percentage: 30.0, fill: "hsl(246, 60%, 60%)" },
+    { name: "United Kingdom", value: 38000, percentage: 21.0, fill: "hsl(180, 75%, 35%)" },
+    { name: "Germany", value: 35000, percentage: 19.0, fill: "hsl(322, 65%, 55%)" },
+    { name: "France", value: 30000, percentage: 16.0, fill: "hsl(15, 75%, 50%)" },
+    { name: "Spain", value: 25000, percentage: 14.0, fill: "hsl(45, 90%, 45%)" },
+  ],
+  wholesalers: [
+    { name: "United States", value: 45000, percentage: 28.0, fill: "hsl(246, 60%, 60%)" },
+    { name: "United Kingdom", value: 35000, percentage: 22.0, fill: "hsl(180, 75%, 35%)" },
+    { name: "Germany", value: 32000, percentage: 20.0, fill: "hsl(322, 65%, 55%)" },
+    { name: "France", value: 28000, percentage: 17.0, fill: "hsl(15, 75%, 50%)" },
+    { name: "Spain", value: 20000, percentage: 13.0, fill: "hsl(45, 90%, 45%)" },
+  ]
+};
+
+// Add country time series data for each booking channel
+const countryTimeSeriesByChannel = {
+  direct: [
+    { 
+      date: "January",
+      categories: {
+        us: { current: 95000, previous: 83000 },
+        uk: { current: 75000, previous: 65000 },
+        de: { current: 48000, previous: 52000 },
+        fr: { current: 42000, previous: 36000 },
+        es: { current: 35000, previous: 31000 }
       }
     },
-    ticks: {
-      text: {
-        fontFamily: "'Geist Sans', sans-serif",
-        fontSize: 11,
-        fontWeight: 500,
-        fill: '#7d8694'
+    { 
+      date: "February",
+      categories: {
+        us: { current: 97000, previous: 85000 },
+        uk: { current: 77000, previous: 67000 },
+        de: { current: 46000, previous: 50000 },
+        fr: { current: 44000, previous: 38000 },
+        es: { current: 37000, previous: 33000 }
+      }
+    },
+    // Add more months as needed
+    { 
+      date: "July",
+      categories: {
+        us: { current: 95000, previous: 83000 },
+        uk: { current: 75000, previous: 65000 },
+        de: { current: 48000, previous: 52000 },
+        fr: { current: 42000, previous: 36000 },
+        es: { current: 35000, previous: 31000 }
       }
     }
-  },
-  legends: {
-    text: {
-      fontFamily: "'Geist Sans', sans-serif",
-      fontSize: 11,
-      fontWeight: 400,
-      fill: '#7d8694'
+  ],
+  booking_com: [
+    // Similar structure for booking.com
+    { 
+      date: "January",
+      categories: {
+        us: { current: 85000, previous: 73000 },
+        uk: { current: 65000, previous: 55000 },
+        de: { current: 58000, previous: 62000 },
+        fr: { current: 45000, previous: 39000 },
+        es: { current: 38000, previous: 34000 }
+      }
+    },
+    // Add more months
+    { 
+      date: "July",
+      categories: {
+        us: { current: 85000, previous: 73000 },
+        uk: { current: 65000, previous: 55000 },
+        de: { current: 58000, previous: 62000 },
+        fr: { current: 45000, previous: 39000 },
+        es: { current: 38000, previous: 34000 }
+      }
     }
-  }
-}
-
-// Add helper functions
-function generateComparisonData(originalData: Array<{ id: string; value: number }>) {
-  return originalData.map(item => {
-    const changePercentage = (Math.random() * 0.4) - 0.2;
-    const newValue = Math.round(item.value * (1 + changePercentage));
-    return {
-      id: item.id,
-      value: Math.max(0, newValue)
-    };
-  });
-}
-
-const getYAxisTickValues = (data: Array<{ id: string; value: number }>) => {
-  const maxValue = Math.max(...data.map(d => d.value));
-  const roundedMax = Math.ceil(maxValue / 100000) * 100000;
-  const step = roundedMax / 5;
-  return Array.from({ length: 6 }, (_, i) => i * step);
-};
-
-const getDisplayTimeframe = (timeframe: string, forExcel: boolean = false) => {
-  if (timeframe.includes('-')) {
-    if (forExcel) {
-      return timeframe;
+  ],
+  // Add similar data for expedia, gds, and wholesalers
+  expedia: [
+    { 
+      date: "January",
+      categories: {
+        us: { current: 75000, previous: 63000 },
+        uk: { current: 42000, previous: 32000 },
+        de: { current: 38000, previous: 42000 },
+        fr: { current: 32000, previous: 26000 },
+        es: { current: 28000, previous: 24000 }
+      }
+    },
+    // Add more months
+    { 
+      date: "July",
+      categories: {
+        us: { current: 75000, previous: 63000 },
+        uk: { current: 42000, previous: 32000 },
+        de: { current: 38000, previous: 42000 },
+        fr: { current: 32000, previous: 26000 },
+        es: { current: 28000, previous: 24000 }
+      }
     }
-    return "Custom period";
-  }
-  return timeframe;
-};
-
-// Types
-type TimeframeOption = {
-  label: string;
-  type: 'dropdown' | 'calendar';
-  options?: {
-    value: string;
-    label: string;
-  }[];
-  onClick?: () => void;
-};
-
-interface NumericalDataItem {
-  title: string;
-  value: string | number;
-  change: number;
-  comparisonValue?: string | number;
-  icon: React.ElementType;
-}
-
-type DateRange = DayPickerDateRange;
-
-// Data
-const numericalData: NumericalDataItem[] = [
-  { title: "Rooms", value: 150, change: 5.2, comparisonValue: 142, icon: BedDoubleIcon },
-  { title: "Total Revenue", value: "$35,000", change: 3.8, comparisonValue: "$33,700", icon: DollarSignIcon },
-  { title: "Room Revenue", value: "$25,000", change: 4.5, comparisonValue: "$23,900", icon: DollarSignIcon },
-  { title: "F&B Revenue", value: "$10,000", change: 2.1, comparisonValue: "$9,800", icon: UtensilsIcon },
-  { title: "ADR", value: "$166.67", change: 3.8, comparisonValue: "$160.56", icon: TrendingUpIcon },
-  { title: "Occupancy", value: "75%", change: 1.5, comparisonValue: "73.8%", icon: PercentIcon },
-  { title: "Cancellations", value: "12", change: -2.3, comparisonValue: "10", icon: XIcon },
-  { title: "Average Length of Stay", value: "3.5", change: 0.8, comparisonValue: "3.2", icon: BarChartIcon },
-  { title: "Lead Time", value: "45", change: 2.1, comparisonValue: "42", icon: LineChartIcon },
-];
-
-// Add after imports
-
-interface ChartData {
-  date: string;
-  cancellations?: number;
-  revenueLost?: number;
-  noShows?: number;
-  comparisonCancellations?: number;
-  comparisonRevenueLost?: number;
-  comparisonNoShows?: number;
-}
-
-const cancellationsData: ChartData[] = [
-  { date: '2023-01', cancellations: 5, revenueLost: 500 },
-  { date: '2023-02', cancellations: 8, revenueLost: 800 },
-  { date: '2023-03', cancellations: 12, revenueLost: 1200 },
-  { date: '2023-04', cancellations: 7, revenueLost: 700 },
-  { date: '2023-05', cancellations: 10, revenueLost: 1000 },
-  { date: '2023-06', cancellations: 15, revenueLost: 1500 },
-];
-
-const noShowsData: ChartData[] = [
-  { date: '2023-01', noShows: 2 },
-  { date: '2023-02', noShows: 4 },
-  { date: '2023-03', noShows: 3 },
-  { date: '2023-04', noShows: 5 },
-  { date: '2023-05', noShows: 6 },
-  { date: '2023-06', noShows: 4 },
-];
-
-// Add this function after the existing helper functions
-const generateLineChartComparisonData = (data: TimeSeriesData[]): TimeSeriesData[] => {
-  return data.map(item => ({
-    date: item.date,
-    value: item.value,
-    comparison: Math.round(item.value * (1 + (Math.random() - 0.5) * 0.4))
-  }));
-};
-
-// Add this helper function after other helper functions
-const formatCurrency = (value: number): string => {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'EUR',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(value);
-}
-
-// Add this type definition near the top with other types
-type Tab = 'All' | 'Direct' | 'OTA' | 'Travel Agent' | 'Corporate';
-
-// Add this interface for the metric card
-interface MetricCard {
-  title: string;
-  data?: Array<{ date: string; value: number; comparison?: number }>;
-}
-
-// Add these interfaces and data near the top with other interfaces
-interface TimeSeriesData {
-  date: string;
-  value: number;
-  comparison?: number;
-}
-
-// Add the new data constants
-const avgLengthOfStayData: TimeSeriesData[] = [
-  { date: '2023-01', value: 3.2 },
-  { date: '2023-02', value: 3.5 },
-  { date: '2023-03', value: 3.8 },
-  { date: '2023-04', value: 3.3 },
-  { date: '2023-05', value: 3.6 },
-  { date: '2023-06', value: 3.9 },
-];
-
-const leadTimeData: TimeSeriesData[] = [
-  { date: '2023-01', value: 42 },
-  { date: '2023-02', value: 45 },
-  { date: '2023-03', value: 48 },
-  { date: '2023-04', value: 43 },
-  { date: '2023-05', value: 46 },
-  { date: '2023-06', value: 49 },
-];
-
-// Add this interface for the table data
-interface BookingChannelTableData {
-  channel: string;
-  rooms: number;
-  totalRevenue: number;
-  roomRevenue: number;
-  fbRevenue: number;
-  adr: number;
-  occupancy: number;
-  cancellations: number;
-  avgLengthOfStay: number;
-  leadTime: number;
-}
-
-// Add this data constant
-const bookingChannelTableData: BookingChannelTableData[] = [
-  {
-    channel: "Direct",
-    rooms: 150,
-    totalRevenue: 35000,
-    roomRevenue: 25000,
-    fbRevenue: 10000,
-    adr: 166.67,
-    occupancy: 75,
-    cancellations: 12,
-    avgLengthOfStay: 3.5,
-    leadTime: 45
-  },
-  {
-    channel: "OTA",
-    rooms: 120,
-    totalRevenue: 28000,
-    roomRevenue: 20000,
-    fbRevenue: 8000,
-    adr: 155.50,
-    occupancy: 70,
-    cancellations: 15,
-    avgLengthOfStay: 3.2,
-    leadTime: 30
-  },
-  {
-    channel: "Travel Agent",
-    rooms: 90,
-    totalRevenue: 21000,
-    roomRevenue: 15000,
-    fbRevenue: 6000,
-    adr: 145.80,
-    occupancy: 65,
-    cancellations: 8,
-    avgLengthOfStay: 4.0,
-    leadTime: 60
-  },
-  {
-    channel: "Corporate",
-    rooms: 60,
-    totalRevenue: 14000,
-    roomRevenue: 10000,
-    fbRevenue: 4000,
-    adr: 138.90,
-    occupancy: 55,
-    cancellations: 5,
-    avgLengthOfStay: 2.8,
-    leadTime: 25
-  }
-];
-
-// Add this component for the table
-const BookingChannelsTable = ({ data, comparisonType }: { data: BookingChannelTableData[], comparisonType: string }) => {
-  // Add comparison data with random changes
-  const comparisonData = data.map(row => ({
-    ...row,
-    rooms: Math.round(row.rooms * (1 + (Math.random() - 0.5) * 0.2)),
-    totalRevenue: Math.round(row.totalRevenue * (1 + (Math.random() - 0.5) * 0.2)),
-    roomRevenue: Math.round(row.roomRevenue * (1 + (Math.random() - 0.5) * 0.2)),
-    fbRevenue: Math.round(row.fbRevenue * (1 + (Math.random() - 0.5) * 0.2)),
-    adr: Math.round(row.adr * (1 + (Math.random() - 0.5) * 0.2) * 100) / 100,
-    occupancy: Math.round(row.occupancy * (1 + (Math.random() - 0.5) * 0.2)),
-    cancellations: Math.round(row.cancellations * (1 + (Math.random() - 0.5) * 0.2)),
-    avgLengthOfStay: Math.round(row.avgLengthOfStay * (1 + (Math.random() - 0.5) * 0.2) * 10) / 10,
-    leadTime: Math.round(row.leadTime * (1 + (Math.random() - 0.5) * 0.2))
-  }));
-
-  const formatValue = (value: number, type: string) => {
-    switch(type) {
-      case 'currency':
-        return `€${value.toLocaleString()}`;
-      case 'percentage':
-        return `${value}%`;
-      default:
-        return value.toLocaleString();
+  ],
+  gds: [
+    { 
+      date: "January",
+      categories: {
+        us: { current: 55000, previous: 45000 },
+        uk: { current: 38000, previous: 28000 },
+        de: { current: 35000, previous: 39000 },
+        fr: { current: 30000, previous: 24000 },
+        es: { current: 25000, previous: 21000 }
+      }
+    },
+    // Add more months
+    { 
+      date: "July",
+      categories: {
+        us: { current: 55000, previous: 45000 },
+        uk: { current: 38000, previous: 28000 },
+        de: { current: 35000, previous: 39000 },
+        fr: { current: 30000, previous: 24000 },
+        es: { current: 25000, previous: 21000 }
+      }
     }
-  };
+  ],
+  wholesalers: [
+    { 
+      date: "January",
+      categories: {
+        us: { current: 45000, previous: 35000 },
+        uk: { current: 35000, previous: 25000 },
+        de: { current: 32000, previous: 36000 },
+        fr: { current: 28000, previous: 22000 },
+        es: { current: 20000, previous: 16000 }
+      }
+    },
+    // Add more months
+    { 
+      date: "July",
+      categories: {
+        us: { current: 45000, previous: 35000 },
+        uk: { current: 35000, previous: 25000 },
+        de: { current: 32000, previous: 36000 },
+        fr: { current: 28000, previous: 22000 },
+        es: { current: 20000, previous: 16000 }
+      }
+    }
+  ]
+};
 
-  const getChangePercentage = (current: number, comparison: number) => {
-    const change = ((current - comparison) / comparison) * 100;
-    return change.toFixed(1);
-  };
+// Add metrics by channel
+const countryMetricsByChannel = {
+  direct: [
+    {
+      key: 'revenue',
+      label: 'Revenue',
+      prefix: '€',
+      data: [
+        { name: "United States", value: 95000, change: 12000 },
+        { name: "United Kingdom", value: 75000, change: 10000 },
+        { name: "Germany", value: 48000, change: -4000 },
+        { name: "France", value: 42000, change: 6000 },
+        { name: "Spain", value: 35000, change: 4000 },
+      ]
+    },
+    {
+      key: 'rooms',
+      label: 'Rooms Sold',
+      data: [
+        { name: "United States", value: 650, change: 80 },
+        { name: "United Kingdom", value: 520, change: 70 },
+        { name: "Germany", value: 350, change: -35 },
+        { name: "France", value: 290, change: 45 },
+        { name: "Spain", value: 240, change: 30 },
+      ]
+    }
+  ],
+  booking_com: [
+    // Similar structure for other channels
+    {
+      key: 'revenue',
+      label: 'Revenue',
+      prefix: '€',
+      data: [
+        { name: "United States", value: 85000, change: 12000 },
+        { name: "United Kingdom", value: 65000, change: 10000 },
+        { name: "Germany", value: 58000, change: -4000 },
+        { name: "France", value: 45000, change: 6000 },
+        { name: "Spain", value: 38000, change: 4000 },
+      ]
+    },
+    {
+      key: 'rooms',
+      label: 'Rooms Sold',
+      data: [
+        { name: "United States", value: 580, change: 80 },
+        { name: "United Kingdom", value: 450, change: 70 },
+        { name: "Germany", value: 400, change: -35 },
+        { name: "France", value: 310, change: 45 },
+        { name: "Spain", value: 260, change: 30 },
+      ]
+    }
+  ],
+  expedia: [
+    {
+      key: 'revenue',
+      label: 'Revenue',
+      prefix: '€',
+      data: [
+        { name: "United States", value: 75000, change: 12000 },
+        { name: "United Kingdom", value: 42000, change: 10000 },
+        { name: "Germany", value: 38000, change: -4000 },
+        { name: "France", value: 32000, change: 6000 },
+        { name: "Spain", value: 28000, change: 4000 },
+      ]
+    },
+    {
+      key: 'rooms',
+      label: 'Rooms Sold',
+      data: [
+        { name: "United States", value: 510, change: 80 },
+        { name: "United Kingdom", value: 290, change: 70 },
+        { name: "Germany", value: 260, change: -35 },
+        { name: "France", value: 220, change: 45 },
+        { name: "Spain", value: 190, change: 30 },
+      ]
+    }
+  ],
+  gds: [
+    {
+      key: 'revenue',
+      label: 'Revenue',
+      prefix: '€',
+      data: [
+        { name: "United States", value: 55000, change: 10000 },
+        { name: "United Kingdom", value: 38000, change: 10000 },
+        { name: "Germany", value: 35000, change: -4000 },
+        { name: "France", value: 30000, change: 6000 },
+        { name: "Spain", value: 25000, change: 4000 },
+      ]
+    },
+    {
+      key: 'rooms',
+      label: 'Rooms Sold',
+      data: [
+        { name: "United States", value: 380, change: 70 },
+        { name: "United Kingdom", value: 260, change: 70 },
+        { name: "Germany", value: 240, change: -35 },
+        { name: "France", value: 210, change: 40 },
+        { name: "Spain", value: 170, change: 30 },
+      ]
+    }
+  ],
+  wholesalers: [  
+    {
+      key: 'revenue',
+      label: 'Revenue',
+      prefix: '€',
+      data: [
+        { name: "United States", value: 45000, change: 10000 },
+        { name: "United Kingdom", value: 35000, change: 10000 },
+        { name: "Germany", value: 32000, change: -4000 },
+        { name: "France", value: 28000, change: 4000 },
+        { name: "Spain", value: 20000, change: 4000 },
+      ]
+    },
+    {
+      key: 'rooms',
+      label: 'Rooms Sold',
+      data: [
+        { name: "United States", value: 310, change: 70 },
+        { name: "United Kingdom", value: 240, change: 65 },
+        { name: "Germany", value: 220, change: -30 },
+        { name: "France", value: 190, change: 30 },
+        { name: "Spain", value: 140, change: 25 },
+      ]
+    }
+  ]
+};
 
-  const renderCell = (currentValue: number, comparisonValue: number, type: string) => {
-    const changePercentage = Number(getChangePercentage(currentValue, comparisonValue));
-    
-    return (
-      <td className="px-6 py-4 whitespace-nowrap text-sm">
-        <div className="flex flex-col">
-          <span className="text-gray-500">{formatValue(currentValue, type)}</span>
-          {comparisonType !== 'No comparison' && (
-            <div className={`text-xs mt-1 ${
-              changePercentage > 0 
-                ? 'text-green-600' 
-                : changePercentage < 0 
-                  ? 'text-red-600' 
-                  : 'text-gray-500'
-            }`}>
-              {changePercentage > 0 ? '↑' : changePercentage < 0 ? '↓' : ''}
-              {Math.abs(changePercentage)}%
-            </div>
-          )}
-        </div>
-      </td>
-    );
-  };
+// Add country chart config 
+const countryChartConfig = {
+  us: {
+    label: "United States",
+    color: "hsl(246, 60%, 60%)",      // Modern Purple
+  },
+  uk: {
+    label: "United Kingdom", 
+    color: "hsl(180, 75%, 35%)",      // Teal
+  },
+  de: {
+    label: "Germany",
+    color: "hsl(322, 65%, 55%)",      // Rose Pink
+  },
+  fr: {
+    label: "France",
+    color: "hsl(15, 75%, 50%)",       // Coral Orange
+  },
+  es: {
+    label: "Spain", 
+    color: "hsl(45, 90%, 45%)",       // Golden Yellow
+  }
+} satisfies ChartConfig;
 
+function TriangleDown({ className }: { className?: string }) {
   return (
-  
-    <div className="bg-white border border-gray-200 shadow-md rounded-lg overflow-hidden">
-      <div className="overflow-x-auto">
-      <div className="flex justify-between items-center bg-white px-6 py-4">
-          <h2 className="text-lg font-semibold bg-white text-gray-800">All booking channels</h2>
-        </div>
-        <table className="min-w-full divide-y divide-gray-300 border-t border-gray-300">
-          <thead className="bg-gray-50 font-medium uppercase">
-            <tr >
-              <th className="px-6 py-4 text-left text-sm font-medium text-gray-800">Channel</th>
-              <th className="px-6 py-4 text-left text-sm font-medium text-gray-800">Rooms</th>
-              <th className="px-6 py-4 text-left text-sm font-medium text-gray-800">Total Revenue</th>
-              <th className="px-6 py-4 text-left text-sm font-medium text-gray-800">Room Revenue</th>
-              <th className="px-6 py-4 text-left text-sm font-medium text-gray-800">F&B Revenue</th>
-              <th className="px-6 py-4 text-left text-sm font-medium text-gray-800">ADR</th>
-              <th className="px-6 py-4 text-left text-sm font-medium text-gray-800">Occupancy</th>
-              <th className="px-6 py-4 text-left text-sm font-medium text-gray-800">Cancellations</th>
-              <th className="px-6 py-4 text-left text-sm font-medium text-gray-800">Avg Length of Stay</th>
-              <th className="px-6 py-4 text-left text-sm font-medium text-gray-800">Lead Time</th>
-            </tr>
-          </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
-            {data.map((row, index) => (
-              <tr key={index}>
-                <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-800 bg-gray-0 border-r border-gray-300 text-sm">{row.channel}</td>
-                {renderCell(row.rooms, comparisonData[index].rooms, 'number')}
-                {renderCell(row.totalRevenue, comparisonData[index].totalRevenue, 'currency')}
-                {renderCell(row.roomRevenue, comparisonData[index].roomRevenue, 'currency')}
-                {renderCell(row.fbRevenue, comparisonData[index].fbRevenue, 'currency')}
-                {renderCell(row.adr, comparisonData[index].adr, 'currency')}
-                {renderCell(row.occupancy, comparisonData[index].occupancy, 'percentage')}
-                {renderCell(row.cancellations, comparisonData[index].cancellations, 'number')}
-                {renderCell(row.avgLengthOfStay, comparisonData[index].avgLengthOfStay, 'number')}
-                {renderCell(row.leadTime, comparisonData[index].leadTime, 'number')}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-      </div>
-     
-  );
-};
+    <svg 
+      width="8" 
+      height="6" 
+      viewBox="0 0 8 6" 
+      fill="currentColor" 
+      className={className}
+    >
+      <path d="M4 6L0 0L8 0L4 6Z" />
+    </svg>
+  )
+}
 
-export function BookingChannelsDashboard() {
+// Add this data near the top where other data is defined
+const lengthOfStayByChannelData = {
+  direct: [
+    { range: "1 night", current: 210, previous: 185 },
+    { range: "2 nights", current: 345, previous: 310 },
+    { range: "3 nights", current: 420, previous: 380 },
+    { range: "4 nights", current: 285, previous: 250 },
+    { range: "5 nights", current: 175, previous: 155 },
+    { range: "6 nights", current: 95, previous: 80 },
+    { range: "7+ nights", current: 120, previous: 105 }
+  ],
+  booking_com: [
+    { range: "1 night", current: 230, previous: 205 },
+    { range: "2 nights", current: 360, previous: 325 },
+    { range: "3 nights", current: 395, previous: 355 },
+    { range: "4 nights", current: 260, previous: 225 },
+    { range: "5 nights", current: 155, previous: 135 },
+    { range: "6 nights", current: 85, previous: 70 },
+    { range: "7+ nights", current: 105, previous: 90 }
+  ],
+  expedia: [
+    { range: "1 night", current: 245, previous: 220 },
+    { range: "2 nights", current: 375, previous: 340 },
+    { range: "3 nights", current: 380, previous: 340 },
+    { range: "4 nights", current: 245, previous: 210 },
+    { range: "5 nights", current: 145, previous: 125 },
+    { range: "6 nights", current: 75, previous: 60 },
+    { range: "7+ nights", current: 90, previous: 75 }
+  ],
+  gds: [
+    { range: "1 night", current: 190, previous: 165 },
+    { range: "2 nights", current: 320, previous: 285 },
+    { range: "3 nights", current: 450, previous: 410 },
+    { range: "4 nights", current: 310, previous: 275 },
+    { range: "5 nights", current: 195, previous: 175 },
+    { range: "6 nights", current: 115, previous: 100 },
+    { range: "7+ nights", current: 140, previous: 125 }
+  ],
+  wholesalers: [
+    { range: "1 night", current: 180, previous: 155 },
+    { range: "2 nights", current: 325, previous: 290 },
+    { range: "3 nights", current: 435, previous: 395 },
+    { range: "4 nights", current: 295, previous: 260 },
+    { range: "5 nights", current: 185, previous: 165 },
+    { range: "6 nights", current: 105, previous: 90 },
+    { range: "7+ nights", current: 130, previous: 115 }
+  ]
+}
+
+// Add lead time data by channel
+const leadTimeByChannelData = {
+  direct: [
+    { range: "0-7 days", current: 245, previous: 220 },
+    { range: "8-14 days", current: 312, previous: 280 },
+    { range: "15-30 days", current: 456, previous: 410 },
+    { range: "31-60 days", current: 323, previous: 290 },
+    { range: "61-90 days", current: 198, previous: 175 },
+    { range: "91-180 days", current: 148, previous: 125 },
+    { range: ">180 days", current: 87, previous: 75 }
+  ],
+  booking_com: [
+    { range: "0-7 days", current: 265, previous: 240 },
+    { range: "8-14 days", current: 332, previous: 300 },
+    { range: "15-30 days", current: 436, previous: 390 },
+    { range: "31-60 days", current: 303, previous: 270 },
+    { range: "61-90 days", current: 178, previous: 155 },
+    { range: "91-180 days", current: 128, previous: 105 },
+    { range: ">180 days", current: 67, previous: 55 }
+  ],
+  expedia: [
+    { range: "0-7 days", current: 275, previous: 250 },
+    { range: "8-14 days", current: 342, previous: 310 },
+    { range: "15-30 days", current: 426, previous: 380 },
+    { range: "31-60 days", current: 293, previous: 260 },
+    { range: "61-90 days", current: 168, previous: 145 },
+    { range: "91-180 days", current: 118, previous: 95 },
+    { range: ">180 days", current: 57, previous: 45 }
+  ],
+  gds: [
+    { range: "0-7 days", current: 225, previous: 200 },
+    { range: "8-14 days", current: 292, previous: 260 },
+    { range: "15-30 days", current: 476, previous: 430 },
+    { range: "31-60 days", current: 343, previous: 310 },
+    { range: "61-90 days", current: 218, previous: 195 },
+    { range: "91-180 days", current: 168, previous: 145 },
+    { range: ">180 days", current: 107, previous: 95 }
+  ],
+  wholesalers: [
+    { range: "0-7 days", current: 215, previous: 190 },
+    { range: "8-14 days", current: 282, previous: 250 },
+    { range: "15-30 days", current: 466, previous: 420 },
+    { range: "31-60 days", current: 333, previous: 300 },
+    { range: "61-90 days", current: 208, previous: 185 },
+    { range: "91-180 days", current: 158, previous: 135 },
+    { range: ">180 days", current: 97, previous: 85 }
+  ]
+}
+
+// Add cancellation lead time data by channel near the other data definitions
+const cancellationLeadTimeByChannelData = {
+  direct: [
+    { range: "0-5 days", current: 45, previous: 52 },
+    { range: "6-10 days", current: 38, previous: 41 },
+    { range: "11-15 days", current: 32, previous: 35 },
+    { range: "16-20 days", current: 25, previous: 28 },
+    { range: "21-25 days", current: 18, previous: 20 },
+    { range: "26-30 days", current: 12, previous: 15 },
+    { range: ">30 days", current: 8, previous: 10 }
+  ],
+  booking_com: [
+    { range: "0-5 days", current: 50, previous: 57 },
+    { range: "6-10 days", current: 42, previous: 45 },
+    { range: "11-15 days", current: 36, previous: 39 },
+    { range: "16-20 days", current: 28, previous: 31 },
+    { range: "21-25 days", current: 21, previous: 23 },
+    { range: "26-30 days", current: 15, previous: 18 },
+    { range: ">30 days", current: 10, previous: 12 }
+  ],
+  expedia: [
+    { range: "0-5 days", current: 52, previous: 59 },
+    { range: "6-10 days", current: 45, previous: 48 },
+    { range: "11-15 days", current: 38, previous: 41 },
+    { range: "16-20 days", current: 30, previous: 33 },
+    { range: "21-25 days", current: 23, previous: 25 },
+    { range: "26-30 days", current: 16, previous: 19 },
+    { range: ">30 days", current: 11, previous: 13 }
+  ],
+  gds: [
+    { range: "0-5 days", current: 40, previous: 47 },
+    { range: "6-10 days", current: 35, previous: 38 },
+    { range: "11-15 days", current: 29, previous: 32 },
+    { range: "16-20 days", current: 22, previous: 25 },
+    { range: "21-25 days", current: 15, previous: 17 },
+    { range: "26-30 days", current: 9, previous: 12 },
+    { range: ">30 days", current: 6, previous: 8 }
+  ],
+  wholesalers: [
+    { range: "0-5 days", current: 38, previous: 45 },
+    { range: "6-10 days", current: 32, previous: 35 },
+    { range: "11-15 days", current: 27, previous: 30 },
+    { range: "16-20 days", current: 20, previous: 23 },
+    { range: "21-25 days", current: 14, previous: 16 },
+    { range: "26-30 days", current: 8, previous: 11 },
+    { range: ">30 days", current: 5, previous: 7 }
+  ]
+}
+
+// Add this constant with the other data constants near the top of the file (around line 670-680)
+const reservationsByDayData = [
+  { 
+    dayOfWeek: "Monday", 
+    bookingsCreated: 145, 
+    prevBookingsCreated: 125,
+    staysStarting: 168,
+    prevStaysStarting: 155
+  },
+  { 
+    dayOfWeek: "Tuesday", 
+    bookingsCreated: 132, 
+    prevBookingsCreated: 120,
+    staysStarting: 142,
+    prevStaysStarting: 130
+  },
+  { 
+    dayOfWeek: "Wednesday", 
+    bookingsCreated: 156, 
+    prevBookingsCreated: 140,
+    staysStarting: 187,
+    prevStaysStarting: 165
+  },
+  { 
+    dayOfWeek: "Thursday", 
+    bookingsCreated: 123, 
+    prevBookingsCreated: 115,
+    staysStarting: 145,
+    prevStaysStarting: 135
+  },
+  { 
+    dayOfWeek: "Friday", 
+    bookingsCreated: 198, 
+    prevBookingsCreated: 175,
+    staysStarting: 210,
+    prevStaysStarting: 190
+  },
+  { 
+    dayOfWeek: "Saturday", 
+    bookingsCreated: 208, 
+    prevBookingsCreated: 185,
+    staysStarting: 245,
+    prevStaysStarting: 220
+  },
+  { 
+    dayOfWeek: "Sunday", 
+    bookingsCreated: 167, 
+    prevBookingsCreated: 150,
+    staysStarting: 189,
+    prevStaysStarting: 170
+  },
+]
+
+export function BookingChannels() {
+  // Add date state
+  const [date, setDate] = useState<Date>(new Date())
+  
+  // Basic state for hotel selection
   const [selectedHotels, setSelectedHotels] = useState<string[]>(["Hotel 1"])
+  const [selectedTimeFrame, setSelectedTimeFrame] = useState("Month")
+  const [selectedViewType, setSelectedViewType] = useState("Actual")
+  const [selectedComparison, setSelectedComparison] = useState("Last year - OTB")
   const allHotels = ["Hotel 1", "Hotel 2", "Hotel 3"]
-  const [selectedCard, setSelectedCard] = useState<string | null>(null)
-  const [selectedTimeframe, setSelectedTimeframe] = useState("OTB")
-  const [comparisonType, setComparisonType] = useState<'Last year' | 'Budget' | 'No comparison'>('Last year')
-  const [pieChartData, setPieChartData] = useState<Array<{ id: string; value: number }> | undefined>(undefined)
-  const [comparisonPieChartData, setComparisonPieChartData] = useState<Array<{ id: string; value: number }> | undefined>(undefined)
-  const [dateRange, setDateRange] = useState<DateRange | undefined>({
-    from: undefined,
-    to: undefined,
-  })
 
   const toggleHotel = (hotel: string) => {
     setSelectedHotels(prev => 
@@ -463,820 +653,395 @@ export function BookingChannelsDashboard() {
     )
   }
 
-  const handleCardClick = (title: string) => {
-    setSelectedCard(title);
+  const toggleRegion = (regionHotels: string[], e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
     
-    // Set pie chart data based on the card title
-    if (title === "Total Revenue") {
-      setPieChartData([
-        { id: "Room Revenue", value: 25000 },
-        { id: "F&B Revenue", value: 10000 },
-        { id: "Other Revenue", value: 5000 },
-      ]);
-      
-      if (comparisonType !== 'No comparison') {
-        setComparisonPieChartData([
-          { id: "Room Revenue", value: 23000 },
-          { id: "F&B Revenue", value: 9000 },
-          { id: "Other Revenue", value: 4500 },
-        ]);
-      }
-    } else if (title === "F&B Revenue") {
-      setPieChartData([
-        { id: "Restaurant", value: 4000 },
-        { id: "Bar", value: 3000 },
-        { id: "Room Service", value: 2000 },
-        { id: "Events", value: 1000 },
-      ]);
-      
-      if (comparisonType !== 'No comparison') {
-        setComparisonPieChartData([
-          { id: "Restaurant", value: 3800 },
-          { id: "Bar", value: 2800 },
-          { id: "Room Service", value: 1900 },
-          { id: "Events", value: 900 },
-        ]);
-      }
+    const allSelected = regionHotels.every(hotel => selectedHotels.includes(hotel))
+    if (allSelected) {
+      setSelectedHotels(prev => prev.filter(h => !regionHotels.includes(h)))
     } else {
-      // For cards without pie chart data
-      setPieChartData(undefined);
-      setComparisonPieChartData(undefined);
+      setSelectedHotels(prev => [...Array.from(new Set([...prev, ...regionHotels]))])
     }
-  };
-
-  const closeDialog = () => {
-    setSelectedCard(null)
-    setPieChartData(undefined)
-    setComparisonPieChartData(undefined)
   }
 
-  // Add this state to control calendar visibility
-  const [isCalendarVisible, setIsCalendarVisible] = useState(false);
-
-  // Add this state to control the temporary date range
-  const [tempDateRange, setTempDateRange] = useState<DateRange | undefined>(undefined);
-
-  // Modify the timeframeOptions to include an onClick handler for the "Custom" option
-  const timeframeOptions: TimeframeOption[] = [
-    {
-      label: "Day",
-      type: 'dropdown',
-      options: [
-        { value: "Today", label: "Today" },
-        { value: "Yesterday", label: "Yesterday" },
-      ]
-    },
-    {
-      label: "Month",
-      type: 'dropdown',
-      options: [
-        { value: "Month-OTB", label: "OTB" },
-        { value: "MTD", label: "MTD" },
-        { value: "Month-Projected", label: "Projected" }
-      ]
-    },
-    {
-      label: "Year",
-      type: 'dropdown',
-      options: [
-        { value: "Year-OTB", label: "OTB" },
-        { value: "YTD", label: "YTD" },
-        { value: "Year-Projected", label: "Projected" }
-      ]
-    },
-    {
-      label: "Custom",
-      type: 'calendar',
-      onClick: () => setIsCalendarVisible(true)
-    }
-  ];
-
-  const handleTimeframeSelect = (value: string) => {
-    setSelectedTimeframe(value);
-    setIsCalendarVisible(false);
-  };
-
-  const handleDateRangeSelect = (range: DayPickerDateRange | undefined) => {
-    setTempDateRange(range);
-  };
-
-  const dropdownRef = useRef<HTMLDivElement | null>(null);
-
-  const applyDateRange = () => {
-    if (tempDateRange?.from && tempDateRange?.to) {
-      setDateRange(tempDateRange);
-      const formattedRange = `${format(tempDateRange.from, 'dd MMM yyyy')} - ${format(tempDateRange.to, 'dd MMM yyyy')}`;
-      setSelectedTimeframe(formattedRange);
-      setIsCalendarVisible(true);
-      if (dropdownRef.current) {
-        dropdownRef.current.click();
-      }
-    }
-  };
-
-  const hideCalendar = () => {
-    setIsCalendarVisible(false);
-  };
-
-  // Add this new function to handle Excel export
-  const handleExportToExcel = () => {
-    const wb = XLSX.utils.book_new();
+  const toggleBrand = (brandHotels: string[], e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
     
-    // Overview Metrics Sheet
-    const overviewData = [
-      ['Overview Metrics', ''],
-      ['Metric', getDisplayTimeframe(selectedTimeframe, true)],
-      ...numericalData.map(item => [
-        item.title,
-        item.value,
-      ])
-    ];
-    
-    if (comparisonType !== 'No comparison') {
-      overviewData[0].push('', '');
-      overviewData[1].push(
-        `${getDisplayTimeframe(selectedTimeframe, true)} ${comparisonType === 'Last year' ? 'STLY' : 'Budget'}`, 
-        'Change %'
-      );
-      overviewData.slice(2).forEach((row, index) => {
-        row.push(numericalData[index].comparisonValue || '-', `${numericalData[index].change}%`);
-      });
+    const allSelected = brandHotels.every(hotel => selectedHotels.includes(hotel))
+    if (allSelected) {
+      setSelectedHotels(prev => prev.filter(h => !brandHotels.includes(h)))
+    } else {
+      setSelectedHotels(prev => [...Array.from(new Set([...prev, ...brandHotels]))])
     }
-    
-    const wsOverview = XLSX.utils.aoa_to_sheet(overviewData);
-
-    // Add styling
-    const applyStyles = (sheet: XLSX.WorkSheet) => {
-      const columnWidths = comparisonType !== 'No comparison' 
-        ? [{ wch: 20 }, { wch: 15 }, { wch: 15 }, { wch: 15 }]
-        : [{ wch: 20 }, { wch: 15 }];
-      sheet['!cols'] = columnWidths;
-
-      if (sheet['A1']) {
-        sheet['A1'].s = { font: { bold: true, sz: 14 } };
-      }
-
-      const headerRow = comparisonType !== 'No comparison'
-        ? ['A2', 'B2', 'C2', 'D2']
-        : ['A2', 'B2'];
-
-      headerRow.forEach(cell => {
-        if (sheet[cell]) {
-          sheet[cell].s = { font: { bold: true }, fill: { fgColor: { rgb: "EFEFEF" } } };
-        }
-      });
-    };
-
-    // Apply styles to overview sheet
-    applyStyles(wsOverview);
-
-    // Add sheet to workbook
-    XLSX.utils.book_append_sheet(wb, wsOverview, 'Overview');
-
-    // Generate filename
-    const filename = `Dashboard_Export_${format(new Date(), 'yyyy-MM-dd')}_${selectedTimeframe.replace(/\s/g, '_')}.xlsx`;
-    
-    // Write the file
-    XLSX.writeFile(wb, filename);
-  };
-
-  // Add new state variables for graph displays
-  const [chartTypes, setChartTypes] = useState<Record<string, 'pie' | 'bar'>>({
-    marketSegments: 'bar',
-    roomTypes: 'bar',
-    bookingChannels: 'bar',
-    geoSources: 'bar',
-  });
-  const [selectedDetailedChart, setSelectedDetailedChart] = useState<string | null>(null);
-  const [selectedPieView, setSelectedPieView] = useState<Record<string, 'current' | 'comparison'>>({
-    marketSegments: 'current',
-    roomTypes: 'current',
-    bookingChannels: 'current',
-    geoSources: 'current',
-  });
-
-  // Add renderChart function
-  const renderChart = (data: Array<{ id: string; value: number }>, title: string, filterKey: string) => {
-    const chartType = chartTypes[filterKey]
-    const comparisonData = generateComparisonData(data)
-    const pieView = selectedPieView[filterKey]
-
-    const toggleChartType = () => {
-      setChartTypes(prev => ({
-        ...prev,
-        [filterKey]: chartType === 'pie' ? 'bar' : 'pie'
-      }))
-    }
-
-    const togglePieView = (view: 'current' | 'comparison') => {
-      setSelectedPieView(prev => ({
-        ...prev,
-        [filterKey]: view
-      }))
-    }
-
-    return (
-      <Card className="bg-white shadow-lg rounded-lg overflow-hidden flex flex-col">
-        <CardHeader className="flex flex-col items-start">
-          <div className="flex w-full justify-between items-center">
-            <div>
-              <CardTitle className="text-md font-medium text-gray-800">{title}</CardTitle>
-            </div>  
-            <div className="flex items-center space-x-2">
-              <button
-                className={`text-sm px-3 py-1 rounded-full flex items-center transition-colors ${
-                  chartType === 'bar' 
-                    ? 'bg-blue-100 text-blue-600' 
-                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                }`}
-                onClick={toggleChartType}
-              >
-                <BarChartIcon className="w-4 h-4 mr-1" />
-                Bar
-              </button>
-              <button
-                className={`text-sm px-3 py-1 rounded-full flex items-center transition-colors ${
-                  chartType === 'pie' 
-                    ? 'bg-blue-100 text-blue-600' 
-                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                }`}
-                onClick={toggleChartType}
-              >
-                <PieChartIcon className="w-4 h-4 mr-1" />
-                Pie
-              </button>
-            </div>
-          </div>
-          {chartType === 'pie' && comparisonType !== 'No comparison' && (
-            <div className="flex w-full mt-4 border-b">
-              <button 
-                className={`px-4 py-2 ${
-                  pieView === 'current'
-                    ? 'border-b-2 border-blue-500 text-blue-600 text-sm'
-                    : 'text-gray-500 text-sm '
-                }`}
-                onClick={() => togglePieView('current')}
-              >
-                {getDisplayTimeframe(selectedTimeframe)}
-              </button>
-              <button
-                className={`px-4 py-2 ${
-                  pieView === 'comparison'
-                    ? 'border-b-2 border-blue-500 text-sm text-blue-600'
-                    : 'text-gray-500 text-sm'
-                }`}
-                onClick={() => togglePieView('comparison')}
-              >
-                {getDisplayTimeframe(selectedTimeframe)} {comparisonType === 'Last year' ? 'STLY' : 'Budget'}
-              </button>
-            </div>
-          )}
-        </CardHeader>
-        <CardContent className="flex-grow pb-2">
-          <div style={{ height: chartType === 'pie' ? 250 : 300 }}>
-            {chartType === 'pie' ? (
-              <ResponsivePie
-                data={pieView === 'current' ? data : comparisonData}
-                margin={{ top: 50, right: 80, bottom: 20, left: 80 }}
-                innerRadius={0.5}
-                padAngle={0.7}
-                cornerRadius={3}
-                activeOuterRadiusOffset={8}
-                colors={COLORS}
-                borderWidth={1}
-                borderColor={{ from: 'color', modifiers: [['darker', 0.2]] }}
-                arcLinkLabelsSkipAngle={10}
-                arcLinkLabelsTextColor="#666666"
-                arcLinkLabelsThickness={2}
-                arcLinkLabelsColor={{ from: 'color' }}
-                arcLabelsSkipAngle={10}
-                arcLabelsTextColor={{ from: 'color', modifiers: [['darker', 2]] }}
-                arcLabel={d => `${Math.round((d.value / data.reduce((sum, item) => sum + item.value, 0)) * 100)}%`}
-                theme={modernTheme}
-              />
-            ) : (
-              <ResponsiveBar
-                data={data.map((item, index) => ({
-                  ...item,
-                  comparisonValue: comparisonType !== 'No comparison' ? comparisonData[index].value : undefined
-                })) as any}
-                keys={comparisonType !== 'No comparison' ? ['value', 'comparisonValue'] : ['value']}
-                indexBy="id"
-                margin={{ 
-                  top: 50,
-                  right: 20, 
-                  bottom: comparisonType !== 'No comparison' ? 80 : 40,
-                  left: 50
-                }}
-                padding={0.2}
-                colors={({ id }) => COLORS[id === 'value' ? 0 : 1]}
-                borderColor={{ from: 'color', modifiers: [['darker', 1.6]] }}
-                axisBottom={{
-                  tickSize: 5,
-                  tickPadding: 10,
-                  tickRotation: 0,
-                  legend: undefined,
-                  legendPosition: 'middle',
-                  legendOffset: 32
-                }}
-                axisLeft={{
-                  tickSize: 5,
-                  tickPadding: 10,
-                  tickRotation: 0,
-                  legend: '',
-                  legendPosition: 'middle',
-                  legendOffset: -50,
-                  format: (value) => `€${value / 1000}K`,
-                  tickValues: getYAxisTickValues(data),
-                  renderTick: (tick) => {
-                    return (
-                      <g transform={`translate(${tick.x},${tick.y})`}>
-                        <line x2="-6" y2="0" stroke="#e5e7eb" />
-                        <text
-                          x="-12"
-                          y="0"
-                          dy="0.32em"
-                          textAnchor="end"
-                          fontFamily="'Geist Sans', sans-serif"
-                          fontSize="11px"
-                          fill="#7d8694"
-                        >
-                          {tick.value === 0 ? '€0' : `€${tick.value / 1000}K`}
-                        </text>
-                      </g>
-                    );
-                  }
-                }}
-                gridYValues={getYAxisTickValues(data)}
-                labelSkipWidth={12}
-                labelSkipHeight={12}
-                enableLabel={comparisonType === 'No comparison'}
-                label={d => `${(d.value || 0).toLocaleString()}`}
-                labelTextColor={{ from: 'color', modifiers: [['darker', 1.6]] }}
-                animate={true}
-                theme={modernTheme}
-                groupMode={comparisonType !== 'No comparison' ? "grouped" : "stacked"}
-                legends={comparisonType !== 'No comparison' ? [
-                  {
-                    dataFrom: 'keys',
-                    anchor: 'bottom',
-                    direction: 'row',
-                    justify: false,
-                    translateX: 0,
-                    translateY: 80,
-                    itemsSpacing: 20,
-                    itemWidth: 80,
-                    itemHeight: 20,
-                    itemDirection: 'left-to-right',
-                    itemOpacity: 1,
-                    symbolSize: 12,
-                    symbolShape: 'circle',
-                    effects: [],
-                    data: [
-                      { id: 'value', label: getDisplayTimeframe(selectedTimeframe), color: COLORS[0] },
-                      { id: 'comparisonValue', label: `${getDisplayTimeframe(selectedTimeframe)} ${comparisonType === 'Last year' ? 'STLY' : 'Budget'}`, color: COLORS[1] }
-                    ]
-                  }
-                ] : []}
-                tooltip={({ id, value, color }) => (
-                  <div
-                    style={{
-                      padding: 12,
-                      background: '#ffffff',
-                      color: '#333333',
-                      border: '1px solid #ccc',
-                      borderRadius: '4px',
-                    }}
-                  >
-                    <strong>{id}</strong>
-                    <br />
-                    <span style={{ color }}>€{(value || 0).toLocaleString()}</span>
-                  </div>
-                )}
-              />
-            )}
-          </div>
-        </CardContent>
-        <div className="px-6 py-4">
-          <hr className="border-t border-gray-200 mb-4" />
-          <div className="flex justify-end">
-            <button
-              className="text-blue-600 hover:text-blue-800 font-medium text-sm focus:outline-none"
-              onClick={() => setSelectedDetailedChart(filterKey)}
-            >
-              View Details
-            </button>
-          </div>
-        </div>
-      </Card>
-    )
   }
 
-  // Add inside OverviewDashboard component, with other state declarations
-  const [cancellationMetric, setCancellationMetric] = useState<'cancellations' | 'revenueLost'>('cancellations');
-  const [combinedCancellationsData, setCombinedCancellationsData] = useState<TimeSeriesData[]>([]);
-  const [combinedNoShowsData, setCombinedNoShowsData] = useState<TimeSeriesData[]>([]);
+  // Add date change handler
+  const handleDateChange = (newDate: Date | undefined) => {
+    if (newDate) {
+      setDate(newDate)
+      // Here you can add any additional logic needed when the date changes
+      // For example, fetching new data for the selected date
+    }
+  }
 
-  // Add this useEffect after the state declarations
-  useEffect(() => {
-    // Convert cancellationsData to TimeSeriesData format
-    const formattedCancellationsData: TimeSeriesData[] = cancellationsData.map(item => ({
-      date: item.date,
-      value: item.cancellations || 0,
-      comparison: item.comparisonCancellations
-    }));
+  // Add sample data for the TopFiveMultiple component
+  const bookingChannelCategories = [
+    { key: 'direct', label: 'Direct Bookings' },
+    { key: 'booking_com', label: 'Booking.com' },
+    { key: 'expedia', label: 'Expedia' },
+    { key: 'gds', label: 'GDS' },
+    { key: 'wholesalers', label: 'Wholesalers' },
+  ]
 
-    // Convert noShowsData to TimeSeriesData format
-    const formattedNoShowsData: TimeSeriesData[] = noShowsData.map(item => ({
-      date: item.date,
-      value: item.noShows || 0,
-      comparison: item.comparisonNoShows
-    }));
+  // Sample metrics for producers by booking channel
+  const producerMetrics = [
+    {
+      key: 'revenue',
+      label: 'Revenue',
+      prefix: '€',
+      data: [
+        { name: "Grand Hotel Berlin", value: 125000, change: 16500 },
+        { name: "Luxury Resort Milan", value: 98000, change: 18000 },
+        { name: "Boutique Paris", value: 85000, change: -7500 },
+        { name: "City Lodge Amsterdam", value: 76000, change: 8000 },
+        { name: "Beach Retreat Barcelona", value: 72000, change: -4000 },
+      ]
+    },
+    {
+      key: 'rooms',
+      label: 'Rooms Sold',
+      data: [
+        { name: "Grand Hotel Berlin", value: 850, change: 110 },
+        { name: "Luxury Resort Milan", value: 720, change: 150 },
+        { name: "Boutique Paris", value: 580, change: -50 },
+        { name: "City Lodge Amsterdam", value: 510, change: 60 },
+        { name: "Beach Retreat Barcelona", value: 490, change: -35 },
+      ]
+    },
+    {
+      key: 'adr',
+      label: 'ADR',
+      prefix: '€',
+      data: [
+        { name: "Grand Hotel Berlin", value: 195, change: 15 },
+        { name: "Luxury Resort Milan", value: 210, change: 22 },
+        { name: "Boutique Paris", value: 185, change: -12 },
+        { name: "City Lodge Amsterdam", value: 165, change: 8 },
+        { name: "Beach Retreat Barcelona", value: 155, change: -6 },
+      ]
+    }
+  ]
 
-    setCombinedCancellationsData(formattedCancellationsData);
-    setCombinedNoShowsData(formattedNoShowsData);
-  }, []);
+  // Sample distribution data
+  const producersDistributionData = [
+    { name: "Grand Hotel Berlin", value: 125000, percentage: 27.5, fill: "hsl(198, 85%, 45%)" },
+    { name: "Luxury Resort Milan", value: 98000, percentage: 21.5, fill: "hsl(150, 60%, 40%)" },
+    { name: "Boutique Paris", value: 85000, percentage: 18.7, fill: "hsl(280, 65%, 55%)" },
+    { name: "City Lodge Amsterdam", value: 76000, percentage: 16.7, fill: "hsl(210, 80%, 50%)" },
+    { name: "Beach Retreat Barcelona", value: 72000, percentage: 15.6, fill: "hsl(340, 70%, 50%)" },
+  ]
 
-  // Add inside OverviewDashboard component, after other render functions
-  const renderAreaChart = (
-    data: TimeSeriesData[], 
-    title: string, 
-    dataKey: string, 
-    comparisonDataKey: string,
-    color: string, 
-    comparisonColor: string, 
-    showSelector: boolean
-  ) => (
-    <Card className="bg-white shadow-lg rounded-lg overflow-hidden">
-      <CardHeader className="flex flex-col items-start">
-        <div className="flex w-full justify-between items-center">
-          <div>
-            <CardTitle className="text-md font-medium text-gray-800">{title}</CardTitle>
-          </div>
-        </div>
-      </CardHeader>
-      <CardContent>
-        <div style={{ height: 300 }}>
-          <ResponsiveContainer width="100%" height="100%">
-            <AreaChart
-              data={data}
-              margin={{ top: 20, right: 30, left: 0, bottom: comparisonType !== 'No comparison' ? 40 : 20 }}
-            >
-              <CartesianGrid horizontal={true} vertical={false} />
-              <XAxis
-                dataKey="date"
-                axisLine={false}
-                tickLine={false}
-                tick={{ dy: 15, fontSize: 11, fill: "#999", fontWeight: 500 }}
-              />
-              <YAxis
-                domain={[0, 'dataMax']}
-                axisLine={false}
-                tickLine={false}
-                tick={{ dx: -15, fontSize: 11, fill: "#999", fontWeight: 500 }}
-              />
-              <Tooltip />
-              {comparisonType === 'No comparison' ? (
-                <Area 
-                  type="monotone"
-                  dataKey="value"
-                  stroke={color}
-                  strokeWidth={2}
-                  fill={color}
-                  fillOpacity={0.1}
-                  dot={false}
-                  activeDot={{ r: 8 }}
-                />
-              ) : (
-                <>
-                  <Area 
-                    type="monotone"
-                    dataKey="value"
-                    stroke={color}
-                    strokeWidth={2}
-                    fill="none"
-                    dot={false}
-                    activeDot={{ r: 8 }}
-                  />
-                  <Area 
-                    type="monotone"
-                    dataKey="comparison"
-                    stroke={comparisonColor}
-                    strokeWidth={2}
-                    fill="none"
-                    dot={false}
-                    activeDot={{ r: 8 }}
-                  />
-                </>
-              )}
-            </AreaChart>
-          </ResponsiveContainer>
-        </div>
-        {comparisonType !== 'No comparison' && (
-          <div className="flex justify-center mt-4">
-            <div className="flex items-center space-x-8">
-              <div className="flex items-center">
-                <div className="w-2.5 h-2.5 rounded-full mr-2" style={{ backgroundColor: color }}></div>
-                <span className="text-xs text-gray-400">{getDisplayTimeframe(selectedTimeframe)}</span>
-              </div>
-              <div className="flex items-center">
-                <div className="w-2.5 h-2.5 rounded-full mr-2" style={{ backgroundColor: comparisonColor }}></div>
-                <span className="text-xs text-gray-400">{`${getDisplayTimeframe(selectedTimeframe)} ${comparisonType === 'Last year' ? 'STLY' : 'Budget'}`}</span>
-              </div>
-            </div>
-          </div>
-        )}
-      </CardContent>
-      <div className="px-6 py-4">
-        <hr className="border-t border-gray-200 mb-4" />
-        <div className="flex justify-end">
-          <button
-            className="text-blue-600 hover:text-blue-800 font-medium text-sm focus:outline-none"
-            onClick={() => {
-              const formattedData = data.map(item => ({
-                date: item.date,
-                value: item.value,
-                comparison: item.comparison
-              }));
-              setSelectedMetricCard({
-                title,
-                data: formattedData
-              });
-            }}
-          >
-            View Details
-          </button>
-        </div>
-      </div>
-    </Card>
-  );
+  // Sample time series data
+  const producersTimeSeriesData = [
+    { 
+      date: "January",
+      categories: {
+        berlin: { current: 125000, previous: 108500 },
+        milan: { current: 98000, previous: 80000 },
+        paris: { current: 85000, previous: 92500 }
+      }
+    },
+    { 
+      date: "February",
+      categories: {
+        berlin: { current: 127000, previous: 110000 },
+        milan: { current: 99500, previous: 81500 },
+        paris: { current: 83000, previous: 90000 }
+      }
+    },
+    // Add more months as needed
+  ]
 
-  // First, add these new state variables near the top of the OverviewDashboard component
-  const [selectedTab, setSelectedTab] = useState<Tab>('All');
-  const [selectedMetricCard, setSelectedMetricCard] = useState<MetricCard | null>(null);
+  // Add new state for selected booking channel
+  const [selectedBookingChannel, setSelectedBookingChannel] = useState<keyof typeof BOOKING_CHANNELS>('direct');
 
-  // Add the new CustomDialog for metrics near the end of the component, alongside the existing dialogs
   return (
-    <div className="flex-1 overflow-auto">
-      <div className="p-8">
+    <div className="flex-1 overflow-auto bg-[#f5f8ff]">
+        {/* Header with Filters */}
+        <div className="fixed top-0 left-[256px] right-0 z-30 flex justify-between items-center mb-6 bg-white py-6 px-12 border-b border-gray-300 shadow-sm">
+          <div>
+            <h2 className="text-xl font-bold text-gray-800 mb-1">Booking channels</h2>
+            <span className='text-gray-400 font-ligth mt-3 pt-2 text-sm'>{`${selectedTimeFrame} ${selectedViewType}`}</span>
+          </div>
 
-        {/* Header */}
-        <div className="flex flex-col mb-6">
-          <div className="flex justify-between items-center">  
-            <div className="flex items-center">
-              <h2 className="text-3xl font-bold text-gray-800">Booking Channels</h2>
-            </div>
-            <div className="flex space-x-4 items-center">
-              <Button 
-                variant="ghost" 
-                onClick={handleExportToExcel}
-                className="flex items-center space-x-2 text-blue-600"
-              >
-                <DownloadIcon className="h-4 w-4" />
-                <span>Export to Excel</span>
-              </Button>
+          <div className="flex items-center space-x-8">
+            {/* Combined Time Frame and View Type Dropdown */}
+            <div className="flex flex-col">
+              <span className="text-xs text-gray-500 mb-2">Selected period</span>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="outline">
-                    {selectedHotels.length === 1 ? selectedHotels[0] : `${selectedHotels.length} Hotels`} <ChevronDownIcon className="ml-2 h-4 w-4" />
+                  <Button 
+                    variant="ghost" 
+                    className="bg-[#f2f8ff] hover:bg-[#f2f8ff] text-[#342630] rounded-full px-4"
+                  >
+                    {`${selectedTimeFrame} ${selectedViewType}`} <TriangleDown className="ml-2" />
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent>
-                  <DropdownMenuItem onSelect={toggleAllHotels}>
-                    <div className="flex items-center">
-                      <div className={`mr-2 h-4 w-4 border rounded-sm flex items-center justify-center ${selectedHotels.length === allHotels.length ? 'bg-primary border-primary' : 'border-input'}`}>
-                        {selectedHotels.length === allHotels.length && <Check className="h-3 w-3 text-primary-foreground" />}
-                      </div>  
-                      Select All
-                    </div>
-                  </DropdownMenuItem>
-                  {allHotels.map((hotel) => (
-                    <DropdownMenuItem key={hotel} onSelect={() => toggleHotel(hotel)}>
-                      <div className="flex items-center">
-                        <div className={`mr-2 h-4 w-4 border rounded-sm flex items-center justify-center ${selectedHotels.includes(hotel) ? 'bg-primary border-primary' : 'border-input'}`}>
-                          {selectedHotels.includes(hotel) && <Check className="h-3 w-3 text-primary-foreground" />}
-                        </div>
-                        {hotel}
-                      </div>  
+                <DropdownMenuContent className="w-56">
+                  {/* Day Group */}
+                  <div className="px-2 py-2 text-sm font-semibold text-gray-800  border-b border-gray-300">
+                    Day
+                  </div>
+                  <div className="p-1 text-gray-600">
+                    <DropdownMenuItem onSelect={() => { setSelectedTimeFrame("Day"); setSelectedViewType("Actual"); }}>
+                      Actual
                     </DropdownMenuItem>
-                  ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
-                
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline">
-                    {selectedTimeframe.includes('-') ? selectedTimeframe : `${selectedTimeframe}`} <ChevronDownIcon className="ml-2 h-4 w-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent ref={dropdownRef} className={`p-0 ${isCalendarVisible ? 'w-[500px]' : 'w-[250px]'}`}>
-                  <div className="flex">
-                    <div className="w-full border-r pl-2 pt-2 pb-2">
-                      {timeframeOptions.map((group) => (
-                        <div key={group.label}>
-                          <div className="px-2 py-1.5 text-sm font-medium text-gray-900 border-gray-200">
-                            {group.label}
-                          </div>
-                          {group.type === 'dropdown' && group.options?.map((option) => (
-                            <DropdownMenuItem
-                              key={`${group.label}-${option.value}`}
-                              onSelect={() => {
-                                handleTimeframeSelect(option.value);
-                                setIsCalendarVisible(false);
-                              }}
-                              className="pl-4"
-                            >
-                              <span className='text-sm text-gray-500'>{option.label}</span>
-                            </DropdownMenuItem>
-                          ))}
-                          {group.type === 'calendar' && (
-                            <DropdownMenuItem
-                              onSelect={(e) => {
-                                e.preventDefault();
-                                group.onClick && group.onClick();
-                              }}
-                              className="pl-4 flex items-center"
-                            >
-                              <CalendarIcon className="mr-2 h-4 w-4 text-gray-500" />
-                              <span className='text-sm text-gray-500'>Choose dates</span>
-                            </DropdownMenuItem>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                    {isCalendarVisible && (
-                      <div className="w-[250px] p-2">
-                        <Calendar
-                          mode="range"
-                          selected={tempDateRange}
-                          onSelect={handleDateRangeSelect}
-                          numberOfMonths={1}
-                          className="w-full"
-                        />
-                        <div className="flex justify-between mt-2">
-                          <button onClick={hideCalendar} className="text-sm text-black bg-gray-100 border border-gray-300 px-3 py-1 rounded">Hide</button>
-                          <button onClick={applyDateRange} className="text-sm text-white bg-black px-3 py-1 rounded">Apply</button>
-                        </div>
-                      </div>
-                    )}
+                    <DropdownMenuItem onSelect={() => { setSelectedTimeFrame("Day"); setSelectedViewType("OTB"); }}>
+                      OTB
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => { setSelectedTimeFrame("Day"); setSelectedViewType("Projected"); }}>
+                      Projected
+                    </DropdownMenuItem>
+                  </div>
+                  
+                  {/* Month Group */}
+                  <div className="px-2 py-2 text-sm font-semibold text-gray-800  border-y border-gray-300">
+                    Month
+                  </div>
+                  <div className="p-1 text-gray-600">
+                    <DropdownMenuItem onSelect={() => { setSelectedTimeFrame("Month"); setSelectedViewType("Actual"); }}>
+                      Actual
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => { setSelectedTimeFrame("Month"); setSelectedViewType("OTB"); }}>
+                      OTB
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => { setSelectedTimeFrame("Month"); setSelectedViewType("Projected"); }}>
+                      Projected
+                    </DropdownMenuItem>
+                  </div>
+                  
+                  {/* Year Group */}
+                  <div className="px-2 py-2 text-sm font-semibold text-gray-800  border-y border-gray-300">
+                    Year
+                  </div>
+                  <div className="p-1">
+                    <DropdownMenuItem onSelect={() => { setSelectedTimeFrame("Year"); setSelectedViewType("Actual"); }}>
+                      Actual
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => { setSelectedTimeFrame("Year"); setSelectedViewType("OTB"); }}>
+                      OTB
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => { setSelectedTimeFrame("Year"); setSelectedViewType("Projected"); }}>
+                      Projected
+                    </DropdownMenuItem>
                   </div>
                 </DropdownMenuContent>
               </DropdownMenu>
+            </div>
 
+            {/* Comparison Dropdown with Label */}
+            <div className="flex flex-col">
+              <span className="text-xs text-gray-500 mb-2">Compare with:</span>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="outline">
-                    Compare with: {comparisonType} <ChevronDownIcon className="ml-2 h-4 w-4" />
+                  <Button 
+                    variant="ghost" 
+                    className="bg-[#f2f8ff] hover:bg-[#f2f8ff] text-[#342630] rounded-full px-4"
+                  >
+                    {selectedComparison} <TriangleDown className="ml-2" />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent>
-                  <DropdownMenuItem onSelect={() => setComparisonType('Last year')}>
-                    Last year
+                  <DropdownMenuItem onSelect={() => setSelectedComparison("Last year - OTB")}>
+                     Last year - OTB
                   </DropdownMenuItem>
-                  <DropdownMenuItem onSelect={() => setComparisonType('Budget')}>
-                    Budget
+                  <DropdownMenuItem onSelect={() => setSelectedComparison("Last year (match day of week) - OTB")}>
+                     Last year (match day of week) - OTB
                   </DropdownMenuItem>
-                  <DropdownMenuItem onSelect={() => setComparisonType('No comparison')}>
-                    No comparison
+                  <DropdownMenuItem onSelect={() => setSelectedComparison("Last year - Actual")}>
+                     Last year - Actual
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => setSelectedComparison("Last year (match day of week) - Actual")}>
+                     Last year (match day of week) - Actual
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
+            </div>
+            
+            {/* Date Picker with Label */}
+            <div className="flex flex-col">
+              <span className="text-xs text-gray-500 mb-2">Business date</span>
+              <DatePicker 
+                date={date} 
+                onDateChange={handleDateChange}
+              />
+            </div>
+
+            {/* Hotel Selector with Label */}
+            <div className="flex flex-col">
+              <span className="text-xs text-gray-500 mb-2">Property</span>
+              <HotelSelector 
+                selectedHotels={selectedHotels}
+                setSelectedHotels={setSelectedHotels}
+              />
+            </div>
+
+            {/* Export Button */}
+            {/* <Button 
+              variant="ghost" 
+              className="flex items-center space-x-2 text-blue-600 mt-7"
+            >
+              <DownloadIcon className="h-4 w-4" />
+              <span>Export to Excel</span>
+            </Button> */}
+          </div>
+        </div>
+
+        {/* Add the charts */}
+        <div className="mt-[140px] px-12 py-0">
+          {/* Add the existing CategoriesDetailContent component */}
+          <div className="mb-8">
+            <CategoriesDetailContent
+              title="Booking Channels Analysis"
+              categories={BOOKING_CHANNELS}
+              prefix="€"
+            />
+          </div>
+          
+          {/* Add the TopFiveMultiple component underneath */}
+          <div className="mb-8 grid grid-cols-2 gap-6">
+            <TopFive 
+              title="Top Producers"
+              subtitle="by Booking Channel"
+              color="blue"
+              categories={bookingChannelCategories}
+              metrics={producerMetrics}
+              distributionData={producersDistributionData}
+              categoryTimeSeriesData={producersTimeSeriesData}
+            />
+            
+            {/* Replace the empty div with the new component */}
+            <div className="bg-white rounded-lg shadow overflow-hidden">
+              <HorizontalBarChartMultipleDatasets 
+                datasets={[
+                  {
+                    key: "lengthOfStay",
+                    title: "Length of Stay",
+                    data: lengthOfStayByChannelData[selectedBookingChannel]
+                  }
+                ]}
+                defaultDataset="lengthOfStay"
+                categories={[
+                  { key: "direct", label: "Direct Bookings" },
+                  { key: "booking_com", label: "Booking.com" },
+                  { key: "expedia", label: "Expedia" },
+                  { key: "gds", label: "GDS" },
+                  { key: "wholesalers", label: "Wholesalers" }
+                ]}
+                defaultCategory={selectedBookingChannel}
+              />
             </div>
           </div>
           
-          {/* Add the tabs */}
-          <div className="flex space-x-8 mt-6 border-b">
-            {(['All', 'Direct', 'OTA', 'Travel Agent', 'Corporate'] as Tab[]).map((tab) => (
-              <button
-                key={tab}
-                onClick={() => setSelectedTab(tab)}
-                className={cn(
-                  "pb-4 text-sm font-medium transition-colors relative",
-                  selectedTab === tab
-                    ? "text-blue-600 border-b-2 border-blue-600"
-                    : "text-gray-500 hover:text-gray-900"
-                )}
-              >
-                {tab}
-              </button>
-            ))}
-          </div>
-        </div>
-                  
-        {/* Numerical Cards Grid */}
-        {selectedTab !== 'All' && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-            {numericalData.map((item) => (
-              <motion.div
-                key={item.title}
-                whileHover={{ scale: 1.05, boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)" }}
-                onClick={() => handleCardClick(item.title)}
-                className="cursor-pointer"
-              >
-                <Card className="bg-white shadow-lg rounded-lg overflow-hidden relative border border-gray-300">
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 bg-gray-0 py-3 pt-4">
-                    <div className="flex items-center mt-1">
-                      <CardTitle className="text-sm font-medium text-gray-600">
-                        {item.title}  
-                      </CardTitle>
+          {/* Add the new World Map with TopFiveMultiple component in a new row */}
+          <div className="mt-8">
+            <Card className="bg-white rounded-lg overflow-hidden">
+              <CardHeader className="flex flex-col items-start">
+                <div className="flex w-full justify-between items-center">
+                  <div>
+                    <CardTitle className="text-lg font-semibold text-gray-800 mb-3">Global Distribution by Booking Channel</CardTitle>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 gap-8">
+                  {/* World Map Side */}
+                  <div>
+                    <div className="h-[500px] flex justify-center items-center">
+                      <WorldMap
+                        color="rgb(59, 130, 246)"
+                        title=""
+                        valueSuffix="€"
+                        size="xl"
+                        data={countryData}
+                        tooltipBgColor="black"
+                        tooltipTextColor="white"
+                        richInteraction={true}
+                      />
                     </div>
-                    <ArrowRightIcon className="h-4 w-4 text-gray-400" />
-                  </CardHeader>
-                  <CardContent className="py-6">
-                    <div className="flex items-center justify-between">
-                      <div className="text-xl font-bold text-gray-800">{item.value}</div>
-                      <div className={`flex items-center text-sm font-medium ${
-                        comparisonType === 'No comparison' 
-                          ? 'text-gray-400'
-                          : item.change >= 0 
-                            ? 'text-green-600' 
-                            : 'text-red-600'
-                      }`}>
-                        {comparisonType === 'No comparison' 
-                          ? '-'
-                          : `${item.change >= 0 ? '↑' : '↓'} ${Math.abs(item.change)}%`
-                        }
+                    <div className="flex justify-center mt-4">
+                      <div className="flex items-center space-x-8">
+                        <div className="flex items-center">
+                          <div className="w-24 h-3 bg-gradient-to-r from-blue-100 to-blue-600"></div>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <span className="text-sm text-gray-500">Lower</span>
+                          <span className="text-sm text-gray-500">-</span>
+                          <span className="text-sm text-gray-500">Higher Revenue</span>
+                        </div>
                       </div>
                     </div>
-                  </CardContent>
-                </Card>
-              </motion.div>
-            ))}
+                  </div>
+
+                  {/* TopFiveMultiple by Booking Channel Side */}
+                  <div className="border-l border-gray-100 pl-8">
+                    <TopFive 
+                      title="Top Countries Performance"
+                      color="blue"
+                      withBorder={false}
+                      categories={bookingChannelCategories}
+                      metrics={countryMetricsByChannel[selectedBookingChannel]}
+                      distributionData={countryDistributionByChannel[selectedBookingChannel]}
+                      categoryTimeSeriesData={countryTimeSeriesByChannel[selectedBookingChannel]}
+                    />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           </div>
-        )}
-
-        {/* Graph Displays */}
-        <div className="grid grid-cols-1 gap-8">
-          {selectedTab === 'All' ? (
-            <BookingChannelsTable data={bookingChannelTableData} comparisonType={comparisonType} />
-          ) : (
-            renderChart(roomTypes, "Room Types", "roomTypes")
-          )}
         </div>
 
-        {/* Line Charts */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-8">
-          {renderAreaChart(
-            generateLineChartComparisonData(avgLengthOfStayData), 
-            "Average Length of Stay", 
-            "value", 
-            "comparison",
-            "#60a5fa", 
-            "#82ca9d", 
-            false
-          )}
-          {renderAreaChart(
-            generateLineChartComparisonData(leadTimeData), 
-            "Lead Time", 
-            "value", 
-            "comparison",
-            "#60a5fa", 
-            "#82ca9d", 
-            false
-          )}
+        {/* Add this section at the bottom of the return statement before the final closing div */}
+        <div className="mt-8 px-12 pb-12 grid grid-cols-2 gap-6">
+          <div className="bg-white rounded-lg shadow overflow-hidden">
+            <HorizontalBarChartMultipleDatasets 
+              datasets={[
+                {
+                  key: "cancellation",
+                  title: "Cancellation Lead Time",
+                  data: cancellationLeadTimeByChannelData[selectedBookingChannel]
+                },
+                {
+                  key: "leadTime",
+                  title: "Lead Time",
+                  data: leadTimeByChannelData[selectedBookingChannel]
+                }
+              ]}
+              defaultDataset="cancellation"
+              categories={[
+                { key: "direct", label: "Direct Bookings" },
+                { key: "booking_com", label: "Booking.com" },
+                { key: "expedia", label: "Expedia" },
+                { key: "gds", label: "GDS" },
+                { key: "wholesalers", label: "Wholesalers" }
+              ]}
+              defaultCategory={selectedBookingChannel}
+            />
+          </div>
+          <ReservationsByDayChart 
+            data={reservationsByDayData} 
+            color="blue"
+            categories={[
+              { key: "direct", label: "Direct Bookings" },
+              { key: "booking_com", label: "Booking.com" },
+              { key: "expedia", label: "Expedia" },
+              { key: "gds", label: "GDS" },
+              { key: "wholesalers", label: "Wholesalers" }
+            ]}
+          />
         </div>
-      </div>
-
-      {/* Custom Dialog */}
-      <CustomDialog
-        selectedCard={selectedCard}
-        closeDialog={closeDialog}
-        selectedTimeframe={selectedTimeframe}
-        comparisonType={comparisonType}
-        pieChartData={pieChartData}
-        comparisonPieChartData={comparisonPieChartData}
-      />
-
-      {/* Custom Dialog for Metrics */}
-      <CustomDialog
-        selectedCard={selectedMetricCard?.title || null}
-        closeDialog={() => setSelectedMetricCard(null)}
-        selectedTimeframe={selectedTimeframe}
-        comparisonType={comparisonType}
-        customData={selectedMetricCard?.data}
-      />
-
-      {/* Add DetailedDialog */}
-      {selectedDetailedChart && (
-        <DetailedDialog
-          title={selectedDetailedChart.replace(/([A-Z])/g, ' $1').trim().replace(/^\w/, c => c.toUpperCase())}
-          subtitle={`${getDisplayTimeframe(selectedTimeframe)} vs ${getDisplayTimeframe(selectedTimeframe)} ${comparisonType === 'Last year' ? 'STLY' : 'Budget'}`}
-          closeDialog={() => setSelectedDetailedChart(null)}
-          selectedData={
-            selectedDetailedChart === 'marketSegments' ? marketSegments :
-            selectedDetailedChart === 'roomTypes' ? roomTypes :
-            selectedDetailedChart === 'bookingChannels' ? bookingChannels :
-            geoSources
-          }
-          comparisonData={generateComparisonData(
-            selectedDetailedChart === 'marketSegments' ? marketSegments :
-            selectedDetailedChart === 'roomTypes' ? roomTypes :
-            selectedDetailedChart === 'bookingChannels' ? bookingChannels :
-            geoSources
-          )}
-        />
-      )}
-
     </div>
   )
-}
+} 

@@ -12,8 +12,6 @@ const sidebarLinks = [
   { name: "Booking Channels", icon: GlobeIcon, path: "/booking-channels" },
   { name: "Market Segments", icon: UsersIcon, path: "/market-segments" },
   { name: "Room Types", icon: BedDoubleIcon, path: "/room-types" },
-  { name: "Geo Source", icon: MapPinIcon, path: "/geo-source" },
-  { name: "Age Bucket", icon: UserIcon, path: "/age-bucket" },
   { name: "Pickup", icon: CalendarIcon, path: "/pickup" },
   { name: "Pace", icon: TrendingUpIcon, path: "/pace" },
 ]

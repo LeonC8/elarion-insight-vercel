@@ -37,6 +37,14 @@ import { ResponsivePie } from '@nivo/pie'
 import { ResponsiveBar, BarDatum } from '@nivo/bar'
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts'
 import { cn } from "@/lib/utils"
+import { HotelSelector } from '../new/HotelSelector'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog"
 
 // Add the COLORS constant
 const COLORS = ['rgba(59, 130, 246, 0.5)', 'rgba(34, 197, 94, 0.5)', 'rgba(234, 179, 8, 0.5)', 'rgba(239, 68, 68, 0.5)']
@@ -493,7 +501,15 @@ const calculateRowSum = (rowData: { [key: string]: PickupMetrics }, metric: Metr
 };
 
 // Update the MonthlyPickupTable component's return statement
-const MonthlyPickupTable = ({ selectedMetric, selectedDate }: { selectedMetric: MetricType; selectedDate: Date }) => {
+const MonthlyPickupTable = ({ 
+  selectedMetric, 
+  selectedDate,
+  onCellClick 
+}: { 
+  selectedMetric: MetricType; 
+  selectedDate: Date;
+  onCellClick: (date: string, month: string) => void;
+}) => {
   const monthDates = generateMonthDates(selectedDate);
   const today = new Date();
 
@@ -576,7 +592,8 @@ const MonthlyPickupTable = ({ selectedMetric, selectedDate }: { selectedMetric: 
                   return (
                     <td 
                       key={date} 
-                      className={`px-6 py-4 whitespace-nowrap text-sm text-gray-500 transition-colors ${colorClass}`}
+                      className={`px-6 py-4 whitespace-nowrap text-sm text-gray-500 transition-colors ${colorClass} cursor-pointer hover:bg-gray-100`}
+                      onClick={() => onCellClick(format(new Date(date), 'dd MMM yyyy'), format(new Date(date), 'MMM yyyy'))}
                     >
                       {formatValue(row.pickupData[date])}
                     </td>
@@ -597,13 +614,22 @@ const MonthlyPickupTable = ({ selectedMetric, selectedDate }: { selectedMetric: 
 };
 
 // Update the YearlyPickupTable component's return statement similarly
-const YearlyPickupTable = ({ selectedMetric, selectedDate }: { selectedMetric: MetricType; selectedDate: Date }) => {
+const YearlyPickupTable = ({ 
+  selectedMetric, 
+  selectedDate,
+  onCellClick 
+}: { 
+  selectedMetric: MetricType; 
+  selectedDate: Date;
+  onCellClick: (date: string, month: string) => void;
+}) => {
   const bookingDays = generateDaysFromMonthStart(selectedDate);
   const yearMonths = generateYearMonths(selectedDate);
   const today = new Date();
 
   // Sample data - replace with actual data
   const pickupData: YearlyPickupData[] = bookingDays.map(date => ({
+    bookingMonth: format(new Date(date), 'MMM yyyy'), // Fix: Add the required bookingMonth property
     bookingDate: date,
     pickupData: yearMonths.reduce((acc, stayMonth) => {
       const bookingDay = new Date(date);
@@ -681,7 +707,8 @@ const YearlyPickupTable = ({ selectedMetric, selectedDate }: { selectedMetric: M
                   return (
                     <td 
                       key={month} 
-                      className={`px-6 py-4 whitespace-nowrap text-sm text-gray-500 transition-colors ${colorClass}`}
+                      className={`px-6 py-4 whitespace-nowrap text-sm text-gray-500 transition-colors ${colorClass} cursor-pointer hover:bg-gray-100`}
+                      onClick={() => onCellClick(format(new Date(row.bookingDate), 'dd MMM yyyy'), month)}
                     >
                       {formatValue(row.pickupData[month])}
                     </td>
@@ -707,6 +734,13 @@ export function PickupDashboard() {
   const [selectedHotels, setSelectedHotels] = useState<string[]>(["Hotel 1"]);
   const [selectedDate] = useState(new Date());
   const allHotels = ["Hotel 1", "Hotel 2", "Hotel 3"];
+  const [showStatsModal, setShowStatsModal] = useState(false);
+  const [selectedCell, setSelectedCell] = useState<{date: string, month: string} | null>(null);
+
+  const handleCellClick = (date: string, month: string) => {
+    setSelectedCell({date, month});
+    setShowStatsModal(true);
+  };
 
   const toggleAllHotels = () => {
     setSelectedHotels(prev => 
@@ -722,6 +756,11 @@ export function PickupDashboard() {
     );
   };
 
+  // Function to close the modal
+  const closeStatsModal = () => {
+    setShowStatsModal(false);
+  };
+
   return (
     <div className="flex-1 overflow-auto">
       <div className="p-8">
@@ -731,97 +770,164 @@ export function PickupDashboard() {
               <h2 className="text-3xl font-bold text-gray-800">Pickup</h2>
             </div>
             <div className="flex space-x-4 items-center">
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline">
-                    {selectedView === 'month' ? 'Month View' : 'Year View'} <ChevronDownIcon className="ml-2 h-4 w-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent>
-                  <DropdownMenuItem onSelect={() => setSelectedView('month')}>
-                    Month View
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onSelect={() => setSelectedView('year')}>
-                    Year View
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline">
-                    {selectedHotels.length === 1 ? selectedHotels[0] : `${selectedHotels.length} Hotels`} <ChevronDownIcon className="ml-2 h-4 w-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent>
-                  <DropdownMenuItem onSelect={toggleAllHotels}>
-                    <div className="flex items-center">
-                      <div className={`mr-2 h-4 w-4 border rounded-sm flex items-center justify-center ${selectedHotels.length === allHotels.length ? 'bg-primary border-primary' : 'border-input'}`}>
-                        {selectedHotels.length === allHotels.length && <Check className="h-3 w-3 text-primary-foreground" />}
-                      </div>  
-                      Select All
-                    </div>
-                  </DropdownMenuItem>
-                  {allHotels.map((hotel) => (
-                    <DropdownMenuItem key={hotel} onSelect={() => toggleHotel(hotel)}>
-                      <div className="flex items-center">
-                        <div className={`mr-2 h-4 w-4 border rounded-sm flex items-center justify-center ${selectedHotels.includes(hotel) ? 'bg-primary border-primary' : 'border-input'}`}>
-                          {selectedHotels.includes(hotel) && <Check className="h-3 w-3 text-primary-foreground" />}
-                        </div>
-                        {hotel}
-                      </div>  
+              {/* New style dropdown for view selection */}
+              <div className="flex flex-col">
+                <span className="text-xs text-gray-500 mb-2">View type</span>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button 
+                      variant="ghost" 
+                      className="bg-[#f2f8ff] hover:bg-[#f2f8ff] text-[#342630] rounded-full px-4"
+                    >
+                      {selectedView === 'month' ? 'Month View' : 'Year View'} <ChevronDownIcon className="ml-2 h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent>
+                    <DropdownMenuItem onSelect={() => setSelectedView('month')}>
+                      Month View
                     </DropdownMenuItem>
-                  ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
+                    <DropdownMenuItem onSelect={() => setSelectedView('year')}>
+                      Year View
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+
+              {/* New style dropdown for metric selection */}
+              <div className="flex flex-col">
+                <span className="text-xs text-gray-500 mb-2">Metric</span>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button 
+                      variant="ghost" 
+                      className="bg-[#f2f8ff] hover:bg-[#f2f8ff] text-[#342630] rounded-full px-4"
+                    >
+                      {selectedMetric === 'soldRooms' ? 'Sold Rooms' : 
+                       selectedMetric === 'revenue' ? 'Revenue' : 'ADR'} <ChevronDownIcon className="ml-2 h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent>
+                    <DropdownMenuItem onSelect={() => setSelectedMetric('soldRooms')}>
+                      Sold Rooms
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => setSelectedMetric('revenue')}>
+                      Revenue
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => setSelectedMetric('adr')}>
+                      ADR
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+
+              {/* Advanced Hotel Selector from Overview page */}
+              <div className="flex flex-col">
+                <span className="text-xs text-gray-500 mb-2">Property</span>
+                <HotelSelector 
+                  selectedHotels={selectedHotels}
+                  setSelectedHotels={setSelectedHotels}
+                />
+              </div>
             </div>
-          </div>
-          
-          <div className="flex space-x-8 mt-6 border-b">
-            <button
-              onClick={() => setSelectedMetric('soldRooms')}
-              className={cn(
-                "pb-4 text-sm font-medium transition-colors relative",
-                selectedMetric === 'soldRooms'
-                  ? "text-blue-600 border-b-2 border-blue-600"
-                  : "text-gray-500 hover:text-gray-900"
-              )}
-            >
-              Sold Rooms
-            </button>
-            <button
-              onClick={() => setSelectedMetric('revenue')}
-              className={cn(
-                "pb-4 text-sm font-medium transition-colors relative",
-                selectedMetric === 'revenue'
-                  ? "text-blue-600 border-b-2 border-blue-600"
-                  : "text-gray-500 hover:text-gray-900"
-              )}
-            >
-              Revenue
-            </button>
-            <button
-              onClick={() => setSelectedMetric('adr')}
-              className={cn(
-                "pb-4 text-sm font-medium transition-colors relative",
-                selectedMetric === 'adr'
-                  ? "text-blue-600 border-b-2 border-blue-600"
-                  : "text-gray-500 hover:text-gray-900"
-              )}
-            >
-              ADR
-            </button>
           </div>
         </div>
 
         <div className="mt-6">
           {selectedView === 'month' ? (
-            <MonthlyPickupTable selectedMetric={selectedMetric} selectedDate={selectedDate} />
+            <MonthlyPickupTable 
+              selectedMetric={selectedMetric} 
+              selectedDate={selectedDate} 
+              onCellClick={handleCellClick}
+            />
           ) : (
-            <YearlyPickupTable selectedMetric={selectedMetric} selectedDate={selectedDate} />
+            <YearlyPickupTable 
+              selectedMetric={selectedMetric} 
+              selectedDate={selectedDate} 
+              onCellClick={handleCellClick}
+            />
           )}
         </div>
       </div>
+
+      {/* Replace the existing modal with Dialog component */}
+      <Dialog open={showStatsModal} onOpenChange={setShowStatsModal}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-bold">
+              Statistics for {selectedCell?.date}
+            </DialogTitle>
+            <DialogDescription className="text-base text-gray-500 text-sm pt-2">
+              Business date: {format(new Date(), 'dd MMM yyyy')}
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="grid grid-cols-4 gap-4 mt-6">
+            {/* Rooms Sold */}
+            <div className="rounded-lg border border-gray-100 p-5 flex flex-col items-center text-center">
+              <div className="text-sm text-gray-500 font-medium">Rooms Sold</div>
+              <div className="text-3xl font-bold mt-4 mb-8">0</div>
+              <div className="text-sm text-gray-500">Variance LY</div>
+              <div className="text-md font-medium text-green-500">+8%</div>
+            </div>
+            
+            {/* Revenue */}
+            <div className="rounded-lg border border-gray-100 p-5 flex flex-col items-center text-center">
+              <div className="text-sm text-gray-500 font-medium">Revenue</div>
+              <div className="text-3xl font-bold mt-4 mb-8">€0</div>
+              <div className="text-sm text-gray-500">Variance LY</div>
+              <div className="text-md font-medium text-red-500">-13%</div>
+            </div>
+            
+            {/* ADR */}
+            <div className="rounded-lg border border-gray-100 p-5 flex flex-col items-center text-center">
+              <div className="text-sm text-gray-500 font-medium">ADR</div>
+              <div className="text-3xl font-bold mt-4 mb-8">€0</div>
+              <div className="text-sm text-gray-500">Variance LY</div>
+              <div className="text-md font-medium text-green-500">+14%</div>
+            </div>
+            
+            {/* Occupancy */}
+            <div className="rounded-lg border border-gray-100 p-5 flex flex-col items-center text-center">
+              <div className="text-sm text-gray-500 font-medium">Occupancy</div>
+              <div className="text-3xl font-bold mt-4 mb-8">86%</div>
+              <div className="text-sm text-gray-500">Variance LY</div>
+              <div className="text-md font-medium text-red-500">-10%</div>
+            </div>
+            
+            {/* Rooms Cancelled */}
+            <div className="rounded-lg border border-gray-100 p-5 flex flex-col items-center text-center">
+              <div className="text-sm text-gray-500 font-medium">Rooms Cancelled</div>
+              <div className="text-3xl font-bold mt-4 mb-8">0</div>
+              <div className="text-sm text-gray-500">Variance LY</div>
+              <div className="text-md font-medium text-gray-500">0%</div>
+            </div>
+            
+            {/* Revenue Cancelled */}
+            <div className="rounded-lg border border-gray-100 p-5 flex flex-col items-center text-center">
+              <div className="text-sm text-gray-500 font-medium">Revenue Lost</div>
+              <div className="text-3xl font-bold mt-4 mb-8">€474</div>
+              <div className="text-sm text-gray-500">Variance LY</div>
+              <div className="text-md font-medium text-green-500">+16%</div>
+            </div>
+            
+            {/* Rooms Available */}
+            <div className="rounded-lg border border-gray-100 p-5 flex flex-col items-center text-center">
+              <div className="text-sm text-gray-500 font-medium">Rooms Available</div>
+              <div className="text-3xl font-bold mt-4 mb-8">32</div>
+              <div className="text-sm text-gray-500">Variance LY</div>
+              <div className="text-md font-medium text-red-500">-6%</div>
+            </div>
+            
+            {/* RevPAR */}
+            <div className="rounded-lg border border-gray-100 p-5 flex flex-col items-center text-center">
+              <div className="text-sm text-gray-500 font-medium">RevPAR</div>
+              <div className="text-3xl font-bold mt-4 mb-8">€43</div>
+              <div className="text-sm text-gray-500">Variance LY</div>
+              <div className="text-md font-medium text-red-500">-8%</div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

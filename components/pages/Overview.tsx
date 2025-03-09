@@ -1235,7 +1235,7 @@ function TriangleDown({ className }: { className?: string }) {
   )
 }
 
-export function OverviewCopy() {
+export function Overview() {
   // Add date state
   const [date, setDate] = useState<Date>(new Date())
   

@@ -74,14 +74,14 @@ const CATEGORY_COLORS = {
 
 // Define all possible categories
 const allCategories: Category[] = [
-  { id: 'leisure', name: 'Leisure Travelers', color: CATEGORY_COLORS.leisure },
-  { id: 'business', name: 'Business Travelers', color: CATEGORY_COLORS.business },
-  { id: 'groups', name: 'Group Bookings', color: CATEGORY_COLORS.groups },
-  { id: 'conferences', name: 'Conferences & Events', color: CATEGORY_COLORS.conferences },
-  { id: 'wholesale', name: 'Wholesale/Tour Operators', color: CATEGORY_COLORS.wholesale },
-  { id: 'government', name: 'Government', color: CATEGORY_COLORS.government },
-  { id: 'packages', name: 'Package Deals', color: CATEGORY_COLORS.packages },
-  { id: 'other', name: 'Other', color: CATEGORY_COLORS.other }
+  { id: 'standard', name: 'Standard Rooms', color: CATEGORY_COLORS.leisure },
+  { id: 'deluxe', name: 'Deluxe Rooms', color: CATEGORY_COLORS.business },
+  { id: 'suite', name: 'Suites', color: CATEGORY_COLORS.groups },
+  { id: 'executive', name: 'Executive Rooms', color: CATEGORY_COLORS.conferences },
+  { id: 'family', name: 'Family Rooms', color: CATEGORY_COLORS.wholesale },
+  { id: 'connecting', name: 'Connecting Rooms', color: CATEGORY_COLORS.government },
+  { id: 'accessible', name: 'Accessible Rooms', color: CATEGORY_COLORS.packages },
+  { id: 'other', name: 'Other Room Types', color: CATEGORY_COLORS.other }
 ]
 
 // Define available datasets

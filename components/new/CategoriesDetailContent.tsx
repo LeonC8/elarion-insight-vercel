@@ -322,7 +322,7 @@ export function CategoriesDetailContent({
         <Card className="border-gray-300">
           <CardHeader>
             <div className="flex justify-between items-center">
-              <h3 className="text-lg font-medium">Distribution</h3>
+              <h3 className="text-lg font-medium">Current</h3>
               <div className="flex items-center gap-3">
                 {/* Chart Type Selector */}
                 <DropdownMenu>
@@ -739,7 +739,7 @@ export function CategoriesDetailContent({
                     return (
                       <TableRow key={row.categoryId} className="border-b border-[#d0d7e3] last:border-0">
                         <TableCell 
-                          className="text-left border-r border-[#d0d7e3] min-w-[180px] sticky left-0 bg-white z-10 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]"
+                          className="text-left border-r border-[#d0d7e3] min-w-[180px] sticky left-0 bg-white z-10 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] py-4"
                         >
                           {category.name}
                         </TableCell>
@@ -752,7 +752,7 @@ export function CategoriesDetailContent({
                           return (
                             <TableCell 
                               key={dataset.id} 
-                              className="text-right border-r border-[#d0d7e3] min-w-[150px]"
+                              className="text-right border-r border-[#d0d7e3] min-w-[150px] py-4"
                             >
                               <div className="flex justify-end items-center gap-2">
                                 <span>{formatValue(metrics.current, dataset)}</span>
