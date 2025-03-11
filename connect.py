@@ -11,8 +11,7 @@ start_time = time.time()
 # Execute query with date filter
 res = client.query("""
     SELECT * 
-    FROM ela_tets.revenue_inventory_room_type_exploded
-    WHERE business_datetime BETWEEN '2025-02-02 00:00:00' AND '2025-02-06 23:59:59'
+    FROM SAND01CN.room_types_insights
 """)
 df = pd.DataFrame(res.result_set, columns=res.column_names)
 

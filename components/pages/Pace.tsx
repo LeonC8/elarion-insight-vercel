@@ -31,6 +31,8 @@ import * as XLSX from 'xlsx'
 import { ResponsivePie } from '@nivo/pie'
 import { ResponsiveBar } from '@nivo/bar'
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts'
+import { PacingChart } from '@/components/PacingChart'
+import { HotelSelector } from '../new/HotelSelector'
 
 // Add the COLORS constant
 const COLORS = ['rgba(59, 130, 246, 0.5)', 'rgba(34, 197, 94, 0.5)', 'rgba(234, 179, 8, 0.5)', 'rgba(239, 68, 68, 0.5)']
@@ -701,129 +703,77 @@ export function PaceDashboard() {
     <div className="flex-1 overflow-auto">
       <div className="p-8">
 
-        {/* Header */}
-        <div className="flex justify-between items-center mb-6">  
-          <div className="flex items-center">
-            <h2 className="text-3xl font-bold text-gray-800">Overview</h2>
-          </div>
-          <div className="flex space-x-4 items-center">
-            <Button 
-              variant="ghost" 
+        {/* Update the Header to match Pickup style */}
+        <div className="flex flex-col mb-6">
+          <div className="flex justify-between items-center">  
+            <div className="flex items-center">
+              <h2 className="text-3xl font-bold text-gray-800">Pace</h2>
+            </div>
+            <div className="flex space-x-4 items-center">
+              {/* New style dropdown for view selection */}
+              <div className="flex flex-col">
+                <span className="text-xs text-gray-500 mb-2">View type</span>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button 
+                      variant="ghost" 
+                      className="bg-[#f2f8ff] hover:bg-[#f2f8ff] text-[#342630] rounded-full px-4"
+                    >
+                      {selectedTimeframe === "Month" ? 'Month View' : 'Year View'} <ChevronDownIcon className="ml-2 h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent>
+                    <DropdownMenuItem onSelect={() => setSelectedTimeframe('Month')}>
+                      Month View
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => setSelectedTimeframe('Year')}>
+                      Year View
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+
+              {/* Advanced Hotel Selector from Pickup page */}
+              <div className="flex flex-col">
+                <span className="text-xs text-gray-500 mb-2">Property</span>
+                <HotelSelector 
+                  selectedHotels={selectedHotels}
+                  setSelectedHotels={setSelectedHotels}
+                />
+              </div>
               
-              className="flex items-center space-x-2 text-blue-600"
-            >
-              <DownloadIcon className="h-4 w-4" />
-              <span>Export to Excel</span>
-            </Button>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline">
-                  {selectedHotels.length === 1 ? selectedHotels[0] : `${selectedHotels.length} Hotels`} <ChevronDownIcon className="ml-2 h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent>
-                <DropdownMenuItem onSelect={toggleAllHotels}>
-                  <div className="flex items-center">
-                    <div className={`mr-2 h-4 w-4 border rounded-sm flex items-center justify-center ${selectedHotels.length === allHotels.length ? 'bg-primary border-primary' : 'border-input'}`}>
-                      {selectedHotels.length === allHotels.length && <Check className="h-3 w-3 text-primary-foreground" />}
-                    </div>
-                    Select All
-                  </div>
-                </DropdownMenuItem>
-                {allHotels.map((hotel) => (
-                  <DropdownMenuItem key={hotel} onSelect={() => toggleHotel(hotel)}>
-                    <div className="flex items-center">
-                      <div className={`mr-2 h-4 w-4 border rounded-sm flex items-center justify-center ${selectedHotels.includes(hotel) ? 'bg-primary border-primary' : 'border-input'}`}>
-                        {selectedHotels.includes(hotel) && <Check className="h-3 w-3 text-primary-foreground" />}
-                      </div>
-                      {hotel}
-                    </div>  
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-                
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline">
-                  {selectedTimeframe === "Month" ? "Month view" : "Year view"} <ChevronDownIcon className="ml-2 h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent>
-                {timeframeOptions.map((option) => (
-                  <DropdownMenuItem 
-                    key={option.value} 
-                    onSelect={() => handleTimeframeSelect(option.value)}
-                  >
-                    {option.label}
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline">
-                  Compare with: {comparisonType} <ChevronDownIcon className="ml-2 h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent>
-                <DropdownMenuItem onSelect={() => setComparisonType('Last year')}>
-                  Last year
-                </DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => setComparisonType('Budget')}>
-                  Budget
-                </DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => setComparisonType('No comparison')}>
-                  No comparison
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+              {/* Keep the comparison type dropdown */}
+              <div className="flex flex-col">
+                <span className="text-xs text-gray-500 mb-2">Compare with</span>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button 
+                      variant="ghost" 
+                      className="bg-[#f2f8ff] hover:bg-[#f2f8ff] text-[#342630] rounded-full px-4"
+                    >
+                      {comparisonType} <ChevronDownIcon className="ml-2 h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent>
+                    <DropdownMenuItem onSelect={() => setComparisonType('Last year')}>
+                      Last year
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => setComparisonType('Budget')}>
+                      Budget
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => setComparisonType('No comparison')}>
+                      No comparison
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            </div>
           </div>
         </div>
 
-        
-
-        {/* Line Charts */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-8">
-          {renderAreaChart(
-            combinedRoomsData, 
-            "Number of Rooms", 
-            "rooms", 
-            "comparisonRooms",
-            "#60a5fa", 
-            "#82ca9d", 
-            false
-          )}
-          {renderAreaChart(
-            combinedRoomsData, 
-            "Total Revenue", 
-            "revenue", 
-            "comparisonRevenue",  
-            "#60a5fa", 
-            "#82ca9d", 
-            false
-          )}
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
-          {renderAreaChart(
-            combinedRoomsData, 
-            "Rooms Revenue", 
-            "roomsRevenue", 
-            "comparisonRoomsRevenue",
-            "#60a5fa", 
-            "#82ca9d", 
-            false
-          )}
-          {renderAreaChart(
-            combinedRoomsData, 
-            "F&B Revenue", 
-            "fbRevenue", 
-            "comparisonFbRevenue", 
-            "#60a5fa", 
-            "#82ca9d", 
-            false
-          )}
+        {/* Main Content - Pacing Chart */}
+        <div className="mt-6">
+          <PacingChart viewType={selectedTimeframe} />
         </div>
       </div>
 
@@ -833,8 +783,6 @@ export function PaceDashboard() {
         closeDialog={closeDialog}
         selectedTimeframe={selectedTimeframe}
         comparisonType={comparisonType}
-        pieChartData={pieChartData}
-        comparisonPieChartData={comparisonPieChartData}
       />
 
       {/* Custom Dialog for Metrics */}

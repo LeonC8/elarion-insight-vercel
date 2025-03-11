@@ -465,6 +465,7 @@ interface MonthlyPickupData {
 
 interface YearlyPickupData {
   bookingMonth: string;
+  bookingDate: string;
   pickupData: {
     [stayMonth: string]: PickupMetrics;
   };
@@ -558,7 +559,7 @@ const MonthlyPickupTable = ({
   };
 
   return (
-    <div className="overflow-x-auto border border-gray-200 rounded-lg relative max-h-[calc(100vh-300px)]">
+    <div className="overflow-x-auto border border-gray-200 rounded-lg relative max-h-[calc(100vh-180px)]">
       <table className="min-w-full divide-y divide-gray-200">
         <thead className="bg-gray-50 sticky top-0 z-20">
           <tr>
@@ -623,13 +624,14 @@ const YearlyPickupTable = ({
   selectedDate: Date;
   onCellClick: (date: string, month: string) => void;
 }) => {
-  const bookingDays = generateDaysFromMonthStart(selectedDate);
+  // Instead of using generateDaysFromMonthStart, use generateMonthDates to get all dates
+  const monthDates = generateMonthDates(selectedDate);
   const yearMonths = generateYearMonths(selectedDate);
   const today = new Date();
 
   // Sample data - replace with actual data
-  const pickupData: YearlyPickupData[] = bookingDays.map(date => ({
-    bookingMonth: format(new Date(date), 'MMM yyyy'), // Fix: Add the required bookingMonth property
+  const pickupData: YearlyPickupData[] = monthDates.map(date => ({
+    bookingMonth: format(new Date(date), 'MMM yyyy'),
     bookingDate: date,
     pickupData: yearMonths.reduce((acc, stayMonth) => {
       const bookingDay = new Date(date);
@@ -673,7 +675,7 @@ const YearlyPickupTable = ({
   };
 
   return (
-    <div className="overflow-x-auto border border-gray-200 rounded-lg relative max-h-[calc(100vh-300px)]">
+    <div className="overflow-x-auto border border-gray-200 rounded-lg relative max-h-[calc(100vh-180px)]">
       <table className="min-w-full divide-y divide-gray-200">
         <thead className="bg-gray-50 sticky top-0 z-20">
           <tr>
@@ -736,6 +738,27 @@ export function PickupDashboard() {
   const allHotels = ["Hotel 1", "Hotel 2", "Hotel 3"];
   const [showStatsModal, setShowStatsModal] = useState(false);
   const [selectedCell, setSelectedCell] = useState<{date: string, month: string} | null>(null);
+
+  // Hardcoded statistics data for the modal
+  const statsData = {
+    roomsSold: 24,
+    revenue: 3850,
+    adr: 160,
+    occupancy: 86,
+    roomsCancelled: 3,
+    revenueLost: 474,
+    roomsAvailable: 32,
+    revPAR: 43,
+    // Variance data
+    roomsSoldVariance: 8,
+    revenueVariance: -13,
+    adrVariance: 14,
+    occupancyVariance: -10,
+    roomsCancelledVariance: 0,
+    revenueLostVariance: 16,
+    roomsAvailableVariance: -6,
+    revPARVariance: -8
+  };
 
   const handleCellClick = (date: string, month: string) => {
     setSelectedCell({date, month});
@@ -849,7 +872,7 @@ export function PickupDashboard() {
         </div>
       </div>
 
-      {/* Replace the existing modal with Dialog component */}
+      {/* Updated Dialog component with hardcoded data */}
       <Dialog open={showStatsModal} onOpenChange={setShowStatsModal}>
         <DialogContent className="max-w-3xl">
           <DialogHeader>
@@ -865,65 +888,81 @@ export function PickupDashboard() {
             {/* Rooms Sold */}
             <div className="rounded-lg border border-gray-100 p-5 flex flex-col items-center text-center">
               <div className="text-sm text-gray-500 font-medium">Rooms Sold</div>
-              <div className="text-3xl font-bold mt-4 mb-8">0</div>
+              <div className="text-3xl font-bold mt-4 mb-8">{statsData.roomsSold}</div>
               <div className="text-sm text-gray-500">Variance LY</div>
-              <div className="text-md font-medium text-green-500">+8%</div>
+              <div className={`text-md font-medium ${statsData.roomsSoldVariance >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                {statsData.roomsSoldVariance >= 0 ? '+' : ''}{statsData.roomsSoldVariance}%
+              </div>
             </div>
             
             {/* Revenue */}
             <div className="rounded-lg border border-gray-100 p-5 flex flex-col items-center text-center">
               <div className="text-sm text-gray-500 font-medium">Revenue</div>
-              <div className="text-3xl font-bold mt-4 mb-8">€0</div>
+              <div className="text-3xl font-bold mt-4 mb-8">€{statsData.revenue}</div>
               <div className="text-sm text-gray-500">Variance LY</div>
-              <div className="text-md font-medium text-red-500">-13%</div>
+              <div className={`text-md font-medium ${statsData.revenueVariance >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                {statsData.revenueVariance >= 0 ? '+' : ''}{statsData.revenueVariance}%
+              </div>
             </div>
             
             {/* ADR */}
             <div className="rounded-lg border border-gray-100 p-5 flex flex-col items-center text-center">
               <div className="text-sm text-gray-500 font-medium">ADR</div>
-              <div className="text-3xl font-bold mt-4 mb-8">€0</div>
+              <div className="text-3xl font-bold mt-4 mb-8">€{statsData.adr}</div>
               <div className="text-sm text-gray-500">Variance LY</div>
-              <div className="text-md font-medium text-green-500">+14%</div>
+              <div className={`text-md font-medium ${statsData.adrVariance >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                {statsData.adrVariance >= 0 ? '+' : ''}{statsData.adrVariance}%
+              </div>
             </div>
             
             {/* Occupancy */}
             <div className="rounded-lg border border-gray-100 p-5 flex flex-col items-center text-center">
               <div className="text-sm text-gray-500 font-medium">Occupancy</div>
-              <div className="text-3xl font-bold mt-4 mb-8">86%</div>
+              <div className="text-3xl font-bold mt-4 mb-8">{statsData.occupancy}%</div>
               <div className="text-sm text-gray-500">Variance LY</div>
-              <div className="text-md font-medium text-red-500">-10%</div>
+              <div className={`text-md font-medium ${statsData.occupancyVariance >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                {statsData.occupancyVariance >= 0 ? '+' : ''}{statsData.occupancyVariance}%
+              </div>
             </div>
             
             {/* Rooms Cancelled */}
             <div className="rounded-lg border border-gray-100 p-5 flex flex-col items-center text-center">
               <div className="text-sm text-gray-500 font-medium">Rooms Cancelled</div>
-              <div className="text-3xl font-bold mt-4 mb-8">0</div>
+              <div className="text-3xl font-bold mt-4 mb-8">{statsData.roomsCancelled}</div>
               <div className="text-sm text-gray-500">Variance LY</div>
-              <div className="text-md font-medium text-gray-500">0%</div>
+              <div className={`text-md font-medium ${statsData.roomsCancelledVariance >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                {statsData.roomsCancelledVariance >= 0 ? '+' : ''}{statsData.roomsCancelledVariance}%
+              </div>
             </div>
             
-            {/* Revenue Cancelled */}
+            {/* Revenue Lost */}
             <div className="rounded-lg border border-gray-100 p-5 flex flex-col items-center text-center">
               <div className="text-sm text-gray-500 font-medium">Revenue Lost</div>
-              <div className="text-3xl font-bold mt-4 mb-8">€474</div>
+              <div className="text-3xl font-bold mt-4 mb-8">€{statsData.revenueLost}</div>
               <div className="text-sm text-gray-500">Variance LY</div>
-              <div className="text-md font-medium text-green-500">+16%</div>
+              <div className={`text-md font-medium ${statsData.revenueLostVariance >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                {statsData.revenueLostVariance >= 0 ? '+' : ''}{statsData.revenueLostVariance}%
+              </div>
             </div>
             
             {/* Rooms Available */}
             <div className="rounded-lg border border-gray-100 p-5 flex flex-col items-center text-center">
               <div className="text-sm text-gray-500 font-medium">Rooms Available</div>
-              <div className="text-3xl font-bold mt-4 mb-8">32</div>
+              <div className="text-3xl font-bold mt-4 mb-8">{statsData.roomsAvailable}</div>
               <div className="text-sm text-gray-500">Variance LY</div>
-              <div className="text-md font-medium text-red-500">-6%</div>
+              <div className={`text-md font-medium ${statsData.roomsAvailableVariance >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                {statsData.roomsAvailableVariance >= 0 ? '+' : ''}{statsData.roomsAvailableVariance}%
+              </div>
             </div>
             
             {/* RevPAR */}
             <div className="rounded-lg border border-gray-100 p-5 flex flex-col items-center text-center">
               <div className="text-sm text-gray-500 font-medium">RevPAR</div>
-              <div className="text-3xl font-bold mt-4 mb-8">€43</div>
+              <div className="text-3xl font-bold mt-4 mb-8">€{statsData.revPAR}</div>
               <div className="text-sm text-gray-500">Variance LY</div>
-              <div className="text-md font-medium text-red-500">-8%</div>
+              <div className={`text-md font-medium ${statsData.revPARVariance >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                {statsData.revPARVariance >= 0 ? '+' : ''}{statsData.revPARVariance}%
+              </div>
             </div>
           </div>
         </DialogContent>
@@ -954,19 +993,4 @@ const generateYearMonths = (selectedDate: Date) => {
     months.push(format(new Date(year, i, 1), 'MMM yyyy'));
   }
   return months;
-};
-
-const generateDaysFromMonthStart = (selectedDate: Date) => {
-  const year = selectedDate.getFullYear();
-  const month = selectedDate.getMonth();
-  const today = new Date();
-  const days = [];
-  const startDate = new Date(year, month, 1);
-  
-  while (startDate <= today) {
-    days.push(format(startDate, 'yyyy-MM-dd'));
-    startDate.setDate(startDate.getDate() + 1);
-  }
-  
-  return days;
 };
