@@ -280,6 +280,8 @@ export function PaceDashboard() {
 
   const dropdownRef = useRef<HTMLDivElement | null>(null);
 
+  const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
+
   const applyDateRange = () => {
     if (tempDateRange?.from && tempDateRange?.to) {
       setDateRange(tempDateRange);
@@ -412,10 +414,13 @@ export function PaceDashboard() {
               />
             ) : (
               <ResponsiveBar
-                data={data.map((item, index) => ({
-                  ...item,
-                  comparisonValue: comparisonType !== 'No comparison' ? comparisonData[index].value : undefined
-                }))}
+                data={data.map((item, index) => {
+                  return {
+                    id: item.id,
+                    value: item.value,
+                    comparisonValue: comparisonType !== 'No comparison' ? comparisonData[index].value : 0
+                  };
+                })}
                 keys={comparisonType !== 'No comparison' ? ['value', 'comparisonValue'] : ['value']}
                 indexBy="id"
                 margin={{ 
@@ -696,7 +701,10 @@ export function PaceDashboard() {
   );
 
   // First, add these new state variables near the top of the OverviewDashboard component
-  const [selectedMetricCard, setSelectedMetricCard] = useState<string | null>(null);
+  const [selectedMetricCard, setSelectedMetricCard] = useState<{
+    title: string;
+    data: any[];
+  } | null>(null);
 
   // Add the new CustomDialog for metrics near the end of the component, alongside the existing dialogs
   return (
@@ -773,7 +781,7 @@ export function PaceDashboard() {
 
         {/* Main Content - Pacing Chart */}
         <div className="mt-6">
-          <PacingChart viewType={selectedTimeframe} />
+          <PacingChart viewType={selectedTimeframe === "Month" ? "Month" : selectedTimeframe === "Year" ? "Year" : "Month"} />
         </div>
       </div>
 
@@ -791,7 +799,7 @@ export function PaceDashboard() {
         closeDialog={() => setSelectedMetricCard(null)}
         selectedTimeframe={selectedTimeframe}
         comparisonType={comparisonType}
-        customData={selectedMetricCard?.data}
+        customData={selectedMetricCard?.data || []}
       />
 
       {/* Add DetailedDialog */}

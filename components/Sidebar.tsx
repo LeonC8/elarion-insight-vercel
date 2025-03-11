@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { motion } from 'framer-motion'
-import { BarChart2Icon, HomeIcon, GlobeIcon, UsersIcon, BedDoubleIcon, MapPinIcon, UserIcon, LogOutIcon, CalendarIcon, TrendingUpIcon, Settings } from 'lucide-react'
+import { BarChart2Icon, HomeIcon, GlobeIcon, UsersIcon, BedDoubleIcon, MapPinIcon, UserIcon, LogOutIcon, CalendarIcon, TrendingUpIcon, Settings, BarChart3Icon } from 'lucide-react'
 import { usePathname } from 'next/navigation'
 
 interface SidebarProps {
@@ -13,6 +13,7 @@ const sidebarLinks = [
   { name: "Market Segments", icon: UsersIcon, path: "/market-segments" },
   { name: "Room Types", icon: BedDoubleIcon, path: "/room-types" },
   { name: "Pickup", icon: CalendarIcon, path: "/pickup" },
+  { name: "Pickup Analytics", icon: BarChart3Icon, path: "/pickup-analytics" },
   { name: "Pace", icon: TrendingUpIcon, path: "/pace" },
 ]
 

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { Card, CardHeader, CardContent, CardTitle } from "@/components/ui/card"
-import { ResponsiveContainer, ComposedChart, CartesianGrid, XAxis, YAxis, Bar, Line, Tooltip } from 'recharts'
+import { ResponsiveContainer, ComposedChart, CartesianGrid, XAxis, YAxis, Bar, Line, Tooltip, ReferenceLine } from 'recharts'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { ArrowUpIcon, ArrowDownIcon } from 'lucide-react'
 import { format, getDaysInMonth, subYears } from 'date-fns'
@@ -22,6 +22,7 @@ interface PacingDataItem {
   lastYearRevenue: number;
   lastYearRoomsSold: number;
   lastYearAdr: number;
+  isCurrent?: boolean;
 }
 
 // Generate dummy data for month view (days of current month)
@@ -30,15 +31,11 @@ const generateMonthData = (): PacingDataItem[] => {
   const daysInMonth = getDaysInMonth(today);
   const currentMonth = today.getMonth();
   const currentYear = today.getFullYear();
+  const currentDay = today.getDate();
   
   return Array.from({ length: daysInMonth }, (_, i) => {
     const day = i + 1;
     const date = new Date(currentYear, currentMonth, day);
-    
-    // Only include days up to today
-    if (date > today) {
-      return null;
-    }
     
     // Base values with some randomness
     const baseRevenue = 4000 + Math.random() * 2000;
@@ -69,9 +66,10 @@ const generateMonthData = (): PacingDataItem[] => {
       adr,
       lastYearRevenue,
       lastYearRoomsSold,
-      lastYearAdr
+      lastYearAdr,
+      isCurrent: day === currentDay
     };
-  }).filter(Boolean) as PacingDataItem[];
+  });
 };
 
 // Generate dummy data for year view (months of current year)
@@ -81,11 +79,6 @@ const generateYearData = (): PacingDataItem[] => {
   const currentYear = today.getFullYear();
   
   return Array.from({ length: 12 }, (_, i) => {
-    // Only include months up to current month
-    if (i > currentMonth) {
-      return null;
-    }
-    
     const date = new Date(currentYear, i, 15);
     
     // Base values with seasonal patterns
@@ -114,9 +107,10 @@ const generateYearData = (): PacingDataItem[] => {
       adr,
       lastYearRevenue,
       lastYearRoomsSold,
-      lastYearAdr
+      lastYearAdr,
+      isCurrent: i === currentMonth
     };
-  }).filter(Boolean) as PacingDataItem[];
+  });
 };
 
 interface PacingChartProps {
@@ -398,6 +392,58 @@ export function PacingChart({ viewType = 'Month' }: PacingChartProps) {
                     dot={{ r: 3 }}
                     name="lastYearAdr"
                   />
+                )}
+                
+                {/* Add the ReferenceLine component to show the current day/month with labels */}
+                {processedData.findIndex(d => d.isCurrent) !== -1 && (
+                  <>
+                    {/* "Actual" label - centered between left edge and Today */}
+                    <ReferenceLine 
+                      x={processedData[
+                        Math.floor(processedData.findIndex(d => d.isCurrent) / 2)
+                      ]?.id}
+                      yAxisId="left"
+                      stroke="transparent"
+                      label={{ 
+                        value: "Actual", 
+                        position: "top",
+                        fill: "#18b0cc", 
+                        fontSize: 12,
+                        fontWeight: "bold" 
+                      }} 
+                    />
+                    
+                    {/* Today line */}
+                    <ReferenceLine 
+                      x={processedData.find(d => d.isCurrent)?.id} 
+                      yAxisId="left"
+                      stroke="#6b7280" 
+                      strokeDasharray="5 5" 
+                      strokeWidth={2} 
+                      label={{ 
+                        value: "Today", 
+                        position: "top", 
+                        fill: "#6b7280",
+                        fontSize: 12
+                      }} 
+                    />
+                    
+                    {/* "OTB" label - centered between Today and right edge */}
+                    <ReferenceLine 
+                      x={processedData[
+                        Math.floor((processedData.findIndex(d => d.isCurrent) + processedData.length) / 2)
+                      ]?.id}
+                      yAxisId="left"
+                      stroke="transparent"
+                      label={{ 
+                        value: "OTB", 
+                        position: "top",
+                        fill: "#e11d48", 
+                        fontSize: 12,
+                        fontWeight: "bold" 
+                      }} 
+                    />
+                  </>
                 )}
               </ComposedChart>
             </ResponsiveContainer>
