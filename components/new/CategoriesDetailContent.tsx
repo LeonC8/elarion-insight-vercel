@@ -534,7 +534,7 @@ export function CategoriesDetailContent({
         <Card className="border-gray-300">
           <CardHeader>
             <div className="flex justify-between items-center">
-              <h3 className="text-lg font-medium">Categories Over Time</h3>
+              <h3 className="text-lg font-medium">Over Time</h3>
               <div className="flex items-center gap-3">
                 {/* Chart Mode Selector */}
                 <DropdownMenu>
@@ -544,7 +544,7 @@ export function CategoriesDetailContent({
                       size="sm"
                       className="bg-[#f2f8ff] hover:bg-[#f2f8ff] text-[#342630] rounded-full px-4 font-semibold whitespace-nowrap"
                     >
-                      {timeSeriesMode === 'normal' ? 'Normal View' : 'Stacked View'}
+                      {timeSeriesMode === 'normal' ? 'Line Chart' : 'Stacked Line Chart'}
                       <TriangleDown className="ml-3" />
                     </Button>
                   </DropdownMenuTrigger>

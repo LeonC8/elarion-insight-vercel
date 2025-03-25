@@ -159,6 +159,7 @@ export function KpiWithSubtleChart({
         onOpenChange={setShowDetails}
         title={title}
         currentValue={currentValue}
+        percentageChange={percentageChange}
         prefix={prefix}
         suffix={suffix}
         mainTimeSeriesData={chartData}

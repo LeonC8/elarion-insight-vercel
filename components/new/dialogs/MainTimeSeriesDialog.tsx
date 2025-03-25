@@ -38,6 +38,7 @@ interface MainTimeSeriesDialogProps {
   onOpenChange: (open: boolean) => void
   title: string
   currentValue: number
+  percentageChange: number
   prefix?: string
   suffix?: string
   mainTimeSeriesData: TimeSeriesData[]
@@ -54,11 +55,11 @@ interface FullScreenTableProps {
 
 const mainKpiConfig = {
   current: {
-    label: "Current Period",
+    label: "Selected Period",
     color: "hsl(221.2 83.2% 53.3%)",
   },
   previous: {
-    label: "Previous Period",
+    label: "Comparison Period",
     color: "hsl(215 20.2% 65.1%)",
   },
 } as ChartConfig
@@ -117,32 +118,46 @@ const getLeftMargin = (data: Array<{ current: number; previous: number }>) => {
   const maxNumber = Math.max(
     ...data.flatMap(item => [item.current, item.previous])
   )
+  console.log(maxNumber)
   const numLength = Math.round(maxNumber).toString().replace(/,/g, '').length
+  console.log(numLength)
   const marginMap: { [key: number]: number } = {
+    2: -13,
     3: -5,  // 100-999
     4: 3,   // 1,000-9,999
     5: 9,   // 10,000-99,999
     6: 18,  // 100,000-999,999
-    7: 27   // 1,000,000-9,999,999
+    7: 27,
+    8: 44   // 1,000,000-9,999,999
   }
   return marginMap[numLength] || 3
 }
 
-// Add this helper function at the top level
+// First, update the calculateSummaryValue function to handle infinity and NaN values
 const calculateSummaryValue = (data: TimeSeriesData[], title: string) => {
   if (!data?.length) return { value: 0, change: 0 };
   
   const isSum = title.toLowerCase().includes('revenue') || title.toLowerCase().includes('sold');
   
+  // Filter out any infinity or NaN values before calculating
+  const validData = data.filter(item => 
+    isFinite(item.current) && !isNaN(item.current) &&
+    isFinite(item.previous) && !isNaN(item.previous)
+  );
+  
+  if (validData.length === 0) return { value: 0, change: 0 };
+  
   const currentValue = isSum 
-    ? data.reduce((sum, item) => sum + item.current, 0)
-    : data.reduce((sum, item) => sum + item.current, 0) / data.length;
+    ? validData.reduce((sum, item) => sum + item.current, 0)
+    : validData.reduce((sum, item) => sum + item.current, 0) / validData.length;
     
   const previousValue = isSum
-    ? data.reduce((sum, item) => sum + item.previous, 0)
-    : data.reduce((sum, item) => sum + item.previous, 0) / data.length;
+    ? validData.reduce((sum, item) => sum + item.previous, 0)
+    : validData.reduce((sum, item) => sum + item.previous, 0) / validData.length;
     
-  const percentageChange = ((currentValue - previousValue) / previousValue) * 100;
+  const percentageChange = previousValue === 0 
+    ? (currentValue > 0 ? 100 : 0) // Avoid infinity when previous is 0
+    : ((currentValue - previousValue) / previousValue) * 100;
   
   return {
     value: currentValue,
@@ -155,6 +170,7 @@ export function MainTimeSeriesDialog({
   onOpenChange, 
   title,
   currentValue,
+  percentageChange,
   prefix = "€",
   suffix = "",
   mainTimeSeriesData,
@@ -172,14 +188,15 @@ export function MainTimeSeriesDialog({
 
   const mainTimeSeriesConfig = {
     current: {
-      label: "Current Period",
+      label: "Selected Period",
       color: "hsl(221.2 83.2% 53.3%)",
     },
     previous: {
-      label: "Previous Period",
+      label: "Comparison period",
       color: "hsl(215 20.2% 65.1%)",
     },
   } as ChartConfig;
+
 
   const renderFullScreenTable = () => {
     if (!fullScreenTable.type) return null;
@@ -189,7 +206,7 @@ export function MainTimeSeriesDialog({
         open={fullScreenTable.isOpen}
         onOpenChange={(open) => setFullScreenTable({ isOpen: open, type: open ? 'main' : null })}
         title={`${title} Over Time`}
-        headers={['Month', 'Current Period', 'Previous Period', 'Change']}
+        headers={['Month', 'Selected Period', 'Comparison period', 'Change']}
         data={mainTimeSeriesData}
         renderRow={(row) => (
           <>
@@ -197,10 +214,10 @@ export function MainTimeSeriesDialog({
               {row.date}
             </TableCell>
             <TableCell className="w-[25%] text-left border-r border-[#d0d7e3]">
-              {prefix}{row.current.toLocaleString()}
+              {prefix}{isFinite(row.current) ? Math.round(Math.min(row.current, 999999999999)).toLocaleString() : 0}
             </TableCell>
             <TableCell className="w-[25%] text-left border-r border-[#d0d7e3]">
-              {prefix}{row.previous.toLocaleString()}
+              {prefix}{isFinite(row.previous) ? Math.round(Math.min(row.previous, 999999999999)).toLocaleString() : 0}
             </TableCell>
             <TableCell className={`w-[25%] text-left ${row.current > row.previous ? "text-emerald-500" : "text-red-500"}`}>
               {((row.current - row.previous) / row.previous * 100).toFixed(1)}%
@@ -211,11 +228,33 @@ export function MainTimeSeriesDialog({
     ) : null;
   };
 
+  // Update this function to calculate domain based on actual data values
+  const getChartDomain = () => {
+    const allValues = mainTimeSeriesData.flatMap(item => [item.current, item.previous]);
+    const minValue = Math.min(...allValues);
+    const maxValue = Math.max(...allValues);
+    
+    // For charts with currency or percentage, use exact max value
+    if (prefix || suffix) {
+      return [0, maxValue]; // Start at 0, end at exact max value
+    }
+    
+    // For other charts, ensure we have a reasonable range
+    return [
+      Math.max(0, Math.floor(minValue * 0.9)), // Ensure no negative values
+      Math.ceil(maxValue * 1.1)  // Add some padding at the top
+    ];
+  };
+
+  // Instead of calculating change here, use the passed percentageChange
+  const changePercent = Math.round(percentageChange * 10) / 10
+  const isPositive = changePercent > 0
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-[45vw] max-h-[90vh] flex flex-col p-0">
         <DialogHeader className="flex-none py-6 pb-2" showBorder={true}>
-          <DialogTitle className="text-lg font-medium px-4">{title} Breakdown</DialogTitle>
+          <DialogTitle className="text-lg font-medium px-4">{title} over time</DialogTitle>
         </DialogHeader>
         
         <div className="flex-1 overflow-y-auto pr-6 bg-[#f2f8ff] px-4 pb-4 pt-4">
@@ -227,24 +266,18 @@ export function MainTimeSeriesDialog({
               </h3>
               
               {/* Summary Section */}
-              {(() => {
-                const summary = calculateSummaryValue(mainTimeSeriesData, title);
-                const isPositive = summary.change > 0;
-                return (
-                  <div className="flex items-end gap-3 mb-10">
-                    <span className="text-2xl font-bold leading-none">
-                      {prefix}{Math.round(summary.value).toLocaleString()}
-                    </span>
-                    <span className={`text-sm -translate-y-[1px] px-2 py-0.5 rounded ${
-                      isPositive 
-                        ? 'text-green-600 bg-green-100/50 border border-green-600' 
-                        : 'text-red-600 bg-red-100/50 border border-red-600'
-                    } leading-none`}>
-                      {isPositive ? '+' : ''}{Math.round(summary.change * 10) / 10}% 
-                    </span>
-                  </div>
-                );
-              })()}
+              <div className="flex items-end gap-3 mb-10">
+                <span className="text-2xl font-bold leading-none">
+                  {prefix}{Math.round(currentValue).toLocaleString()}{suffix}
+                </span>
+                <span className={`text-sm -translate-y-[1px] px-2 py-0.5 rounded ${
+                  isPositive 
+                    ? 'text-green-600 bg-green-100/50 border border-green-600' 
+                    : 'text-red-600 bg-red-100/50 border border-red-600'
+                } leading-none`}>
+                  {isPositive ? '+' : ''}{changePercent}% 
+                </span>
+              </div>
 
               <ChartContainer config={mainTimeSeriesConfig}>
                 <AreaChart
@@ -272,8 +305,8 @@ export function MainTimeSeriesDialog({
                     dataKey="date"
                     tickLine={false}
                     axisLine={false}
-                    tickFormatter={(value) => value.slice(0, 3)}
                     tickMargin={8}
+                    interval={Math.ceil(mainTimeSeriesData.length / 10) - 1}
                   />
                   <YAxis
                     tickLine={false}
@@ -281,6 +314,9 @@ export function MainTimeSeriesDialog({
                     tickFormatter={(value) => `${Math.round(value).toLocaleString()}`}
                     tickMargin={8}
                     width={45}
+                    domain={getChartDomain()}
+                    allowDecimals={false}
+                    minTickGap={20}
                   />
                   <ChartTooltip content={<ChartTooltipContent />} />
                   {activeMainTimeSeriesLines.includes("previous") && (
@@ -341,8 +377,8 @@ export function MainTimeSeriesDialog({
                   <TableHeader>
                     <TableRow className="hover:bg-transparent">
                       <TableHead className="bg-[#f0f4fa]/60 w-[25%] text-left">Month</TableHead>
-                      <TableHead className="bg-[#f0f4fa]/60 w-[25%] text-left">Current Period</TableHead>
-                      <TableHead className="bg-[#f0f4fa]/60 w-[25%] text-left">Previous Period</TableHead>
+                      <TableHead className="bg-[#f0f4fa]/60 w-[25%] text-left">Selected Period</TableHead>
+                      <TableHead className="bg-[#f0f4fa]/60 w-[25%] text-left">Comparison Period</TableHead>
                       <TableHead className="bg-[#f0f4fa]/60 w-[25%] text-left">Change</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -353,10 +389,10 @@ export function MainTimeSeriesDialog({
                           {row.date}
                         </TableCell>
                         <TableCell className="border-r border-[#d0d7e3]">
-                          {prefix}{row.current.toLocaleString()}
+                          {prefix}{isFinite(row.current) ? Math.round(Math.min(row.current, 999999999999)).toLocaleString() : 0}
                         </TableCell>
                         <TableCell className="border-r border-[#d0d7e3]">
-                          {prefix}{row.previous.toLocaleString()}
+                          {prefix}{isFinite(row.previous) ? Math.round(Math.min(row.previous, 999999999999)).toLocaleString() : 0}
                         </TableCell>
                         <TableCell className={row.current > row.previous ? "text-emerald-500" : "text-red-500"}>
                           {((row.current - row.previous) / row.previous * 100).toFixed(1)}%

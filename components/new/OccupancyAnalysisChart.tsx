@@ -9,7 +9,7 @@ import {
   ChartTooltip,
   ChartTooltipContent,
 } from "@/components/ui/chart"
-import { useState } from "react"
+import { useState, useMemo } from "react"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -27,56 +27,32 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import { format, parseISO } from "date-fns"
 
-interface ReservationsByDayChartProps {
-  data: Array<{
-    dayOfWeek: string
-    bookingsCreated: number
-    prevBookingsCreated: number
-    staysStarting: number
-    prevStaysStarting: number
-  }>
-  color?: 'green' | 'blue'
-  categories?: Array<{
-    key: string
-    label: string
-  }>
+interface OccupancyData {
+  date: string;
+  current: number;
+  previous: number;
 }
 
-// Updated chart configuration for current/previous period
+interface OccupancyAnalysisChartProps {
+  color?: 'green' | 'blue';
+  occupancyData?: OccupancyData[];
+  totalRooms?: number; // Total number of rooms in the hotel
+  loading?: boolean; // Add loading prop to handle parent loading state
+}
+
+// Chart configuration for occupied/free rooms
 const chartConfig = {
-  current: {
-    label: "Current Period",
+  occupied: {
+    label: "Occupied Rooms",
     color: "hsl(221.2 83.2% 53.3%)",  // Blue
   },
-  previous: {
-    label: "Previous Period",
-    color: "#93c5fd",  // Lighter Blue
+  free: {
+    label: "Available Rooms",
+    color: "#e0e7ff",  // Light Blue/Gray
   },
 } satisfies ChartConfig
-
-// Exact copy of KpiWithChart's margin calculation
-const getLeftMargin = (data: Array<{ bookingsCreated: number; staysStarting: number }>) => {
-  // Find the largest number in both datasets
-  const maxNumber = Math.max(
-    ...data.flatMap(item => [item.bookingsCreated, item.staysStarting])
-  )
-  
-  // Convert to string and count digits
-  const numLength = Math.round(maxNumber).toString().length
-
-  // Map number length to margin values
-  const marginMap: { [key: number]: number } = {
-    3: 35,  // 100-999
-    4: 42,  // 1,000-9,999
-    5: 48,  // 10,000-99,999
-    6: 56,  // 100,000-999,999
-    7: 64   // 1,000,000-9,999,999
-  }
-
-  // Return the appropriate margin or default to 42 if not found
-  return marginMap[numLength] || 42
-}
 
 function TriangleDown({ className }: { className?: string }) {
   return (
@@ -92,27 +68,141 @@ function TriangleDown({ className }: { className?: string }) {
   )
 }
 
-export function ReservationsByDayChart({ data, color = 'green', categories }: ReservationsByDayChartProps) {
-  const [dateType, setDateType] = useState<'book' | 'stay'>('book')
+const daysOfWeek = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+export function OccupancyAnalysisChart({ 
+  color = 'blue', 
+  occupancyData = [], 
+  totalRooms = 100,
+  loading = false
+}: OccupancyAnalysisChartProps) {
+  const [viewType, setViewType] = useState<'period' | 'dow'>('period')
   const [activeSeries, setActiveSeries] = React.useState<string[]>([
-    'current',
-    'previous'
+    'occupied',
+    'free'
   ])
   const [fullScreenTable, setFullScreenTable] = React.useState(false)
-  const [selectedCategory, setSelectedCategory] = React.useState<string>(
-    categories && categories.length > 0 ? categories[0].key : ''
-  )
 
-  // Get the appropriate data keys based on date type
-  const currentKey = dateType === 'book' ? 'bookingsCreated' : 'staysStarting'
-  const previousKey = dateType === 'book' ? 'prevBookingsCreated' : 'prevStaysStarting'
+  // Check if parent is in loading state or if we have real data to display
+  // The check for date format helps identify real data vs fallback data
+  const isRealData = !loading && occupancyData && occupancyData.length > 0 && 
+                    occupancyData.some(item => item.date && 
+                    (item.date.includes('-') || item.date.includes('/')));
+  
+  // Process the occupancy data to create period data
+  const periodData = useMemo(() => {
+    if (!isRealData) {
+      return [];
+    }
 
-  // Transform data for the selected date type
-  const chartData = data.map(item => ({
-    dayOfWeek: item.dayOfWeek,
-    current: item[currentKey],
-    previous: item[previousKey],
-  }))
+    return occupancyData.map(item => {
+      const date = item.date.includes('-') 
+        ? format(parseISO(item.date), 'd MMM') 
+        : item.date;
+      
+      // Calculate occupied and free values
+      const occupied = Math.round(item.current);
+      const free = Math.max(0, 100 - occupied); // Ensure free is not negative
+      
+      return {
+        period: date,
+        occupied,
+        free,
+        totalRooms
+      };
+    });
+  }, [occupancyData, totalRooms, isRealData]);
+
+  // Simplify the day of week calculation to directly use the occupancy data
+  const dowData = useMemo(() => {
+    if (!isRealData) {
+      return [];
+    }
+
+    // Simple dictionary to accumulate values by day of week
+    const dowAccumulator: Record<string, { sum: number; count: number }> = {
+      "Sunday": { sum: 0, count: 0 },
+      "Monday": { sum: 0, count: 0 },
+      "Tuesday": { sum: 0, count: 0 },
+      "Wednesday": { sum: 0, count: 0 },
+      "Thursday": { sum: 0, count: 0 },
+      "Friday": { sum: 0, count: 0 },
+      "Saturday": { sum: 0, count: 0 }
+    };
+    
+    // Process each data point
+    occupancyData.forEach(dataPoint => {
+      try {
+        // Parse the date
+        let date;
+        
+        if (dataPoint.date.includes('-')) {
+          // ISO format (YYYY-MM-DD)
+          date = parseISO(dataPoint.date);
+        } else if (dataPoint.date.includes('/')) {
+          // MM/DD format
+          const [month, day] = dataPoint.date.split('/').map(Number);
+          const year = new Date().getFullYear();
+          date = new Date(year, month - 1, day);
+        } else {
+          // Try to parse directly
+          date = new Date(dataPoint.date);
+        }
+        
+        // Check if date is valid
+        if (date && !isNaN(date.getTime())) {
+          // Get day of week
+          const dayOfWeek = daysOfWeek[date.getDay()];
+          
+          // Add to accumulator
+          dowAccumulator[dayOfWeek].sum += dataPoint.current;
+          dowAccumulator[dayOfWeek].count += 1;
+        } else {
+          console.warn(`Could not parse date: ${dataPoint.date}`);
+        }
+      } catch (error) {
+        console.error(`Error processing dataPoint: ${dataPoint.date}`, error);
+      }
+    });
+
+    // Calculate averages and create final data
+    const result = daysOfWeek.map(day => {
+      const data = dowAccumulator[day];
+      const avg = data.count > 0 ? Math.round(data.sum / data.count) : 0;
+      
+      return {
+        period: day,
+        occupied: avg,
+        free: Math.max(0, 100 - avg),
+        totalRooms
+      };
+    });
+
+    return result;
+  }, [occupancyData, totalRooms, isRealData]);
+
+  // Get the appropriate data based on view type
+  const chartData = viewType === 'period' ? periodData : dowData;
+
+  // Render a loading skeleton if no data is available
+  if (loading || !isRealData) {
+    return (
+      <Card className="border-gray-300 h-[432px]">
+        <CardHeader>
+          <div className="flex w-full justify-between items-center">
+            <CardTitle className="text-lg font-semibold text-gray-800">
+              Occupancy Analysis
+            </CardTitle>
+            <div className="animate-pulse h-8 w-40 bg-gray-200 rounded-full"></div>
+          </div>
+        </CardHeader>
+        <CardContent className="flex flex-col justify-center items-center h-[352px]">
+          <div className="w-full h-[300px] bg-gray-100 rounded-lg animate-pulse flex items-center justify-center">
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <>
@@ -120,33 +210,9 @@ export function ReservationsByDayChart({ data, color = 'green', categories }: Re
         <CardHeader>
           <div className="flex w-full justify-between items-center">
             <CardTitle className="text-lg font-semibold text-gray-800">
-              Reservation trends (DOW)
+              Occupancy Analysis
             </CardTitle>
             <div className="flex space-x-2">
-              {categories && categories.length > 0 && (
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button 
-                      variant="ghost" 
-                      size="sm"
-                      className="bg-[#f2f8ff] hover:bg-[#f2f8ff] text-[#342630] rounded-full px-4"
-                    >
-                      {categories.find(c => c.key === selectedCategory)?.label || categories[0].label} <TriangleDown className="ml-2" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent>
-                    {categories.map(category => (
-                      <DropdownMenuItem 
-                        key={category.key} 
-                        onClick={() => setSelectedCategory(category.key)}
-                      >
-                        {category.label}
-                      </DropdownMenuItem>
-                    ))}
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              )}
-              
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button 
@@ -154,15 +220,15 @@ export function ReservationsByDayChart({ data, color = 'green', categories }: Re
                     size="sm"
                     className="bg-[#f2f8ff] hover:bg-[#f2f8ff] text-[#342630] rounded-full px-4"
                   >
-                    {dateType === 'book' ? 'Booking Date' : 'Stay Date'} <TriangleDown className="ml-2" />
+                    {viewType === 'period' ? 'Period Overview' : 'Day of Week Overview'} <TriangleDown className="ml-2" />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent>
-                  <DropdownMenuItem onClick={() => setDateType('book')}>
-                    Booking Date
+                  <DropdownMenuItem onClick={() => setViewType('period')}>
+                    Period Overview
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setDateType('stay')}>
-                    Stay Date
+                  <DropdownMenuItem onClick={() => setViewType('dow')}>
+                    Day of Week Overview
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -178,12 +244,12 @@ export function ReservationsByDayChart({ data, color = 'green', categories }: Re
                 top: 10,
                 right: 10,
                 bottom: 20,
-                left: -20,
+                left: -10,
               }}
             >
               <CartesianGrid strokeDasharray="3 3" vertical={false} />
               <XAxis
-                dataKey="dayOfWeek"
+                dataKey="period"
                 tickLine={false}
                 axisLine={false}
                 tickMargin={8}
@@ -191,22 +257,24 @@ export function ReservationsByDayChart({ data, color = 'green', categories }: Re
               <YAxis
                 tickLine={false}
                 axisLine={false}
-                tickFormatter={(value) => `${Math.round(value).toLocaleString()}`}
+                tickFormatter={(value) => `${value}%`}
                 tickMargin={8}
               />
               <ChartTooltip content={<ChartTooltipContent />} />
-              {activeSeries.includes('current') && (
+              {activeSeries.includes('occupied') && (
                 <Bar
-                  dataKey="current"
-                  fill={chartConfig.current.color}
+                  dataKey="occupied"
+                  stackId="a"
+                  fill={chartConfig.occupied.color}
                   radius={[4, 4, 0, 0]}
                 />
               )}
-              {activeSeries.includes('previous') && (
+              {activeSeries.includes('free') && (
                 <Bar
-                  dataKey="previous"
-                  fill={chartConfig.previous.color}
-                  radius={[4, 4, 0, 0]}
+                  dataKey="free"
+                  stackId="a"
+                  fill={chartConfig.free.color}
+                  radius={[0, 0, 0, 0]}
                 />
               )}
             </BarChart>
@@ -259,7 +327,7 @@ export function ReservationsByDayChart({ data, color = 'green', categories }: Re
         <DialogContent className="max-w-7xl min-h-fit max-h-[90vh]">
           <DialogHeader className="pb-6">
             <DialogTitle>
-              Reservation trends (DOW) – {dateType === 'book' ? 'Booking date' : 'Stay date'}
+              Occupancy Analysis – {viewType === 'period' ? 'Period Overview' : 'Day of Week Overview'}
             </DialogTitle>
           </DialogHeader>
           <div className="border rounded-lg bg-[#f0f4fa]/40 border-[#d0d7e3]">
@@ -268,16 +336,16 @@ export function ReservationsByDayChart({ data, color = 'green', categories }: Re
                 <TableHeader>
                   <TableRow className="border-b border-[#d0d7e3] hover:bg-transparent">
                     <TableHead className="bg-[#f0f4fa]/60 first:rounded-tl-lg text-left border-r border-[#d0d7e3]">
-                      Day of Week
+                      {viewType === 'period' ? 'Period' : 'Day of Week'}
                     </TableHead>
                     <TableHead className="bg-[#f0f4fa]/60 text-left border-r border-[#d0d7e3]">
-                      Current Period
+                      Occupied (%)
                     </TableHead>
                     <TableHead className="bg-[#f0f4fa]/60 text-left border-r border-[#d0d7e3]">
-                      Previous Period
+                      Available (%)
                     </TableHead>
                     <TableHead className="bg-[#f0f4fa]/60 last:rounded-tr-lg text-left">
-                      Change
+                      Total Rooms
                     </TableHead>
                   </TableRow>
                 </TableHeader>
@@ -285,16 +353,16 @@ export function ReservationsByDayChart({ data, color = 'green', categories }: Re
                   {chartData.map((row, idx) => (
                     <TableRow key={idx} className="border-b border-[#d0d7e3] last:border-0">
                       <TableCell className="w-[25%] bg-[#f0f4fa]/40 border-r border-[#d0d7e3] text-left">
-                        {row.dayOfWeek}
+                        {row.period}
                       </TableCell>
                       <TableCell className="w-[25%] text-left border-r border-[#d0d7e3]">
-                        {row.current.toLocaleString()}
+                        {row.occupied}%
                       </TableCell>
                       <TableCell className="w-[25%] text-left border-r border-[#d0d7e3]">
-                        {row.previous.toLocaleString()}
+                        {row.free}%
                       </TableCell>
-                      <TableCell className={`w-[25%] text-left ${row.current > row.previous ? "text-emerald-500" : "text-red-500"}`}>
-                        {((row.current - row.previous) / row.previous * 100).toFixed(1)}%
+                      <TableCell className="w-[25%] text-left">
+                        {row.totalRooms} rooms
                       </TableCell>
                     </TableRow>
                   ))}

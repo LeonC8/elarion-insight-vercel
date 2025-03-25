@@ -34,24 +34,50 @@ export interface CategoryOption {
   key: string
 }
 
-interface HorizontalBarChartMultipleDatasetsProps {
+export interface HorizontalBarChartMultipleDatasetsProps {
   datasets: DataSet[]
   defaultDataset?: string
   categories?: CategoryOption[]
   defaultCategory?: string
+  leftMargin?: number
+  loading?: boolean
+  error?: string | null
 }
 
 export function HorizontalBarChartMultipleDatasets({ 
   datasets,
   defaultDataset = datasets[0]?.key,
   categories,
-  defaultCategory = categories?.[0]?.key
+  defaultCategory = categories?.[0]?.key,
+  leftMargin = -10,
+  loading = false,
+  error = null
 }: HorizontalBarChartMultipleDatasetsProps) {
   const [selectedDataset, setSelectedDataset] = useState(defaultDataset)
   const [selectedCategory, setSelectedCategory] = useState(defaultCategory)
   
   const currentDataset = datasets.find(d => d.key === selectedDataset) || datasets[0]
   const currentCategory = categories?.find(c => c.key === selectedCategory) || categories?.[0]
+
+  if (loading) {
+    return (
+      <div className="relative">
+        <div className="h-[400px] flex items-center justify-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="relative">
+        <div className="h-[400px] flex items-center justify-center">
+          <div className="text-red-500">Error: {error}</div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="relative">
@@ -105,6 +131,7 @@ export function HorizontalBarChartMultipleDatasets({
       <HorizontalBarChart 
         data={currentDataset.data}
         title={currentDataset.title}
+        leftMargin={leftMargin}
       />
     </div>
   )

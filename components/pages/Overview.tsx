@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -33,6 +33,9 @@ import { HotelSelector } from '../new/HotelSelector'
 import { HorizontalBarChartMultipleDatasets } from "../new/HorizontalBarChartMultipleDatasets"
 import { PieChartWithLabels } from "@/components/new/PieChartWithLabels"
 import { addDays } from "date-fns"
+import { OccupancyAnalysisChart } from '../new/OccupancyAnalysisChart'
+import { KpiResponse } from '@/app/api/overview/general/route'
+import { KpiWithAlignedChart } from '../new/KpiWithAlignedChart'
 
 // Dynamic import for WorldMap with loading state
 const WorldMap = dynamic(
@@ -46,21 +49,6 @@ const WorldMap = dynamic(
     )
   }
 )
-
-// First, add this constant at the top of the file with other constants
-const countryData = [
-  { country: "us", value: 285000 }, // United States
-  { country: "gb", value: 195000 }, // United Kingdom
-  { country: "de", value: 168000 }, // Germany
-  { country: "fr", value: 142000 }, // France
-  { country: "es", value: 125000 }, // Spain
-  // Add more countries with lower values to show contrast
-  { country: "it", value: 98000 },  // Italy
-  { country: "nl", value: 85000 },  // Netherlands
-  { country: "ch", value: 75000 },  // Switzerland
-  { country: "se", value: 65000 },  // Sweden
-  { country: "be", value: 55000 },  // Belgium
-];
 
 // Update the sample data section with more variable datasets
 const totalRevenueChartData = [
@@ -1235,6 +1223,20 @@ function TriangleDown({ className }: { className?: string }) {
   )
 }
 
+// First, let's add a Skeleton component at the top of the file after the imports
+function Skeleton({ className }: { className?: string }) {
+  return (
+    <div className={`animate-pulse rounded bg-gray-200 ${className}`} />
+  )
+}
+
+// Add a mapping for the metric keys
+const metricKeyMapping: Record<string, string> = {
+  'revenue': 'revenue',
+  'rooms': 'roomsSold', // Map 'rooms' to 'roomsSold' as returned by the API
+  'adr': 'adr'
+};
+
 export function Overview() {
   // Add date state
   const [date, setDate] = useState<Date>(new Date())
@@ -1243,8 +1245,191 @@ export function Overview() {
   const [selectedHotels, setSelectedHotels] = useState<string[]>(["Hotel 1"])
   const [selectedTimeFrame, setSelectedTimeFrame] = useState("Month")
   const [selectedViewType, setSelectedViewType] = useState("Actual")
-  const [selectedComparison, setSelectedComparison] = useState("Last year - OTB")
+  const [selectedComparison, setSelectedComparison] = useState("Last year - Actual")
   const allHotels = ["Hotel 1", "Hotel 2", "Hotel 3"]
+  
+  // Add state for API data
+  const [kpiData, setKpiData] = useState<KpiResponse | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  // Add state for length of stay data
+  const [lengthOfStayData, setLengthOfStayData] = useState<any[]>([]);
+  const [lengthOfStayLoading, setLengthOfStayLoading] = useState(true);
+  const [lengthOfStayError, setLengthOfStayError] = useState<string | null>(null);
+
+  // Add length of stay API params
+  const [lengthOfStayApiParams, setLengthOfStayApiParams] = useState({
+    businessDate: date.toISOString().split('T')[0],
+    periodType: selectedTimeFrame,
+    viewType: selectedViewType,
+    comparison: selectedComparison
+  });
+
+  // Keep one set of API params that can be used for all analysis endpoints
+  const [analysisApiParams, setAnalysisApiParams] = useState({
+    businessDate: date.toISOString().split('T')[0],
+    periodType: selectedTimeFrame,
+    viewType: selectedViewType,
+    comparison: selectedComparison
+  });
+
+  // Update API params when filters change
+  useEffect(() => {
+    setAnalysisApiParams({
+      businessDate: date.toISOString().split('T')[0],
+      periodType: selectedTimeFrame,
+      viewType: selectedViewType,
+      comparison: selectedComparison
+    });
+  }, [date, selectedTimeFrame, selectedViewType, selectedComparison]);
+
+  // Add a new state to track the primary data loading status separately
+  const [primaryDataLoaded, setPrimaryDataLoaded] = useState(false);
+
+  // Modify the fetchKpiData function to mark primary data as loaded
+  const fetchKpiData = async () => {
+    try {
+      setLoading(true)
+      setError(null)
+      
+      // Format the date for the API
+      const formattedDate = date.toISOString().split('T')[0]
+      
+      // Construct the query parameters
+      const params = new URLSearchParams({
+        businessDate: formattedDate,
+        periodType: selectedTimeFrame,
+        viewType: selectedViewType,
+        comparison: selectedComparison
+      })
+      
+      // Fetch data from the API
+      const response = await fetch(`/api/overview/general?${params.toString()}`)
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch data: ${response.status}`)
+      }
+      
+      const data = await response.json()
+      setKpiData(data)
+      
+      // Mark primary data as loaded and trigger secondary data loads
+      setPrimaryDataLoaded(true)
+      
+      // Now fetch secondary data in parallel
+      fetchSecondaryData();
+      
+    } catch (err) {
+      console.error('Error fetching KPI data:', err)
+      setError(err instanceof Error ? err.message : 'An unknown error occurred')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Create a function to fetch all secondary data in parallel
+  const fetchSecondaryData = () => {
+    fetchLengthOfStayData();
+    fetchLeadTimesData();
+    fetchReservationTrendsData();
+    // Add other secondary data fetches here
+  }
+
+  // Update the initial data loading useEffect
+  useEffect(() => {
+    fetchKpiData()
+    // Remove other fetch calls from here - they'll be triggered after primary data loads
+  }, [date, selectedTimeFrame, selectedViewType, selectedComparison])
+
+  // Function to fetch length of stay data
+  const fetchLengthOfStayData = async () => {
+    try {
+      setLengthOfStayLoading(true);
+      setLengthOfStayError(null);
+      
+      // Format the date for the API
+      const formattedDate = date.toISOString().split('T')[0];
+      
+      // Construct the query parameters
+      const params = new URLSearchParams({
+        businessDate: formattedDate,
+        periodType: selectedTimeFrame,
+        viewType: selectedViewType,
+        comparison: selectedComparison
+      });
+      
+      // Fetch data from the API
+      const response = await fetch(`/api/overview/length-of-stay?${params.toString()}`);
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch length of stay data: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      setLengthOfStayData(data.data);
+    } catch (err) {
+      console.error('Error fetching length of stay data:', err);
+      setLengthOfStayError(err instanceof Error ? err.message : 'An unknown error occurred');
+    } finally {
+      setLengthOfStayLoading(false);
+    }
+  };
+
+  // Fetch length of stay data on initial load and when filters change
+  useEffect(() => {
+    fetchLengthOfStayData();
+  }, [date, selectedTimeFrame, selectedViewType, selectedComparison]);
+
+  // Add state for lead times data
+  const [leadTimesData, setLeadTimesData] = useState<{ 
+    bookingLeadTime: any[]; 
+    cancellationLeadTime: any[] 
+  }>({ 
+    bookingLeadTime: [], 
+    cancellationLeadTime: [] 
+  });
+  const [leadTimesLoading, setLeadTimesLoading] = useState(true);
+  const [leadTimesError, setLeadTimesError] = useState<string | null>(null);
+
+  // Function to fetch lead times data
+  const fetchLeadTimesData = async () => {
+    try {
+      setLeadTimesLoading(true);
+      setLeadTimesError(null);
+      
+      // Format the date for the API
+      const formattedDate = date.toISOString().split('T')[0];
+      
+      // Construct the query parameters
+      const params = new URLSearchParams({
+        businessDate: formattedDate,
+        periodType: selectedTimeFrame,
+        viewType: selectedViewType,
+        comparison: selectedComparison
+      });
+      
+      // Fetch data from the API
+      const response = await fetch(`/api/overview/lead-times?${params.toString()}`);
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch lead times data: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      setLeadTimesData(data);
+    } catch (err) {
+      console.error('Error fetching lead times data:', err);
+      setLeadTimesError(err instanceof Error ? err.message : 'An unknown error occurred');
+    } finally {
+      setLeadTimesLoading(false);
+    }
+  };
+
+  // Fetch lead times data on initial load and when filters change
+  useEffect(() => {
+    fetchLeadTimesData();
+  }, [date, selectedTimeFrame, selectedViewType, selectedComparison]);
 
   const toggleHotel = (hotel: string) => {
     setSelectedHotels(prev => 
@@ -1288,12 +1473,12 @@ export function Overview() {
   const barChartDatasets = [
     {
       key: "leadtime",
-      title: "Lead Time Distribution",
+      title: "Booking Lead Time",
       data: leadTimeData // Your existing leadTimeData
     },
     {
       key: "cancellation",
-      title: "Cancellation Lead Time Distribution",
+      title: "Cancellation Lead Time",
       data: cancellationLeadTimeData // Your existing cancellationLeadTimeData
     }
   ]
@@ -1302,10 +1487,113 @@ export function Overview() {
   const handleDateChange = (newDate: Date | undefined) => {
     if (newDate) {
       setDate(newDate)
-      // Here you can add any additional logic needed when the date changes
-      // For example, fetching new data for the selected date
+      // Data will be fetched via the useEffect
     }
   }
+
+  // Add state for reservation trends data
+  const [reservationTrendsData, setReservationTrendsData] = useState<Array<{
+    dayOfWeek: string;
+    bookingsCreated: number;
+    prevBookingsCreated: number;
+    staysStarting: number;
+    prevStaysStarting: number;
+  }>>([]);
+  const [reservationTrendsLoading, setReservationTrendsLoading] = useState(true);
+  const [reservationTrendsError, setReservationTrendsError] = useState<string | null>(null);
+
+  // Function to fetch reservation trends data
+  const fetchReservationTrendsData = async () => {
+    try {
+      setReservationTrendsLoading(true);
+      setReservationTrendsError(null);
+      
+      // Format the date for the API
+      const formattedDate = date.toISOString().split('T')[0];
+      
+      // Construct the query parameters
+      const params = new URLSearchParams({
+        businessDate: formattedDate,
+        periodType: selectedTimeFrame,
+        viewType: selectedViewType,
+        comparison: selectedComparison
+      });
+      
+      // Fetch data from the API
+      const response = await fetch(`/api/overview/reservation-trends?${params.toString()}`);
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch reservation trends data: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      
+      // Transform API response to match the format expected by ReservationsByDayChart
+      const transformedData = data.occupancyByDayOfWeek.map((occupancyItem: any, index: number) => {
+        const bookingItem = data.bookingsByDayOfWeek[index];
+        return {
+          dayOfWeek: occupancyItem.day,
+          bookingsCreated: bookingItem.current,
+          prevBookingsCreated: bookingItem.previous,
+          staysStarting: occupancyItem.current,
+          prevStaysStarting: occupancyItem.previous
+        };
+      });
+      
+      setReservationTrendsData(transformedData);
+    } catch (err) {
+      console.error('Error fetching reservation trends data:', err);
+      setReservationTrendsError(err instanceof Error ? err.message : 'An unknown error occurred');
+    } finally {
+      setReservationTrendsLoading(false);
+    }
+  };
+
+  // Fetch reservation trends data on initial load and when filters change
+  useEffect(() => {
+    fetchReservationTrendsData();
+  }, [date, selectedTimeFrame, selectedViewType, selectedComparison]);
+
+  // Add new state for world map data
+  const [worldMapData, setWorldMapData] = useState<Array<{ country: string; value: number }>>([]);
+  
+  // Add state to track selected metric at the Overview level
+  const [selectedMapMetric, setSelectedMapMetric] = useState('revenue');
+
+  // Modify the fetchWorldMapData function to use the mapping
+  const fetchWorldMapData = async (metric: string = selectedMapMetric) => {
+    try {
+      const params = new URLSearchParams({
+        businessDate: date.toISOString().split('T')[0],
+        periodType: selectedTimeFrame,
+        viewType: selectedViewType,
+        comparison: selectedComparison,
+        field: 'guest_country',
+        limit: '50'
+      });
+      
+      const response = await fetch(`/api/overview/distribution?${params}`);
+      if (!response.ok) throw new Error('Failed to fetch world map data');
+      
+      const data = await response.json();
+      
+      // Use the mapped metric key to access the correct data
+      const mappedMetric = metricKeyMapping[metric] || metric;
+      const transformedData = data[mappedMetric].map((item: any) => ({
+        country: item.name.toLowerCase(),
+        value: item.value
+      }));
+      
+      setWorldMapData(transformedData);
+    } catch (error) {
+      console.error('Error fetching world map data:', error);
+    }
+  };
+
+  // Update useEffect to include selectedMapMetric in dependencies
+  useEffect(() => {
+    fetchWorldMapData();
+  }, [date, selectedTimeFrame, selectedViewType, selectedComparison, selectedMapMetric]);
 
   return (
     <div className="flex-1 overflow-auto bg-[#f5f8ff]">
@@ -1440,101 +1728,141 @@ export function Overview() {
         </div>
 
 
-      <div className="p-8 px-12  pt-[140px]">
-    
+      <div className="p-8 px-12 pt-[140px]">
+        {/* Remove the black overlay loading spinner */}
+        {/* {loading && (
+          <div className="flex justify-center items-center h-20">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+          </div>
+        )} */}
+        
+        {error && (
+          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-6">
+            <p>Error loading data: {error}</p>
+          </div>
+        )}
 
-        {/* KPI Grid */}
+        {/* KPI Grid - using KpiWithAlignedChart with skeleton loading */}
         <div className="grid grid-cols-4 gap-6 mb-8">
-          <KpiWithSubtleChart
-            title="Total Revenue"
-            currentValue={15200}
-            percentageChange={-8.3}
-            chartData={totalRevenueChartData}
-            prefix="€"
-            valueColor="blue"
-            
-            icon={DollarSign}
-          />
-          <KpiWithSubtleChart
-            title="Rooms Sold"
-            currentValue={1850}
-            percentageChange={-3.4}
-            chartData={roomsSoldChartData}
-            valueColor="blue"
-            prefix=""
-            chartConfig={roomTypesChartConfig}
-            icon={Hotel}
-          />
-          <KpiWithSubtleChart
-            title="ADR"
-            currentValue={205}
-            percentageChange={10.8}
-            chartData={adrChartData}
-            prefix="€"
-            valueColor="green"
-            icon={DollarSign}
-          />
-          <KpiWithSubtleChart
-            title="Occupancy Rate"
-            currentValue={85}
-            percentageChange={-5.2}
-            chartData={occupancyChartData}
-            prefix=""
-            suffix="%"
-            valueColor="green"
-            icon={Percent}
-          />
+          {loading ? (
+            // Skeleton loaders for the KPI grid
+            <>
+              {[...Array(4)].map((_, index) => (
+                <Card key={index} className="bg-white p-6">
+                  <Skeleton className="h-10 w-32 mb-2" />
+                  <Skeleton className="h-5 w-16 mb-4" />
+                  <Skeleton className="h-24 w-full" />
+                </Card>
+              ))}
+            </>
+          ) : (
+            <>
+              <KpiWithAlignedChart
+                title="Revenue"
+                currentValue={kpiData?.totalRevenue.value ?? 15200}
+                percentageChange={kpiData?.totalRevenue.percentageChange ?? -8.3}
+                chartData={kpiData?.totalRevenue.fluctuation ?? totalRevenueChartData}
+                prefix="€"
+                valueColor="blue"
+                icon={DollarSign}
+              />
+              <KpiWithAlignedChart
+                title="Rooms Sold"
+                currentValue={kpiData?.roomsSold.value ?? 1850}
+                percentageChange={kpiData?.roomsSold.percentageChange ?? -3.4}
+                chartData={kpiData?.roomsSold.fluctuation ?? roomsSoldChartData}
+                valueColor="blue"
+                prefix=""
+                icon={Hotel}
+              />
+              <KpiWithAlignedChart
+                title="ADR"
+                currentValue={kpiData?.adr.value ?? 205}
+                percentageChange={kpiData?.adr.percentageChange ?? 10.8}
+                chartData={kpiData?.adr.fluctuation ?? adrChartData}
+                prefix="€"
+                valueColor="green"
+                icon={DollarSign}
+              />
+              <KpiWithAlignedChart
+                title="Occupancy"
+                currentValue={kpiData?.occupancyRate.value ?? 85}
+                percentageChange={kpiData?.occupancyRate.percentageChange ?? -5.2}
+                chartData={kpiData?.occupancyRate.fluctuation ?? occupancyChartData}
+                prefix=""
+                suffix="%"
+                valueColor="green"
+                icon={Percent}
+              />
+            </>
+          )}
         </div>
 
         {/* Second Row - KPIs without Charts */}
         <div className="grid grid-cols-5 gap-4 mb-8">
-          
-          <Kpi
-            title="Room Revenue"
-            currentValue={10200}
-            percentageChange={-6.8}
-            prefix="€"
-            color="green"
-            mainTimeSeriesData={roomRevenueChartData}
-          />
-          <Kpi
-            title="F&B Revenue"
-            currentValue={3000}
-            percentageChange={15.2}
-            prefix="€"
-            color="blue"
-            mainTimeSeriesData={fnbRevenueChartData}
-          />
-          <Kpi
-            title="Other Revenue"
-            currentValue={2000}
-            percentageChange={-4.5}
-            prefix="€"
-            color="blue"
-            mainTimeSeriesData={otherRevenueChartData}
-          />
-          <Kpi
-            title="RevPAR"
-            currentValue={174.25}
-            percentageChange={-7.2}
-            prefix="€"
-            color="green"
-            mainTimeSeriesData={revparChartData}
-          />
-          <Kpi
-            title="TRevPAR"
-            currentValue={215.50}
-            percentageChange={11.2}
-            prefix="€"
-            color="blue"
-            mainTimeSeriesData={trevparChartData}
-          />
+          {loading ? (
+            // Skeleton loaders for the second row of KPIs
+            <>
+              {[...Array(5)].map((_, index) => (
+                <Card key={index} className="bg-white p-4">
+                  <div className="flex justify-between items-start mb-3">
+                    <Skeleton className="h-5 w-24" />
+                  </div>
+                  <Skeleton className="h-8 w-24 mb-2" />
+                  <Skeleton className="h-4 w-16" />
+                </Card>
+              ))}
+            </>
+          ) : (
+            <>
+              <Kpi
+                title="Room Revenue"
+                currentValue={kpiData?.roomRevenue.value ?? 10200}
+                percentageChange={kpiData?.roomRevenue.percentageChange ?? -6.8}
+                prefix="€"
+                color="green"
+                chartData={kpiData?.roomRevenue.fluctuation ?? roomRevenueChartData}
+              />
+              <Kpi
+                title="F&B Revenue"
+                currentValue={kpiData?.fbRevenue.value ?? 3000}
+                percentageChange={kpiData?.fbRevenue.percentageChange ?? 15.2}
+                prefix="€"
+                color="blue"
+                chartData={kpiData?.fbRevenue.fluctuation ?? fnbRevenueChartData}
+              />
+              <Kpi
+                title="Other Revenue"
+                currentValue={kpiData?.otherRevenue.value ?? 2000}
+                percentageChange={kpiData?.otherRevenue.percentageChange ?? -4.5}
+                prefix="€"
+                color="blue"
+                chartData={kpiData?.otherRevenue.fluctuation ?? otherRevenueChartData}
+              />
+              <Kpi
+                title="RevPAR"
+                currentValue={kpiData?.revpar.value ?? 174.25}
+                percentageChange={kpiData?.revpar.percentageChange ?? -7.2}
+                prefix="€"
+                color="green"
+                chartData={kpiData?.revpar.fluctuation ?? revparChartData}
+              />
+              <Kpi
+                title="TRevPAR"
+                currentValue={kpiData?.trevpar.value ?? 215.50}
+                percentageChange={kpiData?.trevpar.percentageChange ?? 11.2}
+                prefix="€"
+                color="blue"
+                chartData={kpiData?.trevpar.fluctuation ?? trevparChartData}
+              />
+            </>
+          )}
         </div>
 
         {/* Top Producers and Demographics */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mt-8">
           <TopFive 
-            title="Top Producers"
+            title="Producers"
             color="blue"
             metrics={[
               {
@@ -1559,18 +1887,39 @@ export function Overview() {
                   { name: "Travel Agencies", value: 510, change: 60 },
                   { name: "Expedia", value: 490, change: -35 },
                 ]
+              },
+              {
+                key: 'adr',
+                label: 'ADR',
+                prefix: '€',
+                data: [
+                  { name: "Booking.com", value: 154, change: 12 },
+                  { name: "Direct Website", value: 148, change: 8 },
+                  { name: "Corporate Partners", value: 146, change: -5 },
+                  { name: "Direct Sales", value: 145, change: 10 },
+                  { name: "Expedia", value: 147, change: 9 },
+                ]
               }
             ]}
             distributionData={producersDistributionData}
             categoryTimeSeriesData={producersTimeSeriesData}
             chartConfig={producersChartConfig}
+            apiEndpoint="/api/overview/distribution" 
+            apiParams={{
+              ...analysisApiParams,
+              field: 'producer',
+              limit: '5'
+            }}
           />
-          <PieChartWithLabels />
+          <OccupancyAnalysisChart 
+            occupancyData={kpiData?.occupancyRate.fluctuation ?? occupancyChartData}
+            totalRooms={kpiData?.hotelCapacity ?? 100}
+          />
         </div>
 
         {/* World Map */}
         <div className="mt-8">
-          <Card className="bg-white  rounded-lg overflow-hidden">
+          <Card className="bg-white rounded-lg overflow-hidden">
             <CardHeader className="flex flex-col items-start">
               <div className="flex w-full justify-between items-center">
                 <div>
@@ -1586,9 +1935,9 @@ export function Overview() {
                     <WorldMap
                       color="rgb(59, 130, 246)"
                       title=""
-                      valueSuffix="€"
+                      valueSuffix={selectedMapMetric === 'revenue' ? '€' : selectedMapMetric === 'adr' ? '€' : ''}
                       size="xl"
-                      data={countryData}
+                      data={worldMapData}
                       tooltipBgColor="black"
                       tooltipTextColor="white"
                       richInteraction={true}
@@ -1602,16 +1951,16 @@ export function Overview() {
                       <div className="flex items-center space-x-2">
                         <span className="text-sm text-gray-500">Lower</span>
                         <span className="text-sm text-gray-500">-</span>
-                        <span className="text-sm text-gray-500">Higher Revenue</span>
+                        <span className="text-sm text-gray-500">Higher</span>
                       </div>
                     </div>
                   </div>
                 </div>
 
-                {/* Top Five Countries Side */}
+                {/* Top Five Countries Side - Now with API integration */}
                 <div className="border-l border-gray-100 pl-8">
                   <TopFive 
-                    title="Top Countries "
+                    title="Countries"
                     color="blue"
                     withBorder={false}
                     metrics={[
@@ -1654,6 +2003,17 @@ export function Overview() {
                     distributionData={countryDistributionData}
                     categoryTimeSeriesData={countryTimeSeriesData}
                     chartConfig={countryChartConfig}
+                    // Replace specific endpoint with generic analysis endpoint
+                    apiEndpoint="/api/overview/distribution"
+                    apiParams={{
+                      ...analysisApiParams,
+                      field: 'guest_country',
+                      limit: '5'
+                    }}
+                    onMetricChange={(metric) => {
+                      setSelectedMapMetric(metric);
+                      fetchWorldMapData(metric);
+                    }}
                   />
                 </div>
               </div>
@@ -1694,10 +2054,17 @@ export function Overview() {
             distributionData={segmentsDistributionData}
             categoryTimeSeriesData={segmentsTimeSeriesData}
             chartConfig={segmentsChartConfig}
+            // Add these two properties to use the generic analysis endpoint
+            apiEndpoint="/api/overview/distribution"
+            apiParams={{
+              ...analysisApiParams,
+              field: 'market_group_code',
+              limit: '5'
+            }}
           />
           <TopFive 
             title="Booking Channels"
-            color="purple"
+            color="blue"
             metrics={[
               {
                 key: 'revenue',
@@ -1726,6 +2093,13 @@ export function Overview() {
             distributionData={bookingChannelsDistributionData}
             categoryTimeSeriesData={bookingChannelsTimeSeriesData}
             chartConfig={bookingChannelsChartConfig}
+            // Add these two properties to use the generic analysis endpoint
+            apiEndpoint="/api/overview/distribution"
+            apiParams={{
+              ...analysisApiParams,
+              field: 'booking_channel',
+              limit: '5'
+            }}
           />
           <TopFive 
             title="Room Types"
@@ -1734,7 +2108,7 @@ export function Overview() {
               {
                 key: 'revenue',
                 label: 'Revenue',
-                prefix: '€',
+                prefix: '€',  
                 data: [
                   { name: "Deluxe Suite", value: 156000, change: 18500 },
                   { name: "Executive Room", value: 128000, change: 15200 },
@@ -1758,6 +2132,46 @@ export function Overview() {
             distributionData={roomTypesDistributionData}
             categoryTimeSeriesData={roomTypesTimeSeriesData}
             chartConfig={roomTypesChartConfig}
+            // Add these two properties to use the generic analysis endpoint
+            apiEndpoint="/api/overview/distribution"
+            apiParams={{
+              ...analysisApiParams,
+              field: 'room_type',
+              limit: '5'
+            }}
+          />
+        </div>
+
+        {/* Horizontal Bar Chart and Reservations by Day */}
+        <div className="grid gap-4 grid-cols-2 pt-8">
+          <HorizontalBarChartMultipleDatasets 
+            datasets={[
+              {
+                key: "leadtime",
+                title: "Booking Lead Time",
+                data: leadTimesData.bookingLeadTime.map(item => ({
+                  range: item.bucket,
+                  current: item.current,
+                  previous: item.previous
+                }))
+              },
+              {
+                key: "cancellation",
+                title: "Cancellation Lead Time",
+                data: leadTimesData.cancellationLeadTime.map(item => ({
+                  range: item.bucket,
+                  current: item.current,
+                  previous: item.previous
+                }))
+              }
+            ]}
+            defaultDataset="leadtime"
+            loading={leadTimesLoading}
+            error={leadTimesError}
+            leftMargin={-10} // Set left margin to -10 for lead times
+          />
+          <ReservationsByDayChart 
+            data={reservationTrendsLoading ? [] : reservationTrendsData} 
           />
         </div>
 
@@ -1765,54 +2179,45 @@ export function Overview() {
         <div className="grid grid-cols-2 gap-6 mt-8">
           <KpiWithChart
             title="Booking Status"
-            initialValue={12}
-            initialPercentageChange={-40}
-            chartData={cancellationsChartData}
-            metrics={[
+            color="blue"
+            apiUrl="/api/overview/cancellations"
+            apiParams={{
+              businessDate: date.toISOString().split('T')[0],
+              periodType: selectedTimeFrame,
+              viewType: selectedViewType,
+              comparison: selectedComparison
+            }}
+            fieldMapping={[
               {
-                key: 'cancellations',
-                label: 'Cancellation Rate',
-                data: cancellationsChartData,
-                prefix: ''
+                apiField: "cancelledRooms",
+                label: "Cancelled rooms",
+                prefix: ""
               },
               {
-                key: 'noshows',
-                label: 'No-Show Rate',
-                data: noShowsChartData,
-                prefix: ''
+                apiField: "noShowRooms",
+                label: "No-Show rooms",
+                prefix: ""
               },
               {
-                key: 'revenue',
-                label: 'Revenue Lost',
-                data: cancellationsChartData.map(item => ({
-                  date: item.date,
-                  current: item.current * 150,
-                  previous: item.previous * 150
-                })),
-                prefix: '€'
+                apiField: "revenueLost",
+                label: "Revenue Lost",
+                prefix: "€"
               }
             ]}
-            color="blue"
           />
           <HorizontalBarChartMultipleDatasets 
             datasets={[
               {
                 key: "lengthOfStay",
                 title: "Length of Stay Distribution",
-                data: lengthOfStayData
+                data: lengthOfStayLoading ? [] : lengthOfStayData
               }
             ]}
             defaultDataset="lengthOfStay"
+            loading={lengthOfStayLoading}
+            error={lengthOfStayError}
+            leftMargin={10} // Set left margin to 10 for length of stay
           />
-        </div>
-
-        {/* Horizontal Bar Chart and Reservations by Day */}
-        <div className="grid gap-4 grid-cols-2 pt-8">
-          <HorizontalBarChartMultipleDatasets 
-            datasets={barChartDatasets}
-            defaultDataset="leadtime"
-          />
-          <ReservationsByDayChart data={reservationsByDayData} />
         </div>
 
       </div>

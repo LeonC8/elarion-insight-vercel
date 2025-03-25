@@ -12,11 +12,11 @@ interface KpiProps {
   prefix?: string
   suffix?: string
   color?: 'green' | 'blue'
-  mainTimeSeriesData?: Array<{
+  chartData?: {
     date: string
     current: number
     previous: number
-  }>
+  }[]
 }
 
 export function Kpi({ 
@@ -26,7 +26,7 @@ export function Kpi({
   prefix = "€",
   suffix,
   color = 'green',
-  mainTimeSeriesData
+  chartData
 }: KpiProps) {
   const [showDetails, setShowDetails] = React.useState(false)
   const formattedValue = Math.round(currentValue).toLocaleString()
@@ -45,11 +45,11 @@ export function Kpi({
               <CardTitle className="text-md text-muted-foreground font-normal mb-3 ">
                 {title}
               </CardTitle>
-              <div className="flex items-end gap-2 ">
+              <div className="flex flex-wrap items-center gap-2">
                 <span className="text-2xl font-bold leading-none">
                   {prefix && prefix}{formattedValue}{suffix && suffix}
                 </span>
-                <span className={`text-xs px-2 py-0.5 ml-1 rounded ${
+                <span className={`text-xs px-2 py-0.5 rounded ${
                   isPositive 
                     ? 'text-green-600 bg-green-100/50 border border-green-600' 
                     : 'text-red-600 bg-red-100/50 border border-red-600'
@@ -63,15 +63,16 @@ export function Kpi({
         </CardHeader>
       </Card>
       
-      {mainTimeSeriesData && (
+      {chartData && (
         <MainTimeSeriesDialog 
           open={showDetails}
           onOpenChange={setShowDetails}
           title={title}
           currentValue={currentValue}
+          percentageChange={percentageChange}
           prefix={prefix}
           suffix={suffix}
-          mainTimeSeriesData={mainTimeSeriesData}
+          mainTimeSeriesData={chartData}
         />
       )}
     </>

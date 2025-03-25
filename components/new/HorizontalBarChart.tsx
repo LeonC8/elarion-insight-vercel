@@ -28,6 +28,7 @@ interface HorizontalBarChartProps {
     previous: number
   }>
   title: string
+  leftMargin?: number
 }
 
 // Chart configuration for current/previous period
@@ -42,7 +43,7 @@ const chartConfig = {
   },
 } satisfies ChartConfig
 
-export function HorizontalBarChart({ data, title }: HorizontalBarChartProps) {
+export function HorizontalBarChart({ data, title, leftMargin = -10 }: HorizontalBarChartProps) {
   const [activeSeries, setActiveSeries] = React.useState<string[]>([
     'current',
     'previous'
@@ -67,7 +68,7 @@ export function HorizontalBarChart({ data, title }: HorizontalBarChartProps) {
                 top: 10,
                 right: 10,
                 bottom: 20,
-                left: -10,
+                left: leftMargin,
               }}
             >
               <CartesianGrid strokeDasharray="3 3" horizontal={false} />

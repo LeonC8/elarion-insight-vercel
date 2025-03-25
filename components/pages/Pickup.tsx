@@ -501,48 +501,61 @@ const calculateRowSum = (rowData: { [key: string]: PickupMetrics }, metric: Metr
   }, 0);
 };
 
-// Update the MonthlyPickupTable component's return statement
+// Update the MonthlyPickupTable component to fetch data from the API
 const MonthlyPickupTable = ({ 
   selectedMetric, 
   selectedDate,
+  businessDate,
   onCellClick 
 }: { 
   selectedMetric: MetricType; 
   selectedDate: Date;
+  businessDate: Date;
   onCellClick: (date: string, month: string) => void;
 }) => {
   const monthDates = generateMonthDates(selectedDate);
   const today = new Date();
+  const [pickupData, setPickupData] = useState<MonthlyPickupData[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // Sample data - replace with actual data
-  const pickupData: MonthlyPickupData[] = monthDates.map(date => ({
-    bookingDate: date,
-    pickupData: monthDates.reduce((acc, stayDate) => {
-      const bookingDay = new Date(date);
-      const stayDay = new Date(stayDate);
-      
-      if (bookingDay > stayDay || bookingDay > today) {
-        acc[stayDate] = {
-          soldRooms: null,
-          revenue: null,
-          adr: null
-        };
-      } else {
-        // Generate random data for demonstration
-        const rooms = Math.floor(Math.random() * 10);
-        const rev = rooms * (Math.random() * 200 + 100);
-        acc[stayDate] = {
-          soldRooms: rooms,
-          revenue: Math.round(rev),
-          adr: rooms > 0 ? Math.round(rev / rooms) : null
-        };
+  useEffect(() => {
+    const fetchData = async () => {
+      setIsLoading(true);
+      setError(null);
+      try {
+        const dateParam = selectedDate.toISOString().split('T')[0];
+        
+        const year = businessDate.getFullYear();
+        const month = String(businessDate.getMonth() + 1).padStart(2, '0');
+        const day = String(businessDate.getDate()).padStart(2, '0');
+        const businessDateParam = `${year}-${month}-${day}`;
+        
+        const response = await fetch(`/api/pickup/month?date=${dateParam}&businessDate=${businessDateParam}`);
+        
+        if (!response.ok) {
+          throw new Error('Failed to fetch pickup data');
+        }
+        
+        const data = await response.json();
+        console.log('Monthly Pickup API Response:', {
+          endpoint: `/api/pickup/month?date=${dateParam}&businessDate=${businessDateParam}`,
+          data: data
+        });
+        setPickupData(data);
+      } catch (err) {
+        console.error('Error fetching pickup data:', err);
+        setError(err instanceof Error ? err.message : 'An unknown error occurred');
+      } finally {
+        setIsLoading(false);
       }
-      return acc;
-    }, {} as { [key: string]: PickupMetrics })
-  }));
+    };
 
-  const formatValue = (metrics: PickupMetrics) => {
-    if (metrics[selectedMetric] === null) return '-';
+    fetchData();
+  }, [selectedDate, businessDate]);
+
+  const formatValue = (metrics: PickupMetrics | undefined) => {
+    if (!metrics || metrics[selectedMetric] === null) return '-';
     switch (selectedMetric) {
       case 'soldRooms':
         return metrics.soldRooms;
@@ -553,10 +566,18 @@ const MonthlyPickupTable = ({
     }
   };
 
-  const getCellValue = (metrics: PickupMetrics) => {
-    if (metrics[selectedMetric] === null) return null;
+  const getCellValue = (metrics: PickupMetrics | undefined) => {
+    if (!metrics || metrics[selectedMetric] === null) return null;
     return metrics[selectedMetric];
   };
+
+  if (isLoading) {
+    return <div className="flex justify-center items-center h-64">Loading pickup data...</div>;
+  }
+
+  if (error) {
+    return <div className="flex justify-center items-center h-64 text-red-500">Error: {error}</div>;
+  }
 
   return (
     <div className="overflow-x-auto border border-gray-200 rounded-lg relative max-h-[calc(100vh-180px)]">
@@ -586,8 +607,17 @@ const MonthlyPickupTable = ({
                   {format(new Date(row.bookingDate), 'd MMM')}
                 </td>
                 {monthDates.map(date => {
-                  const currentValue = getCellValue(row.pickupData[date]);
-                  const previousValue = rowIndex > 0 ? getCellValue(pickupData[rowIndex - 1].pickupData[date]) : null;
+                  const dateMetrics = row.pickupData[date] || {
+                    soldRooms: null,
+                    revenue: null,
+                    adr: null
+                  };
+                  
+                  const currentValue = getCellValue(dateMetrics);
+                  const previousValue = rowIndex > 0 ? 
+                    getCellValue(pickupData[rowIndex - 1]?.pickupData?.[date]) : 
+                    null;
+                  
                   const colorClass = getChangeColor(currentValue, previousValue);
                   
                   return (
@@ -596,7 +626,7 @@ const MonthlyPickupTable = ({
                       className={`px-6 py-4 whitespace-nowrap text-sm text-gray-500 transition-colors ${colorClass} cursor-pointer hover:bg-gray-100`}
                       onClick={() => onCellClick(format(new Date(date), 'dd MMM yyyy'), format(new Date(date), 'MMM yyyy'))}
                     >
-                      {formatValue(row.pickupData[date])}
+                      {formatValue(dateMetrics)}
                     </td>
                   );
                 })}
@@ -614,48 +644,58 @@ const MonthlyPickupTable = ({
   );
 };
 
-// Update the YearlyPickupTable component's return statement similarly
+// Update the YearlyPickupTable component to fetch data from the API
 const YearlyPickupTable = ({ 
   selectedMetric, 
   selectedDate,
+  businessDate,
   onCellClick 
 }: { 
   selectedMetric: MetricType; 
   selectedDate: Date;
+  businessDate: Date;
   onCellClick: (date: string, month: string) => void;
 }) => {
-  // Instead of using generateDaysFromMonthStart, use generateMonthDates to get all dates
-  const monthDates = generateMonthDates(selectedDate);
+  // Get year months
   const yearMonths = generateYearMonths(selectedDate);
-  const today = new Date();
+  const [pickupData, setPickupData] = useState<YearlyPickupData[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // Sample data - replace with actual data
-  const pickupData: YearlyPickupData[] = monthDates.map(date => ({
-    bookingMonth: format(new Date(date), 'MMM yyyy'),
-    bookingDate: date,
-    pickupData: yearMonths.reduce((acc, stayMonth) => {
-      const bookingDay = new Date(date);
-      const stayDay = new Date(stayMonth);
-      
-      if (bookingDay > stayDay || bookingDay > today) {
-        acc[stayMonth] = {
-          soldRooms: null,
-          revenue: null,
-          adr: null
-        };
-      } else {
-        // Generate random data for demonstration
-        const rooms = Math.floor(Math.random() * 10);
-        const rev = rooms * (Math.random() * 200 + 100);
-        acc[stayMonth] = {
-          soldRooms: rooms,
-          revenue: Math.round(rev),
-          adr: rooms > 0 ? Math.round(rev / rooms) : null
-        };
+  useEffect(() => {
+    const fetchData = async () => {
+      setIsLoading(true);
+      setError(null);
+      try {
+        const dateParam = selectedDate.toISOString().split('T')[0];
+        
+        const year = businessDate.getFullYear();
+        const month = String(businessDate.getMonth() + 1).padStart(2, '0');
+        const day = String(businessDate.getDate()).padStart(2, '0');
+        const businessDateParam = `${year}-${month}-${day}`;
+        
+        const response = await fetch(`/api/pickup/year?date=${dateParam}&businessDate=${businessDateParam}`);
+        
+        if (!response.ok) {
+          throw new Error('Failed to fetch yearly pickup data');
+        }
+        
+        const data = await response.json();
+        console.log('Yearly Pickup API Response:', {
+          endpoint: `/api/pickup/year?date=${dateParam}&businessDate=${businessDateParam}`,
+          data: data
+        });
+        setPickupData(data);
+      } catch (err) {
+        console.error('Error fetching yearly pickup data:', err);
+        setError(err instanceof Error ? err.message : 'An unknown error occurred');
+      } finally {
+        setIsLoading(false);
       }
-      return acc;
-    }, {} as { [key: string]: PickupMetrics })
-  }));
+    };
+
+    fetchData();
+  }, [selectedDate, businessDate]);
 
   const formatValue = (metrics: PickupMetrics | undefined) => {
     if (!metrics || metrics[selectedMetric] === null) return '-';
@@ -673,6 +713,14 @@ const YearlyPickupTable = ({
     if (!metrics || metrics[selectedMetric] === null) return null;
     return metrics[selectedMetric];
   };
+
+  if (isLoading) {
+    return <div className="flex justify-center items-center h-64">Loading yearly pickup data...</div>;
+  }
+
+  if (error) {
+    return <div className="flex justify-center items-center h-64 text-red-500">Error: {error}</div>;
+  }
 
   return (
     <div className="overflow-x-auto border border-gray-200 rounded-lg relative max-h-[calc(100vh-180px)]">
@@ -702,8 +750,17 @@ const YearlyPickupTable = ({
                   {format(new Date(row.bookingDate), 'd MMM')}
                 </td>
                 {yearMonths.map(month => {
-                  const currentValue = getCellValue(row.pickupData[month]);
-                  const previousValue = rowIndex > 0 ? getCellValue(pickupData[rowIndex - 1].pickupData[month]) : null;
+                  const dateMetrics = row.pickupData[month] || {
+                    soldRooms: null,
+                    revenue: null,
+                    adr: null
+                  };
+                  
+                  const currentValue = getCellValue(dateMetrics);
+                  const previousValue = rowIndex > 0 ? 
+                    getCellValue(pickupData[rowIndex - 1]?.pickupData?.[month]) : 
+                    null;
+                    
                   const colorClass = getChangeColor(currentValue, previousValue);
 
                   return (
@@ -712,7 +769,7 @@ const YearlyPickupTable = ({
                       className={`px-6 py-4 whitespace-nowrap text-sm text-gray-500 transition-colors ${colorClass} cursor-pointer hover:bg-gray-100`}
                       onClick={() => onCellClick(format(new Date(row.bookingDate), 'dd MMM yyyy'), month)}
                     >
-                      {formatValue(row.pickupData[month])}
+                      {formatValue(dateMetrics)}
                     </td>
                   );
                 })}
@@ -735,11 +792,13 @@ export function PickupDashboard() {
   const [selectedView, setSelectedView] = useState<ViewType>('month');
   const [selectedHotels, setSelectedHotels] = useState<string[]>(["Hotel 1"]);
   const [selectedDate] = useState(new Date());
+  const [businessDate, setBusinessDate] = useState<Date>(new Date());
+  const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const allHotels = ["Hotel 1", "Hotel 2", "Hotel 3"];
   const [showStatsModal, setShowStatsModal] = useState(false);
   const [selectedCell, setSelectedCell] = useState<{date: string, month: string} | null>(null);
 
-  // Hardcoded statistics data for the modal
+  // Define the stats data structure
   const statsData = {
     roomsSold: 24,
     revenue: 3850,
@@ -793,7 +852,37 @@ export function PickupDashboard() {
               <h2 className="text-3xl font-bold text-gray-800">Pickup</h2>
             </div>
             <div className="flex space-x-4 items-center">
-              {/* New style dropdown for view selection */}
+              {/* Business Date Selector */}
+              <div className="flex flex-col">
+                <span className="text-xs text-gray-500 mb-2">Business Date</span>
+                <DropdownMenu open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
+                  <DropdownMenuTrigger asChild>
+                    <Button 
+                      variant="ghost" 
+                      className="bg-[#f2f8ff] hover:bg-[#f2f8ff] text-[#342630] rounded-full px-4"
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {format(businessDate, 'dd MMM yyyy')}
+                      <ChevronDownIcon className="ml-2 h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent className="p-0" align="end">
+                    <Calendar
+                      mode="single"
+                      selected={businessDate}
+                      onSelect={(date) => {
+                        if (date) {
+                          setBusinessDate(date);
+                          setIsCalendarOpen(false);
+                        }
+                      }}
+                      initialFocus
+                    />
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+
+              {/* View Type Dropdown */}
               <div className="flex flex-col">
                 <span className="text-xs text-gray-500 mb-2">View type</span>
                 <DropdownMenu>
@@ -859,13 +948,15 @@ export function PickupDashboard() {
           {selectedView === 'month' ? (
             <MonthlyPickupTable 
               selectedMetric={selectedMetric} 
-              selectedDate={selectedDate} 
+              selectedDate={selectedDate}
+              businessDate={businessDate}
               onCellClick={handleCellClick}
             />
           ) : (
             <YearlyPickupTable 
               selectedMetric={selectedMetric} 
-              selectedDate={selectedDate} 
+              selectedDate={selectedDate}
+              businessDate={businessDate}
               onCellClick={handleCellClick}
             />
           )}
@@ -880,7 +971,7 @@ export function PickupDashboard() {
               Statistics for {selectedCell?.date}
             </DialogTitle>
             <DialogDescription className="text-base text-gray-500 text-sm pt-2">
-              Business date: {format(new Date(), 'dd MMM yyyy')}
+              Business date: {format(businessDate, 'dd MMM yyyy')}
             </DialogDescription>
           </DialogHeader>
           

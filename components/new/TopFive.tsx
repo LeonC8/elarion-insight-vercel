@@ -1,6 +1,6 @@
 import { ArrowUpIcon, ArrowDownIcon, PercentIcon, HashIcon } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -56,6 +56,11 @@ interface TopFiveProps {
     }
   }>
   chartConfig?: any
+  // New prop to specify an API endpoint to fetch data from
+  apiEndpoint?: string
+  // Additional query parameters to send to the API
+  apiParams?: Record<string, string>
+  onMetricChange?: (metric: string) => void
 }
 
 type FilterType = 'top' | 'bottom' | 'rising' | 'falling';
@@ -81,6 +86,18 @@ function TriangleDown({ className }: { className?: string }) {
   )
 }
 
+// Helper function to format numbers consistently
+function formatNumber(value: number): number {
+  // Round to the nearest integer for large numbers, or to 2 decimal places for smaller numbers
+  return value >= 100 ? Math.round(value) : Number(value.toFixed(2));
+}
+
+// New helper function to format numbers with commas
+function formatNumberWithCommas(value: number | undefined): string {
+  if (value === undefined) return '';
+  return value.toLocaleString('en-US');
+}
+
 export function TopFive({ 
   title, 
   subtitle,
@@ -93,6 +110,9 @@ export function TopFive({
   distributionData,
   categoryTimeSeriesData,
   chartConfig,
+  apiEndpoint,
+  apiParams,
+  onMetricChange,
 }: TopFiveProps) {
   const [showPercentage, setShowPercentage] = useState(false)
   const [filterType, setFilterType] = useState<FilterType>('top')
@@ -100,8 +120,162 @@ export function TopFive({
   const [selectedCategory, setSelectedCategory] = useState(defaultCategory || categories?.[0]?.key)
   const [showDetails, setShowDetails] = useState(false)
   
+  // Add state for API-loaded data
+  const [apiData, setApiData] = useState<null | any>(null)
+  const [apiLoading, setApiLoading] = useState(false)
+  const [apiError, setApiError] = useState<null | string>(null)
+  
+  // Fetch data from API if endpoint is provided
+  useEffect(() => {
+    if (!apiEndpoint) return;
+    
+    const fetchData = async () => {
+      try {
+        setApiLoading(true);
+        setApiError(null);
+        
+        // Construct URL with query parameters
+        const url = new URL(apiEndpoint, window.location.origin);
+        if (apiParams) {
+          Object.entries(apiParams).forEach(([key, value]) => {
+            url.searchParams.append(key, value);
+          });
+        }
+
+        
+        const response = await fetch(url.toString());
+        
+        if (!response.ok) {
+          throw new Error(`API request failed with status ${response.status}`);
+        }
+        
+        const data = await response.json();
+        setApiData(data);
+      } catch (error) {
+        console.error('Error fetching data from API:', error);
+        setApiError(error instanceof Error ? error.message : 'Unknown error');
+      } finally {
+        setApiLoading(false);
+      }
+    };
+    
+    fetchData();
+  }, [apiEndpoint, JSON.stringify(apiParams)]);
+  
+  // Determine which data to use - API data or provided props
+  let effectiveMetrics = metrics;
+  let effectiveDistributionData = distributionData;
+  let effectiveTimeSeriesData = categoryTimeSeriesData;
+  
+  // If we have API data, use it instead of the prop data
+  if (apiData) {
+    // Map API data to the metrics format expected by the component
+    if (apiData.revenue && selectedMetric === 'revenue') {
+      effectiveMetrics = metrics.map(metric => {
+        if (metric.key === 'revenue') {
+          return {
+            ...metric,
+            data: apiData.revenue.map((item: any) => ({
+              ...item,
+              value: formatNumber(item.value),
+              change: formatNumber(item.change)
+            }))
+          };
+        } else if (metric.key === 'rooms' && apiData.roomsSold) {
+          return {
+            ...metric,
+            data: apiData.roomsSold.map((item: any) => ({
+              ...item,
+              value: formatNumber(item.value),
+              change: formatNumber(item.change)
+            }))
+          };
+        } else if (metric.key === 'adr' && apiData.adr) {
+          return {
+            ...metric,
+            data: apiData.adr.map((item: any) => ({
+              ...item,
+              value: formatNumber(item.value),
+              change: formatNumber(item.change)
+            }))
+          };
+        }
+        return metric;
+      });
+    } else if (apiData.roomsSold && selectedMetric === 'rooms') {
+      effectiveMetrics = metrics.map(metric => {
+        if (metric.key === 'rooms') {
+          return {
+            ...metric,
+            data: apiData.roomsSold.map((item: any) => ({
+              ...item,
+              value: formatNumber(item.value),
+              change: formatNumber(item.change)
+            }))
+          };
+        } else if (metric.key === 'revenue' && apiData.revenue) {
+          return {
+            ...metric,
+            data: apiData.revenue.map((item: any) => ({
+              ...item,
+              value: formatNumber(item.value),
+              change: formatNumber(item.change)
+            }))
+          };
+        } else if (metric.key === 'adr' && apiData.adr) {
+          return {
+            ...metric,
+            data: apiData.adr.map((item: any) => ({
+              ...item,
+              value: formatNumber(item.value),
+              change: formatNumber(item.change)
+            }))
+          };
+        }
+        return metric;
+      });
+    } else if (apiData.adr && selectedMetric === 'adr') {
+      effectiveMetrics = metrics.map(metric => {
+        if (metric.key === 'adr') {
+          return {
+            ...metric,
+            data: apiData.adr.map((item: any) => ({
+              ...item,
+              value: formatNumber(item.value),
+              change: formatNumber(item.change)
+            }))
+          };
+        } else if (metric.key === 'revenue' && apiData.revenue) {
+          return {
+            ...metric,
+            data: apiData.revenue.map((item: any) => ({
+              ...item,
+              value: formatNumber(item.value),
+              change: formatNumber(item.change)
+            }))
+          };
+        } else if (metric.key === 'rooms' && apiData.roomsSold) {
+          return {
+            ...metric,
+            data: apiData.roomsSold.map((item: any) => ({
+              ...item,
+              value: formatNumber(item.value),
+              change: formatNumber(item.change)
+            }))
+          };
+        }
+        return metric;
+      });
+    }
+    
+    // For time series data
+    if (apiData.timeSeriesData) {
+      effectiveTimeSeriesData = apiData.timeSeriesData;
+    }
+  }
+  
   // Get current metric data
-  const currentMetric = metrics.find(m => m.key === selectedMetric) || metrics[0]
+  const currentMetric = effectiveMetrics.find(m => m.key === selectedMetric) || effectiveMetrics[0]
   const currentData = currentMetric.data
 
   // Find the maximum value to calculate percentages
@@ -148,6 +322,12 @@ export function TopFive({
 
   // Get current category label if categories exist
   const currentCategoryLabel = categories?.find(c => c.key === selectedCategory)?.label
+
+  // Modify the metric selection handler
+  const handleMetricChange = (metric: string) => {
+    setSelectedMetric(metric);
+    onMetricChange?.(metric); // Call the callback if provided
+  };
 
   return (
     <>
@@ -236,10 +416,10 @@ export function TopFive({
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent>
-                {metrics.map(metric => (
+                {effectiveMetrics.map(metric => (
                   <DropdownMenuItem 
                     key={metric.key}
-                    onClick={() => setSelectedMetric(metric.key)}
+                    onClick={() => handleMetricChange(metric.key)}
                   >
                     {metric.label}
                   </DropdownMenuItem>
@@ -250,7 +430,22 @@ export function TopFive({
         </CardHeader>
         
         <CardContent className="pt-3">
-          {filteredData.map((item, index) => (
+          {/* Loading state */}
+          {apiLoading && (
+            <div className="flex justify-center items-center py-4">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+            </div>
+          )}
+          
+          {/* Error state */}
+          {apiError && (
+            <div className="bg-red-50 text-red-700 p-3 rounded-md mb-4">
+              <p>Error loading data: {apiError}</p>
+            </div>
+          )}
+          
+          {/* Data display */}
+          {!apiLoading && !apiError && filteredData.map((item, index) => (
             <div
               key={item.name}
               className="relative mb-4 last:mb-0"
@@ -259,7 +454,7 @@ export function TopFive({
                 <span className="text-gray-600 text-sm">{item.name}</span>
                 <div className="flex items-center">
                   <span className="text-sm font-medium w-16 text-right mr-8">
-                    {currentMetric.prefix || ''}{item.value}{currentMetric.suffix || ''}
+                    {currentMetric.prefix || ''}{formatNumberWithCommas(item.value)}{currentMetric.suffix || ''}
                   </span>
                   <span 
                     className={`flex items-center text-sm ${
@@ -271,7 +466,9 @@ export function TopFive({
                     ) : (
                       <ArrowDownIcon className="h-4 w-4 mr-1" />
                     )}
-                    {formatChange(item)}
+                    {showPercentage ? 
+                      `${Math.abs(calculatePercentageChange(item.value, item.change))}%` : 
+                      `${formatNumberWithCommas(Math.abs(item.change))}`}
                   </span>
                 </div>
               </div>
@@ -306,6 +503,8 @@ export function TopFive({
         onOpenChange={setShowDetails}
         title={categories && selectedCategory ? `${title} - ${currentCategoryLabel}` : title}
         prefix={currentMetric.prefix || ''}
+        apiEndpoint={apiEndpoint}
+        apiParams={apiParams}
       />
     </>
   )

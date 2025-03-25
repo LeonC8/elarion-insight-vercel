@@ -1,80 +1,602 @@
 import { NextResponse } from 'next/server';
-import { parseHotelCSV } from '../../../utils/csvParser';
+import { ClickHouseClient, createClient } from '@clickhouse/client';
+
+// Create an interface for daily data
+interface DailyData {
+  occupancy_date: string;
+  rooms_sold: number;
+  room_revenue: number;
+  fb_revenue: number;
+  other_revenue: number;
+  total_revenue: number;
+  available_rooms: number;
+}
+
+
+
+// Add fluctuation data type
+type FluctuationData = {
+  date: string;
+  current: number;
+  previous: number;
+}[];
+
+
+
+// Update the KpiResponse interface to include fluctuation data
+export interface KpiResponse {
+  totalRevenue: { value: number; percentageChange: number; fluctuation: FluctuationData };
+  roomsSold: { value: number; percentageChange: number; fluctuation: FluctuationData };
+  adr: { value: number; percentageChange: number; fluctuation: FluctuationData };
+  occupancyRate: { value: number; percentageChange: number; fluctuation: FluctuationData };
+  roomRevenue: { value: number; percentageChange: number; fluctuation: FluctuationData };
+  fbRevenue: { value: number; percentageChange: number; fluctuation: FluctuationData };
+  otherRevenue: { value: number; percentageChange: number; fluctuation: FluctuationData };
+  revpar: { value: number; percentageChange: number; fluctuation: FluctuationData };
+  trevpar: { value: number; percentageChange: number; fluctuation: FluctuationData };
+  hotelCapacity: number;
+}
+
+
+
+
+// Add interface for aggregate query results
+interface AggregateQueryResult {
+  available_rooms: string;
+  rooms_sold: string;
+  room_revenue: string;
+  fb_revenue: string;
+  other_revenue: string;
+  total_revenue: string;
+}
+
+// Add interface for room availability query results
+interface RoomAvailabilityResult {
+  available_rooms: string;
+}
 
 export async function GET(request: Request) {
-  try {
-    // Get URL parameters
-    const { searchParams } = new URL(request.url);
-    const businessDate = searchParams.get('business_date');
-    const occupancyDateStart = searchParams.get('occupancy_date_start');
-    const occupancyDateEnd = searchParams.get('occupancy_date_end');
-
-    if (!businessDate || !occupancyDateStart || !occupancyDateEnd) {
-      return NextResponse.json(
-        { error: 'Missing required parameters' },
-        { status: 400 }
-      );
+  // Parse query parameters
+  const { searchParams } = new URL(request.url);
+  const businessDateParam = searchParams.get('businessDate') || new Date().toISOString().split('T')[0];
+  const periodType = searchParams.get('periodType') || 'Month'; // Month, Year, Day
+  const viewType = searchParams.get('viewType') || 'Actual'; // Actual, OTB, Projected
+  const comparisonType = searchParams.get('comparison') || 'Last year - OTB'; 
+  
+  // Define date ranges based on selected period
+  const businessDate = new Date(businessDateParam);
+  let startDate: string, endDate: string;
+  
+  if (periodType === 'Day') {
+    // For Day, always use business date
+    startDate = businessDateParam;
+    endDate = startDate;
+  } else if (periodType === 'Month') {
+    const year = businessDate.getFullYear();
+    const month = businessDate.getMonth();
+    
+    if (viewType === 'Actual') {
+      // From beginning of month to business date - add one day to the start date
+      const firstDayOfMonth = new Date(year, month, 1);
+      firstDayOfMonth.setDate(firstDayOfMonth.getDate() + 1); // Add one day
+      startDate = firstDayOfMonth.toISOString().split('T')[0];
+      endDate = businessDateParam;
+    } else if (viewType === 'OTB') {
+      // From day after business date to end of month
+      const nextDay = new Date(businessDate);
+      nextDay.setDate(nextDay.getDate() + 1);
+      startDate = nextDay.toISOString().split('T')[0];
+      endDate = new Date(year, month + 1, 0).toISOString().split('T')[0];
+    } else { // Projected
+      // Full month - add one day to the start date
+      const firstDayOfMonth = new Date(year, month, 1);
+      firstDayOfMonth.setDate(firstDayOfMonth.getDate() + 1); // Add one day
+      startDate = firstDayOfMonth.toISOString().split('T')[0];
+      endDate = new Date(year, month + 1, 0).toISOString().split('T')[0];
     }
+  } else { // Year
+    const year = businessDate.getFullYear();
+    
+    if (viewType === 'Actual') {
+      // From beginning of year to business date - add one day to the start date
+      const firstDayOfYear = new Date(year, 0, 1);
+      firstDayOfYear.setDate(firstDayOfYear.getDate() + 1); // Add one day
+      startDate = firstDayOfYear.toISOString().split('T')[0];
+      endDate = businessDateParam;
+    } else if (viewType === 'OTB') {
+      // From day after business date to end of year
+      const nextDay = new Date(businessDate);
+      nextDay.setDate(nextDay.getDate() + 1);
+      startDate = nextDay.toISOString().split('T')[0];
+      endDate = new Date(year, 11, 31).toISOString().split('T')[0];
+    } else { // Projected
+      // Full year - add one day to the start date
+      const firstDayOfYear = new Date(year, 0, 1);
+      firstDayOfYear.setDate(firstDayOfYear.getDate() + 1); // Add one day
+      startDate = firstDayOfYear.toISOString().split('T')[0];
+      endDate = new Date(year, 11, 31).toISOString().split('T')[0];
+    }
+  }
+  
+  // Extract comparison method and data type from the comparison string
+  const useMatchingDayOfWeek = comparisonType.includes('match day of week');
+  const useOTBBusinessDate = comparisonType.includes('- OTB');
 
-    const data = await parseHotelCSV();
-    const currentDateTime = new Date().toISOString();
+  // Calculate previous period date range based on comparison type
+  let prevStartDate: Date, prevEndDate: Date;
 
-    // Process and filter data
-    const filteredData = data
-      // Handle null valid_to dates
-      .map(row => ({
-        ...row,
-        scd_valid_to: row.scd_valid_to || currentDateTime
-      }))
-      // Filter by business_datetime within SCD range
-      .filter(row => {
-        const businessDateOnly = businessDate.split('T')[0];
-        const rowBusinessDate = row.business_datetime.split(' ')[0];
-        const validFrom = row.scd_valid_from.split(' ')[0];
-        const validTo = row.scd_valid_to.split(' ')[0];
-        
-        return rowBusinessDate === businessDateOnly &&
-               validFrom <= businessDateOnly &&
-               validTo >= businessDateOnly;
-      })
-      // Filter by occupancy date range
-      .filter(row => {
-        return row.occupancyDate >= occupancyDateStart &&
-               row.occupancyDate <= occupancyDateEnd;
-      });
+  if (useMatchingDayOfWeek) {
+    // Find the same day of the week from previous year
+    prevStartDate = findMatchingDayOfWeek(new Date(startDate), -1);
+    prevEndDate = findMatchingDayOfWeek(new Date(endDate), -1);
+  } else {
+    // Simply subtract a year from the dates
+    prevStartDate = new Date(startDate);
+    prevStartDate.setFullYear(prevStartDate.getFullYear() - 1);
+    prevEndDate = new Date(endDate);
+    prevEndDate.setFullYear(prevEndDate.getFullYear() - 1);
+  }
 
-    // Calculate metrics
-    const metrics = {
-      soldRooms: filteredData.reduce((sum, row) => sum + row.roomsSold, 0),
-      totalRooms: filteredData.reduce((sum, row) => sum + row.physicalRooms, 0),
-      roomRevenue: filteredData.reduce((sum, row) => sum + row.roomRevenue, 0),
-      fbRevenue: filteredData.reduce((sum, row) => sum + row.foodRevenue, 0),
-      totalRevenue: filteredData.reduce((sum, row) => sum + row.totalRevenue, 0),
-      totalAvailableRooms: filteredData.reduce((sum, row) => sum + row.availableRooms, 0),
+  // Determine which business date to use for the previous period
+  let prevBusinessDateParam: string;
+  if (useOTBBusinessDate) {
+    // Use the business date from the beginning of the previous period
+    prevBusinessDateParam = prevStartDate.toISOString().split('T')[0];
+  } else {
+    // Use the same business date as the current period
+    prevBusinessDateParam = businessDateParam;
+  }
+
+  // Initialize client variable before try block
+  let client: ClickHouseClient | undefined;
+
+  try {
+    // Create ClickHouse client
+    client = createClient({
+      host: process.env.CLICKHOUSE_HOST || 'http://34.34.71.156:8123',
+      username: process.env.CLICKHOUSE_USER || 'default',
+      password: process.env.CLICKHOUSE_PASSWORD || 'elarion'
+    });
+
+    // Combined query for aggregate data (combines 4 queries into 1)
+    const aggregateQuery = `
+    SELECT
+      'current' AS period,
+      (
+        SELECT SUM(physicalRooms)
+        FROM SAND01CN.room_type_details
+        WHERE 
+          toDate(occupancy_date) BETWEEN '${startDate}' AND '${endDate}'
+          AND date(scd_valid_from) <= DATE('${businessDateParam}') 
+          AND DATE('${businessDateParam}') < date(scd_valid_to)
+      ) AS available_rooms,
+      SUM(sold_rooms) AS rooms_sold,
+      SUM(roomRevenue) AS room_revenue,
+      SUM(fbRevenue) AS fb_revenue,
+      SUM(otherRevenue) AS other_revenue,
+      SUM(totalRevenue) AS total_revenue
+    FROM SAND01CN.insights
+    WHERE 
+      toDate(occupancy_date) BETWEEN '${startDate}' AND '${endDate}'
+      AND date(scd_valid_from) <= DATE('${businessDateParam}') 
+      AND DATE('${businessDateParam}') < date(scd_valid_to)
+      
+    UNION ALL
+    
+    SELECT
+      'previous' AS period,
+      (
+        SELECT SUM(physicalRooms)
+        FROM SAND01CN.room_type_details
+        WHERE 
+          toDate(occupancy_date) BETWEEN '${prevStartDate.toISOString().split('T')[0]}' AND '${prevEndDate.toISOString().split('T')[0]}'
+          AND date(scd_valid_from) <= DATE('${prevBusinessDateParam}') 
+          AND DATE('${prevBusinessDateParam}') < date(scd_valid_to)
+      ) AS available_rooms,
+      SUM(sold_rooms) AS rooms_sold,
+      SUM(roomRevenue) AS room_revenue,
+      SUM(fbRevenue) AS fb_revenue,
+      SUM(otherRevenue) AS other_revenue,
+      SUM(totalRevenue) AS total_revenue
+    FROM SAND01CN.insights
+    WHERE 
+      toDate(occupancy_date) BETWEEN '${prevStartDate.toISOString().split('T')[0]}' AND '${prevEndDate.toISOString().split('T')[0]}'
+      AND date(scd_valid_from) <= DATE('${prevBusinessDateParam}') 
+      AND DATE('${prevBusinessDateParam}') < date(scd_valid_to)
+    `;
+
+    // Combined query for daily data (combines 4 queries into 1)
+    const dailyQuery = `
+    WITH current_rooms AS (
+      SELECT 
+        toString(toDate(occupancy_date)) AS occupancy_date,
+        SUM(physicalRooms) AS available_rooms
+      FROM SAND01CN.room_type_details
+      WHERE 
+        toDate(occupancy_date) BETWEEN '${startDate}' AND '${endDate}'
+        AND date(scd_valid_from) <= DATE('${businessDateParam}') 
+        AND DATE('${businessDateParam}') < date(scd_valid_to)
+      GROUP BY occupancy_date
+    ),
+    previous_rooms AS (
+      SELECT 
+        toString(toDate(occupancy_date)) AS occupancy_date,
+        SUM(physicalRooms) AS available_rooms
+      FROM SAND01CN.room_type_details
+      WHERE 
+        toDate(occupancy_date) BETWEEN '${prevStartDate.toISOString().split('T')[0]}' AND '${prevEndDate.toISOString().split('T')[0]}'
+        AND date(scd_valid_from) <= DATE('${prevBusinessDateParam}') 
+        AND DATE('${prevBusinessDateParam}') < date(scd_valid_to)
+      GROUP BY occupancy_date
+    ),
+    current_daily AS (
+      SELECT 
+        'current' AS period,
+        toString(toDate(occupancy_date)) AS occupancy_date,
+        SUM(sold_rooms) AS rooms_sold,
+        SUM(roomRevenue) AS room_revenue,
+        SUM(fbRevenue) AS fb_revenue,
+        SUM(otherRevenue) AS other_revenue,
+        SUM(totalRevenue) AS total_revenue
+      FROM SAND01CN.insights
+      WHERE 
+        toDate(occupancy_date) BETWEEN '${startDate}' AND '${endDate}'
+        AND date(scd_valid_from) <= DATE('${businessDateParam}') 
+        AND DATE('${businessDateParam}') < date(scd_valid_to)
+      GROUP BY occupancy_date
+    ),
+    previous_daily AS (
+      SELECT 
+        'previous' AS period,
+        toString(toDate(occupancy_date)) AS occupancy_date,
+        SUM(sold_rooms) AS rooms_sold,
+        SUM(roomRevenue) AS room_revenue,
+        SUM(fbRevenue) AS fb_revenue,
+        SUM(otherRevenue) AS other_revenue,
+        SUM(totalRevenue) AS total_revenue
+      FROM SAND01CN.insights
+      WHERE 
+        toDate(occupancy_date) BETWEEN '${prevStartDate.toISOString().split('T')[0]}' AND '${prevEndDate.toISOString().split('T')[0]}'
+        AND date(scd_valid_from) <= DATE('${prevBusinessDateParam}') 
+        AND DATE('${prevBusinessDateParam}') < date(scd_valid_to)
+      GROUP BY occupancy_date
+    )
+    
+    SELECT 
+      cd.period,
+      cd.occupancy_date,
+      cd.rooms_sold,
+      cd.room_revenue,
+      cd.fb_revenue,
+      cd.other_revenue,
+      cd.total_revenue,
+      cr.available_rooms
+    FROM current_daily cd
+    LEFT JOIN current_rooms cr ON cd.occupancy_date = cr.occupancy_date
+    
+    UNION ALL
+    
+    SELECT 
+      pd.period,
+      pd.occupancy_date,
+      pd.rooms_sold,
+      pd.room_revenue,
+      pd.fb_revenue,
+      pd.other_revenue,
+      pd.total_revenue,
+      pr.available_rooms
+    FROM previous_daily pd
+    LEFT JOIN previous_rooms pr ON pd.occupancy_date = pr.occupancy_date
+    ORDER BY period, occupancy_date
+    `;
+
+    // Execute the combined queries
+    const aggregateResultSet = await client.query({
+      query: aggregateQuery,
+      format: 'JSONEachRow'
+    });
+
+    const dailyResultSet = await client.query({
+      query: dailyQuery,
+      format: 'JSONEachRow'
+    });
+
+    // Process results
+    const aggregateData = await aggregateResultSet.json() as {
+      period: string;
+      available_rooms: string;
+      rooms_sold: string;
+      room_revenue: string;
+      fb_revenue: string;
+      other_revenue: string;
+      total_revenue: string;
+    }[];
+
+    const dailyData = await dailyResultSet.json() as {
+      period: string;
+      occupancy_date: string;
+      rooms_sold: string;
+      room_revenue: string;
+      fb_revenue: string;
+      other_revenue: string;
+      total_revenue: string;
+      available_rooms: string;
+    }[];
+
+    // Separate data by period
+    const current = aggregateData.find(d => d.period === 'current') || {
+      period: 'current',
+      available_rooms: '0',
+      rooms_sold: '0',
+      room_revenue: '0',
+      fb_revenue: '0',
+      other_revenue: '0',
+      total_revenue: '0'
+    };
+    
+    const previous = aggregateData.find(d => d.period === 'previous') || {
+      period: 'previous',
+      available_rooms: '0',
+      rooms_sold: '0',
+      room_revenue: '0',
+      fb_revenue: '0',
+      other_revenue: '0',
+      total_revenue: '0'
     };
 
-    console.log(metrics.totalAvailableRooms)
+    const currentDailyDataWithRooms = dailyData.filter(d => d.period === 'current').map(d => ({
+      occupancy_date: d.occupancy_date,
+      rooms_sold: parseFloat(d.rooms_sold || '0'),
+      room_revenue: parseFloat(d.room_revenue || '0'),
+      fb_revenue: parseFloat(d.fb_revenue || '0'),
+      other_revenue: parseFloat(d.other_revenue || '0'),
+      total_revenue: parseFloat(d.total_revenue || '0'),
+      available_rooms: parseFloat(d.available_rooms || '0')
+    }));
     
+    const previousDailyDataWithRooms = dailyData.filter(d => d.period === 'previous').map(d => ({
+      occupancy_date: d.occupancy_date,
+      rooms_sold: parseFloat(d.rooms_sold || '0'),
+      room_revenue: parseFloat(d.room_revenue || '0'),
+      fb_revenue: parseFloat(d.fb_revenue || '0'),
+      other_revenue: parseFloat(d.other_revenue || '0'),
+      total_revenue: parseFloat(d.total_revenue || '0'),
+      available_rooms: parseFloat(d.available_rooms || '0')
+    }));
+
     // Calculate derived metrics
-    const response = {
-      soldRooms: metrics.soldRooms,
-      totalRooms: metrics.totalRooms,
-      roomRevenue: metrics.roomRevenue,
-      fbRevenue: metrics.fbRevenue,
-      adr: metrics.soldRooms > 0 ? metrics.roomRevenue / metrics.soldRooms : 0,
-      occupancy: metrics.totalAvailableRooms > 0 ? 
-        (metrics.soldRooms / metrics.totalAvailableRooms) * 100 : 0,
-      revPAR: metrics.totalAvailableRooms > 0 ? 
-        metrics.roomRevenue / metrics.totalAvailableRooms : 0,
-      trevPAR: metrics.totalAvailableRooms > 0 ? 
-        metrics.totalRevenue / metrics.totalAvailableRooms : 0,
+    const roomsAvailable = parseFloat(current.available_rooms || '0') || 0;
+    const roomsSold = parseFloat(current.rooms_sold || '0') || 0;
+    const roomRevenue = parseFloat(current.room_revenue || '0') || 0;
+    const fbRevenue = parseFloat(current.fb_revenue || '0') || 0;
+    const otherRevenue = parseFloat(current.other_revenue || '0') || 0;
+    const totalRevenue = parseFloat(current.total_revenue || '0') || 0;
+
+    const prevRoomsAvailable = parseFloat(previous.available_rooms || '0') || 0;
+    const prevRoomsSold = parseFloat(previous.rooms_sold || '0') || 0;
+    const prevRoomRevenue = parseFloat(previous.room_revenue || '0') || 0;
+    const prevFbRevenue = parseFloat(previous.fb_revenue || '0') || 0;
+    const prevOtherRevenue = parseFloat(previous.other_revenue || '0') || 0;
+    const prevTotalRevenue = parseFloat(previous.total_revenue || '0') || 0;
+
+    // Calculate ADR (Average Daily Rate)
+    const adr = roomsSold > 0 ? roomRevenue / roomsSold : 0;
+    const prevAdr = prevRoomsSold > 0 ? prevRoomRevenue / prevRoomsSold : 0;
+
+    // Calculate Occupancy Rate
+    const occupancyRate = roomsAvailable > 0 ? (roomsSold / roomsAvailable) * 100 : 0;
+    const prevOccupancyRate = prevRoomsAvailable > 0 ? (prevRoomsSold / prevRoomsAvailable) * 100 : 0;
+
+    // Calculate RevPAR (Revenue Per Available Room)
+    const revpar = roomsAvailable > 0 ? roomRevenue / roomsAvailable : 0;
+    const prevRevpar = prevRoomsAvailable > 0 ? prevRoomRevenue / prevRoomsAvailable : 0;
+
+    // Calculate TRevPAR (Total Revenue Per Available Room)
+    const trevpar = roomsAvailable > 0 ? totalRevenue / roomsAvailable : 0;
+    const prevTrevpar = prevRoomsAvailable > 0 ? prevTotalRevenue / prevRoomsAvailable : 0;
+
+    // Calculate percentage changes
+    const calculatePercentageChange = (current: number, previous: number) => {
+      if (previous === 0) return 0;
+      return ((current - previous) / previous) * 100;
+    };
+
+    // Process daily data to create fluctuation arrays for each KPI
+    const createFluctuationData = (
+      currentDailyData: DailyData[],
+      previousDailyData: DailyData[],
+      getCurrentValue: (day: DailyData) => number,
+      getPreviousValue: (day: DailyData) => number
+    ): FluctuationData => {
+      // Create a map of previous data by date for easy lookup
+      const previousDataMap = new Map<string, DailyData>();
+      previousDailyData.forEach(day => {
+        // Extract month and day from the previous year's date (ignore year)
+        const prevDate = new Date(day.occupancy_date);
+        const monthDay = `${(prevDate.getMonth() + 1).toString().padStart(2, '0')}/${prevDate.getDate().toString().padStart(2, '0')}`;
+        previousDataMap.set(monthDay, day);
+      });
+
+      // Create the fluctuation data array
+      return currentDailyData.map(currentDay => {
+        const date = new Date(currentDay.occupancy_date);
+        
+        // Format the date as MM/DD instead of just month name
+        const formattedDate = `${(date.getMonth() + 1).toString().padStart(2, '0')}/${date.getDate().toString().padStart(2, '0')}`;
+        
+        // Use the month/day as key to look up previous data (ignoring year)
+        const previousDay = previousDataMap.get(formattedDate) || {
+          occupancy_date: currentDay.occupancy_date,
+          rooms_sold: 0,
+          room_revenue: 0,
+          fb_revenue: 0,
+          other_revenue: 0,
+          total_revenue: 0,
+          available_rooms: 0,
+        };
+
+        return {
+          date: formattedDate,
+          current: getCurrentValue(currentDay),
+          previous: getPreviousValue(previousDay),
+        };
+      });
+    };
+
+    // Create fluctuation data for each KPI using the updated daily data with room availability
+    const totalRevenueFluctuation = createFluctuationData(
+      currentDailyDataWithRooms, 
+      previousDailyDataWithRooms,
+      day => day.total_revenue || 0,
+      day => day.total_revenue || 0
+    );
+
+    const roomsSoldFluctuation = createFluctuationData(
+      currentDailyDataWithRooms, 
+      previousDailyDataWithRooms,
+      day => day.rooms_sold || 0,
+      day => day.rooms_sold || 0
+    );
+
+    const roomRevenueFluctuation = createFluctuationData(
+      currentDailyDataWithRooms, 
+      previousDailyDataWithRooms,
+      day => day.room_revenue || 0,
+      day => day.room_revenue || 0
+    );
+
+    const fbRevenueFluctuation = createFluctuationData(
+      currentDailyDataWithRooms, 
+      previousDailyDataWithRooms,
+      day => day.fb_revenue || 0,
+      day => day.fb_revenue || 0
+    );
+
+    const otherRevenueFluctuation = createFluctuationData(
+      currentDailyDataWithRooms, 
+      previousDailyDataWithRooms,
+      day => day.other_revenue || 0,
+      day => day.other_revenue || 0
+    );
+
+    // ADR fluctuation
+    const adrFluctuation = createFluctuationData(
+      currentDailyDataWithRooms, 
+      previousDailyDataWithRooms,
+      day => (day.rooms_sold > 0 ? day.room_revenue / day.rooms_sold : 0),
+      day => (day.rooms_sold > 0 ? day.room_revenue / day.rooms_sold : 0)
+    );
+
+    // Occupancy rate fluctuation
+    const occupancyRateFluctuation = createFluctuationData(
+      currentDailyDataWithRooms, 
+      previousDailyDataWithRooms,
+      day => (day.available_rooms > 0 ? (day.rooms_sold / day.available_rooms) * 100 : 0),
+      day => (day.available_rooms > 0 ? (day.rooms_sold / day.available_rooms) * 100 : 0)
+    );
+
+    // RevPAR fluctuation
+    const revparFluctuation = createFluctuationData(
+      currentDailyDataWithRooms, 
+      previousDailyDataWithRooms,
+      day => (day.available_rooms > 0 ? day.room_revenue / day.available_rooms : 0),
+      day => (day.available_rooms > 0 ? day.room_revenue / day.available_rooms : 0)
+    );
+
+    // TRevPAR fluctuation
+    const trevparFluctuation = createFluctuationData(
+      currentDailyDataWithRooms, 
+      previousDailyDataWithRooms,
+      day => (day.available_rooms > 0 ? day.total_revenue / day.available_rooms : 0),
+      day => (day.available_rooms > 0 ? day.total_revenue / day.available_rooms : 0)
+    );
+
+    const response: KpiResponse = {
+      totalRevenue: {
+        value: totalRevenue,
+        percentageChange: calculatePercentageChange(totalRevenue, prevTotalRevenue),
+        fluctuation: totalRevenueFluctuation
+      },
+      roomsSold: {
+        value: roomsSold,
+        percentageChange: calculatePercentageChange(roomsSold, prevRoomsSold),
+        fluctuation: roomsSoldFluctuation
+      },
+      adr: {
+        value: adr,
+        percentageChange: calculatePercentageChange(adr, prevAdr),
+        fluctuation: adrFluctuation
+      },
+      occupancyRate: {
+        value: occupancyRate,
+        percentageChange: calculatePercentageChange(occupancyRate, prevOccupancyRate),
+        fluctuation: occupancyRateFluctuation
+      },
+      roomRevenue: {
+        value: roomRevenue,
+        percentageChange: calculatePercentageChange(roomRevenue, prevRoomRevenue),
+        fluctuation: roomRevenueFluctuation
+      },
+      fbRevenue: {
+        value: fbRevenue,
+        percentageChange: calculatePercentageChange(fbRevenue, prevFbRevenue),
+        fluctuation: fbRevenueFluctuation
+      },
+      otherRevenue: {
+        value: otherRevenue,
+        percentageChange: calculatePercentageChange(otherRevenue, prevOtherRevenue),
+        fluctuation: otherRevenueFluctuation
+      },
+      revpar: {
+        value: revpar,
+        percentageChange: calculatePercentageChange(revpar, prevRevpar),
+        fluctuation: revparFluctuation
+      },
+      trevpar: {
+        value: trevpar,
+        percentageChange: calculatePercentageChange(trevpar, prevTrevpar),
+        fluctuation: trevparFluctuation
+      },
+      hotelCapacity: roomsAvailable,
     };
 
     return NextResponse.json(response);
   } catch (error) {
+    console.error('Error querying ClickHouse:', error);
     return NextResponse.json(
-      { error: 'Failed to calculate metrics' },
+      { error: 'Failed to fetch data from ClickHouse' },
       { status: 500 }
     );
+  } finally {
+    // Close client connection if it exists
+    if (client) {
+      await client.close();
+    }
   }
+}
+
+
+
+// Helper function to find matching day of week from previous year
+function findMatchingDayOfWeek(date: Date, yearOffset: number): Date {
+  // Create a new date for the same day in the previous/next year
+  const targetDate = new Date(date);
+  targetDate.setFullYear(targetDate.getFullYear() + yearOffset);
+  
+  // Get day of week for both dates
+  const originalDayOfWeek = date.getDay();
+  const targetDayOfWeek = targetDate.getDay();
+  
+  // If days of week match, return the target date
+  if (originalDayOfWeek === targetDayOfWeek) {
+    return targetDate;
+  }
+  
+  // Otherwise, adjust the target date to match the day of week
+  const dayDifference = originalDayOfWeek - targetDayOfWeek;
+  
+  // Add the difference (might be negative, which is fine for setDate)
+  targetDate.setDate(targetDate.getDate() + dayDifference);
+  
+  return targetDate;
 }
