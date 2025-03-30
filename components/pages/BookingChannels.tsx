@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -26,18 +26,14 @@ import { KpiWithChart } from '../new/KpiWithChart'
 import { Kpi } from '../new/Kpi'
 import { KpiWithSubtleChart } from '../new/KpiWithSubtleChart'
 import { ChartConfig } from '@/components/ui/chart'
-import type { CategoryTimeSeriesData } from '@/components/new/CategoriesDetailsDialog'
+import { CategoriesDetailsDialog, type CategoryTimeSeriesData } from '@/components/new/CategoriesDetailsDialog'
 import { ReservationsByDayChart } from '../new/ReservationsByDayChart'
 import { HorizontalBarChart } from '../new/HorizontalBarChart'
 import { HotelSelector } from '../new/HotelSelector'
 import { HorizontalBarChartMultipleDatasets } from "../new/HorizontalBarChartMultipleDatasets"
-import { PieChartWithLabels } from "@/components/new/PieChartWithLabels"
-import { addDays } from "date-fns"
-import { DistributionChart } from '../new/DistributionChart'
-import { CategoriesOverTimeChart } from '../new/CategoriesOverTimeChart'
-import { ArrowUpIcon } from 'lucide-react'
-import { CategoriesDetailContent } from '../new/CategoriesDetailContent'
-import { TopFiveMultiple } from '../new/TopFiveMultiple'
+import { HorizontalBarChartMultipleDatasetsUpgraded } from "../new/HorizontalBarChartMultipleDatasetsUpgraded"
+import { TopFiveUpgraded } from "@/components/new/TopFiveUpgraded"
+import eventBus from '@/utils/eventBus'
 
 // Dynamic import for WorldMap with loading state
 const WorldMap = dynamic(
@@ -74,21 +70,6 @@ const BOOKING_CHANNELS = {
     color: "#22a74f"
   }
 } as const;
-
-// Add this constant for country data near the top of your file with other constants
-const countryData = [
-  { country: "us", value: 285000 }, // United States
-  { country: "gb", value: 195000 }, // United Kingdom
-  { country: "de", value: 168000 }, // Germany
-  { country: "fr", value: 142000 }, // France
-  { country: "es", value: 125000 }, // Spain
-  // Add more countries with lower values to show contrast
-  { country: "it", value: 98000 },  // Italy
-  { country: "nl", value: 85000 },  // Netherlands
-  { country: "ch", value: 75000 },  // Switzerland
-  { country: "se", value: 65000 },  // Sweden
-  { country: "be", value: 55000 },  // Belgium
-];
 
 // Add country distribution data for each booking channel
 const countryDistributionByChannel = {
@@ -477,104 +458,6 @@ const lengthOfStayByChannelData = {
   ]
 }
 
-// Add lead time data by channel
-const leadTimeByChannelData = {
-  direct: [
-    { range: "0-7 days", current: 245, previous: 220 },
-    { range: "8-14 days", current: 312, previous: 280 },
-    { range: "15-30 days", current: 456, previous: 410 },
-    { range: "31-60 days", current: 323, previous: 290 },
-    { range: "61-90 days", current: 198, previous: 175 },
-    { range: "91-180 days", current: 148, previous: 125 },
-    { range: ">180 days", current: 87, previous: 75 }
-  ],
-  booking_com: [
-    { range: "0-7 days", current: 265, previous: 240 },
-    { range: "8-14 days", current: 332, previous: 300 },
-    { range: "15-30 days", current: 436, previous: 390 },
-    { range: "31-60 days", current: 303, previous: 270 },
-    { range: "61-90 days", current: 178, previous: 155 },
-    { range: "91-180 days", current: 128, previous: 105 },
-    { range: ">180 days", current: 67, previous: 55 }
-  ],
-  expedia: [
-    { range: "0-7 days", current: 275, previous: 250 },
-    { range: "8-14 days", current: 342, previous: 310 },
-    { range: "15-30 days", current: 426, previous: 380 },
-    { range: "31-60 days", current: 293, previous: 260 },
-    { range: "61-90 days", current: 168, previous: 145 },
-    { range: "91-180 days", current: 118, previous: 95 },
-    { range: ">180 days", current: 57, previous: 45 }
-  ],
-  gds: [
-    { range: "0-7 days", current: 225, previous: 200 },
-    { range: "8-14 days", current: 292, previous: 260 },
-    { range: "15-30 days", current: 476, previous: 430 },
-    { range: "31-60 days", current: 343, previous: 310 },
-    { range: "61-90 days", current: 218, previous: 195 },
-    { range: "91-180 days", current: 168, previous: 145 },
-    { range: ">180 days", current: 107, previous: 95 }
-  ],
-  wholesalers: [
-    { range: "0-7 days", current: 215, previous: 190 },
-    { range: "8-14 days", current: 282, previous: 250 },
-    { range: "15-30 days", current: 466, previous: 420 },
-    { range: "31-60 days", current: 333, previous: 300 },
-    { range: "61-90 days", current: 208, previous: 185 },
-    { range: "91-180 days", current: 158, previous: 135 },
-    { range: ">180 days", current: 97, previous: 85 }
-  ]
-}
-
-// Add cancellation lead time data by channel near the other data definitions
-const cancellationLeadTimeByChannelData = {
-  direct: [
-    { range: "0-5 days", current: 45, previous: 52 },
-    { range: "6-10 days", current: 38, previous: 41 },
-    { range: "11-15 days", current: 32, previous: 35 },
-    { range: "16-20 days", current: 25, previous: 28 },
-    { range: "21-25 days", current: 18, previous: 20 },
-    { range: "26-30 days", current: 12, previous: 15 },
-    { range: ">30 days", current: 8, previous: 10 }
-  ],
-  booking_com: [
-    { range: "0-5 days", current: 50, previous: 57 },
-    { range: "6-10 days", current: 42, previous: 45 },
-    { range: "11-15 days", current: 36, previous: 39 },
-    { range: "16-20 days", current: 28, previous: 31 },
-    { range: "21-25 days", current: 21, previous: 23 },
-    { range: "26-30 days", current: 15, previous: 18 },
-    { range: ">30 days", current: 10, previous: 12 }
-  ],
-  expedia: [
-    { range: "0-5 days", current: 52, previous: 59 },
-    { range: "6-10 days", current: 45, previous: 48 },
-    { range: "11-15 days", current: 38, previous: 41 },
-    { range: "16-20 days", current: 30, previous: 33 },
-    { range: "21-25 days", current: 23, previous: 25 },
-    { range: "26-30 days", current: 16, previous: 19 },
-    { range: ">30 days", current: 11, previous: 13 }
-  ],
-  gds: [
-    { range: "0-5 days", current: 40, previous: 47 },
-    { range: "6-10 days", current: 35, previous: 38 },
-    { range: "11-15 days", current: 29, previous: 32 },
-    { range: "16-20 days", current: 22, previous: 25 },
-    { range: "21-25 days", current: 15, previous: 17 },
-    { range: "26-30 days", current: 9, previous: 12 },
-    { range: ">30 days", current: 6, previous: 8 }
-  ],
-  wholesalers: [
-    { range: "0-5 days", current: 38, previous: 45 },
-    { range: "6-10 days", current: 32, previous: 35 },
-    { range: "11-15 days", current: 27, previous: 30 },
-    { range: "16-20 days", current: 20, previous: 23 },
-    { range: "21-25 days", current: 14, previous: 16 },
-    { range: "26-30 days", current: 8, previous: 11 },
-    { range: ">30 days", current: 5, previous: 7 }
-  ]
-}
-
 // Add this constant with the other data constants near the top of the file (around line 670-680)
 const reservationsByDayData = [
   { 
@@ -764,8 +647,63 @@ export function BookingChannels() {
     // Add more months as needed
   ]
 
-  // Add new state for selected booking channel
-  const [selectedBookingChannel, setSelectedBookingChannel] = useState<keyof typeof BOOKING_CHANNELS>('direct');
+  // Create analysis API params similar to what's in the overview page
+  const analysisApiParams = {
+    timeframe: selectedTimeFrame.toLowerCase(),
+    viewType: selectedViewType.toLowerCase(),
+    comparison: selectedComparison.toLowerCase(), 
+    date: date.toISOString().split('T')[0],
+    hotels: selectedHotels.join(',')
+  };
+
+  const metricOptions = [
+    {
+      label: "Revenue",
+      key: "revenue",
+      prefix: "$",
+      data: []
+    },
+    {
+      label: "Rooms Sold",
+      key: "rooms",
+      data: []
+    },
+    {
+      label: "ADR",
+      key: "adr",
+      prefix: "$",
+      data: []
+    }
+  ];
+
+  // Add state for controlling the world map data - initialize as empty
+  const [currentMapData, setCurrentMapData] = useState<Array<{ country: string, value: number }>>([]);
+
+  // Subscribe to TopFiveUpgraded data update events
+  useEffect(() => {
+    // Subscribe to data updates from the 'top-countries' component
+    const unsubscribeDataUpdated = eventBus.subscribe('topfive:top-countries:dataUpdated',
+      (payload: { id: string; primaryGroup: string; metric: string; data: Array<{ name: string; value: number; code: string }> }) => {
+        console.log('BookingChannels: Received dataUpdated event:', payload);
+        if (payload.id === 'top-countries' && payload.data) {
+          // Map the received data to the format WorldMap expects
+          // IMPORTANT: Assumes payload.data items have a 'code' property (e.g., 'us', 'gb')
+          const newMapData = payload.data.map(item => ({
+            country: item.code, // Use the country code directly from the data item
+            value: item.value
+          })).filter(item => item.country); // Ensure items have a country code
+
+          console.log('BookingChannels: Updating map data:', newMapData);
+          setCurrentMapData(newMapData);
+        }
+      }
+    );
+
+    // Cleanup subscription on unmount
+    return () => {
+      unsubscribeDataUpdated();
+    };
+  }, []); // Run only once on mount
 
   return (
     <div className="flex-1 overflow-auto bg-[#f5f8ff]">
@@ -901,46 +839,60 @@ export function BookingChannels() {
 
         {/* Add the charts */}
         <div className="mt-[140px] px-12 py-0">
-          {/* Add the existing CategoriesDetailContent component */}
+          {/* Use the correct URL pattern for CategoriesDetailsDialog */}
           <div className="mb-8">
-            <CategoriesDetailContent
+            <CategoriesDetailsDialog
+              isDialog={false}
               title="Booking Channels Analysis"
-              categories={BOOKING_CHANNELS}
               prefix="€"
+              apiEndpoint="/api/booking-channels/distribution"
+              apiParams={{
+                ...analysisApiParams,
+                field: 'booking_channel',
+                limit: '5'
+              }}
             />
           </div>
+
           
           {/* Add the TopFiveMultiple component underneath */}
           <div className="mb-8 grid grid-cols-2 gap-6">
-            <TopFive 
-              title="Top Producers"
-              subtitle="by Booking Channel"
-              color="blue"
-              categories={bookingChannelCategories}
-              metrics={producerMetrics}
-              distributionData={producersDistributionData}
-              categoryTimeSeriesData={producersTimeSeriesData}
-            />
+            <Card className="bg-white rounded-lg overflow-hidden">
+              <CardContent className="p-0">
+                <TopFiveUpgraded
+                  title="Top Producers"
+                  subtitle="By booking channel"
+                  metrics={metricOptions}
+                  apiEndpoint="/api/booking-channels/distribution-upgraded"
+                  apiParams={{
+                    businessDate: date.toISOString().split('T')[0],
+                    periodType: selectedTimeFrame,
+                    viewType: selectedViewType,
+                    comparison: selectedComparison
+                  }}
+                  primaryField="booking_channel"
+                  secondaryField="producer"
+                  color="blue"
+                  withBorder={false}
+                />
+              </CardContent>
+            </Card>
             
-            {/* Replace the empty div with the new component */}
             <div className="bg-white rounded-lg shadow overflow-hidden">
-              <HorizontalBarChartMultipleDatasets 
-                datasets={[
-                  {
-                    key: "lengthOfStay",
-                    title: "Length of Stay",
-                    data: lengthOfStayByChannelData[selectedBookingChannel]
-                  }
-                ]}
-                defaultDataset="lengthOfStay"
-                categories={[
-                  { key: "direct", label: "Direct Bookings" },
-                  { key: "booking_com", label: "Booking.com" },
-                  { key: "expedia", label: "Expedia" },
-                  { key: "gds", label: "GDS" },
-                  { key: "wholesalers", label: "Wholesalers" }
-                ]}
-                defaultCategory={selectedBookingChannel}
+              <HorizontalBarChartMultipleDatasetsUpgraded 
+                title="Length of Stay by Booking Channel"
+                datasetTitle="Length of Stay"
+                apiEndpoint="/api/booking-channels/length-of-stay"
+                apiParams={{
+                  businessDate: date.toISOString().split('T')[0],
+                  periodType: selectedTimeFrame,
+                  viewType: selectedViewType,
+                  comparison: selectedComparison
+                }}
+                defaultDataset="length_of_stay"
+                defaultCategory="WEB"
+                sort={true}
+                leftMargin={10}
               />
             </div>
           </div>
@@ -960,16 +912,21 @@ export function BookingChannels() {
                   {/* World Map Side */}
                   <div>
                     <div className="h-[500px] flex justify-center items-center">
-                      <WorldMap
-                        color="rgb(59, 130, 246)"
-                        title=""
-                        valueSuffix="€"
-                        size="xl"
-                        data={countryData}
-                        tooltipBgColor="black"
-                        tooltipTextColor="white"
-                        richInteraction={true}
-                      />
+                      {/* Ensure WorldMap receives the updated currentMapData */}
+                      {currentMapData.length > 0 ? (
+                        <WorldMap
+                          color="rgb(59, 130, 246)"
+                          title=""
+                          valueSuffix="€" // Adjust suffix based on actual metric if needed
+                          size="xl"
+                          data={currentMapData}
+                          tooltipBgColor="black"
+                          tooltipTextColor="white"
+                          richInteraction={true}
+                        />
+                      ) : (
+                        <div className="text-gray-500">Select data to display on map</div>
+                      )}
                     </div>
                     <div className="flex justify-center mt-4">
                       <div className="flex items-center space-x-8">
@@ -985,16 +942,32 @@ export function BookingChannels() {
                     </div>
                   </div>
 
-                  {/* TopFiveMultiple by Booking Channel Side */}
+                  {/* Top Five by Country Side - ensure 'id' is set */}
                   <div className="border-l border-gray-100 pl-8">
-                    <TopFive 
-                      title="Top Countries Performance"
+                    <TopFiveUpgraded
+                      id="top-countries" // This ID is crucial for the event subscription
+                      title="Top Countries"
+                      subtitle="by Booking Channel"
+                      metrics={metricOptions} // Pass the metric options config
+                      apiEndpoint="/api/booking-channels/distribution-upgraded"
+                      apiParams={{
+                        // ... existing apiParams ...
+                        // businessDate: date.toISOString().split('T')[0], // Already included in analysisApiParams spread below? Check usage.
+                        periodType: selectedTimeFrame,
+                        viewType: selectedViewType,
+                        comparison: selectedComparison,
+                        // Add hotels if needed by this endpoint
+                        // hotels: selectedHotels.join(',')
+                      }}
+                      primaryField="booking_channel"
+                      secondaryField="guest_country"
+                      defaultPrimaryValue="WEB" // Or fetch the first available one
                       color="blue"
                       withBorder={false}
-                      categories={bookingChannelCategories}
-                      metrics={countryMetricsByChannel[selectedBookingChannel]}
-                      distributionData={countryDistributionByChannel[selectedBookingChannel]}
-                      categoryTimeSeriesData={countryTimeSeriesByChannel[selectedBookingChannel]}
+                      // Remove props related to hardcoded data
+                      // distributionData={...} // REMOVE
+                      // categoryTimeSeriesData={...} // REMOVE
+                      // chartConfig={...} // REMOVE
                     />
                   </div>
                 </div>
@@ -1006,41 +979,39 @@ export function BookingChannels() {
         {/* Add this section at the bottom of the return statement before the final closing div */}
         <div className="mt-8 px-12 pb-12 grid grid-cols-2 gap-6">
           <div className="bg-white rounded-lg shadow overflow-hidden">
-            <HorizontalBarChartMultipleDatasets 
-              datasets={[
-                {
-                  key: "cancellation",
-                  title: "Cancellation Lead Time",
-                  data: cancellationLeadTimeByChannelData[selectedBookingChannel]
-                },
-                {
-                  key: "leadTime",
-                  title: "Lead Time",
-                  data: leadTimeByChannelData[selectedBookingChannel]
-                }
-              ]}
-              defaultDataset="cancellation"
-              categories={[
-                { key: "direct", label: "Direct Bookings" },
-                { key: "booking_com", label: "Booking.com" },
-                { key: "expedia", label: "Expedia" },
-                { key: "gds", label: "GDS" },
-                { key: "wholesalers", label: "Wholesalers" }
-              ]}
-              defaultCategory={selectedBookingChannel}
+            <HorizontalBarChartMultipleDatasetsUpgraded 
+              title="Lead Times by Booking Channel"
+              datasetTitle="Lead Times"
+              apiEndpoint="/api/booking-channels/lead-times"
+              apiParams={{
+                businessDate: date.toISOString().split('T')[0],
+                periodType: selectedTimeFrame,
+                viewType: selectedViewType,
+                comparison: selectedComparison
+              }}
+              defaultDataset="cancellation_lead_time"
+              defaultCategory="WEB"
+              sort={true}
+              leftMargin={-5}
+              orientation="horizontal"
             />
           </div>
-          <ReservationsByDayChart 
-            data={reservationsByDayData} 
-            color="blue"
-            categories={[
-              { key: "direct", label: "Direct Bookings" },
-              { key: "booking_com", label: "Booking.com" },
-              { key: "expedia", label: "Expedia" },
-              { key: "gds", label: "GDS" },
-              { key: "wholesalers", label: "Wholesalers" }
-            ]}
-          />
+          <div className="bg-white rounded-lg shadow overflow-hidden">
+          <HorizontalBarChartMultipleDatasetsUpgraded 
+              title="Reservation Trends (DOW)"
+              datasetTitle="Reservation Trends (DOW)"
+              apiEndpoint="/api/booking-channels/reservation-trends"
+              apiParams={{
+                businessDate: date.toISOString().split('T')[0],
+                periodType: selectedTimeFrame,
+                viewType: selectedViewType,
+                comparison: selectedComparison
+              }}
+              defaultDataset="occupancyByDayOfWeek"
+              leftMargin={20}
+              orientation="vertical"
+            />
+          </div>
         </div>
     </div>
   )

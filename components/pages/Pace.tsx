@@ -33,6 +33,7 @@ import { ResponsiveBar } from '@nivo/bar'
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts'
 import { PacingChart } from '@/components/PacingChart'
 import { HotelSelector } from '../new/HotelSelector'
+import { PacingChartData } from '@/app/api/pace/route'
 
 // Add the COLORS constant
 const COLORS = ['rgba(59, 130, 246, 0.5)', 'rgba(34, 197, 94, 0.5)', 'rgba(234, 179, 8, 0.5)', 'rgba(239, 68, 68, 0.5)']
@@ -198,27 +199,15 @@ interface ChartData {
   comparisonFbRevenue?: number;
 }
 
-const roomsData: ChartData[] = [
-  { date: '2023-01', rooms: 150, revenue: 35000, roomsRevenue: 25000, fbRevenue: 10000 },
-  { date: '2023-02', rooms: 160, revenue: 37000, roomsRevenue: 26000, fbRevenue: 11000 },
-  { date: '2023-03', rooms: 175, revenue: 40000, roomsRevenue: 28000, fbRevenue: 12000 },
-  { date: '2023-04', rooms: 155, revenue: 36000, roomsRevenue: 25500, fbRevenue: 10500 },
-  { date: '2023-05', rooms: 170, revenue: 39000, roomsRevenue: 27500, fbRevenue: 11500 },
-  { date: '2023-06', rooms: 180, revenue: 42000, roomsRevenue: 29500, fbRevenue: 12500 },
-];
+// REMOVE or comment out hardcoded data related to the main pacing chart
+// const roomsData: ChartData[] = [ ... ];
+// const monthData: ChartData[] = [ ... ];
+// const yearData: ChartData[] = [ ... ];
 
-// Add this function after the existing helper functions
-const generateLineChartComparisonData = (data: ChartData[]): ChartData[] => {
-  return data.map(item => ({
-    ...item,
-    comparisonRooms: item.rooms ? Math.round(item.rooms * (1 + (Math.random() - 0.5) * 0.4)) : undefined,
-    comparisonRevenue: item.revenue ? Math.round(item.revenue * (1 + (Math.random() - 0.5) * 0.4)) : undefined,
-    comparisonRoomsRevenue: item.roomsRevenue ? Math.round(item.roomsRevenue * (1 + (Math.random() - 0.5) * 0.4)) : undefined,
-    comparisonFbRevenue: item.fbRevenue ? Math.round(item.fbRevenue * (1 + (Math.random() - 0.5) * 0.4)) : undefined,
-  }));
-};
+// REMOVE or comment out the function used to generate fake comparison data for the main chart
+// const generateLineChartComparisonData = (data: ChartData[]): ChartData[] => { ... };
 
-// Add this helper function after other helper functions
+// Keep this helper function if needed elsewhere, otherwise remove it too
 const formatCurrency = (value: number): string => {
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
@@ -232,7 +221,7 @@ export function PaceDashboard() {
   const [selectedHotels, setSelectedHotels] = useState<string[]>(["Hotel 1"])
   const allHotels = ["Hotel 1", "Hotel 2", "Hotel 3"]
   const [selectedCard, setSelectedCard] = useState<string | null>(null)
-  const [selectedTimeframe, setSelectedTimeframe] = useState("OTB")
+  const [selectedTimeframe, setSelectedTimeframe] = useState("Month")
   const [comparisonType, setComparisonType] = useState<'Last year' | 'Budget' | 'No comparison'>('Last year')
   const [pieChartData, setPieChartData] = useState<Array<{ id: string; value: number }> | undefined>(undefined)
   const [comparisonPieChartData, setComparisonPieChartData] = useState<Array<{ id: string; value: number }> | undefined>(undefined)
@@ -312,6 +301,11 @@ export function PaceDashboard() {
     bookingChannels: 'current',
     geoSources: 'current',
   })
+
+  // Add state for the fetched pacing data
+  const [pacingData, setPacingData] = useState<PacingChartData[]>([]);
+  const [isLoadingPacing, setIsLoadingPacing] = useState(true);
+  const [errorPacing, setErrorPacing] = useState<string | null>(null);
 
   // Add renderChart function
   const renderChart = (data: Array<{ id: string; value: number }>, title: string, filterKey: string) => {
@@ -533,33 +527,31 @@ export function PaceDashboard() {
     )
   }
 
-  // Add inside OverviewDashboard component, with other state declarations
-  const [combinedRoomsData, setCombinedRoomsData] = useState<ChartData[]>([]);
-
-  // Update the roomsData for both month and year views
-  const monthData: ChartData[] = [
-    { date: '2024-03-01', rooms: 150, revenue: 35000, roomsRevenue: 25000, fbRevenue: 10000 },
-    { date: '2024-03-05', rooms: 160, revenue: 37000, roomsRevenue: 26000, fbRevenue: 11000 },
-    { date: '2024-03-10', rooms: 175, revenue: 40000, roomsRevenue: 28000, fbRevenue: 12000 },
-    { date: '2024-03-15', rooms: 155, revenue: 36000, roomsRevenue: 25500, fbRevenue: 10500 },
-    { date: '2024-03-20', rooms: 170, revenue: 39000, roomsRevenue: 27500, fbRevenue: 11500 },
-    { date: '2024-03-25', rooms: 180, revenue: 42000, roomsRevenue: 29500, fbRevenue: 12500 },
-  ];
-
-  const yearData: ChartData[] = [
-    { date: '2024-01', rooms: 150, revenue: 35000, roomsRevenue: 25000, fbRevenue: 10000 },
-    { date: '2024-02', rooms: 160, revenue: 37000, roomsRevenue: 26000, fbRevenue: 11000 },
-    { date: '2024-03', rooms: 175, revenue: 40000, roomsRevenue: 28000, fbRevenue: 12000 },
-    { date: '2024-04', rooms: 155, revenue: 36000, roomsRevenue: 25500, fbRevenue: 10500 },
-    { date: '2024-05', rooms: 170, revenue: 39000, roomsRevenue: 27500, fbRevenue: 11500 },
-    { date: '2024-06', rooms: 180, revenue: 42000, roomsRevenue: 29500, fbRevenue: 12500 },
-  ];
-
-  // Update the useEffect to handle different data based on view
+  // Add useEffect to fetch pacing data from the API
   useEffect(() => {
-    const data = selectedTimeframe === "Month" ? monthData : yearData;
-    setCombinedRoomsData(generateLineChartComparisonData(data));
-  }, [selectedTimeframe]);
+    const fetchPacingData = async () => {
+      setIsLoadingPacing(true);
+      setErrorPacing(null);
+      try {
+        // Determine viewType based on selectedTimeframe state
+        const viewType = selectedTimeframe === "Month" ? "Month" : "Year";
+        const response = await fetch(`/api/pace?viewType=${viewType}`);
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const data: PacingChartData[] = await response.json();
+        setPacingData(data);
+      } catch (error) {
+        console.error("Failed to fetch pacing data:", error);
+        setErrorPacing(error instanceof Error ? error.message : 'An unknown error occurred');
+        setPacingData([]); // Clear data on error
+      } finally {
+        setIsLoadingPacing(false);
+      }
+    };
+
+    fetchPacingData();
+  }, [selectedTimeframe]); // Re-fetch when the view type changes
 
   // Add inside OverviewDashboard component, after other render functions
   const renderAreaChart = (data: ChartData[], title: string, dataKey: string, comparisonDataKey: string, color: string, comparisonColor: string, showSelector: boolean) => (
@@ -718,15 +710,16 @@ export function PaceDashboard() {
               <h2 className="text-3xl font-bold text-gray-800">Pace</h2>
             </div>
             <div className="flex space-x-4 items-center">
-              {/* New style dropdown for view selection */}
+              {/* View type dropdown */}
               <div className="flex flex-col">
                 <span className="text-xs text-gray-500 mb-2">View type</span>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button 
-                      variant="ghost" 
+                    <Button
+                      variant="ghost"
                       className="bg-[#f2f8ff] hover:bg-[#f2f8ff] text-[#342630] rounded-full px-4"
                     >
+                      {/* Update label based on selectedTimeframe */}
                       {selectedTimeframe === "Month" ? 'Month View' : 'Year View'} <ChevronDownIcon className="ml-2 h-4 w-4" />
                     </Button>
                   </DropdownMenuTrigger>
@@ -781,8 +774,25 @@ export function PaceDashboard() {
 
         {/* Main Content - Pacing Chart */}
         <div className="mt-6">
-          <PacingChart viewType={selectedTimeframe === "Month" ? "Month" : selectedTimeframe === "Year" ? "Year" : "Month"} />
+          {/* Pass the fetched data and loading/error states to PacingChart */}
+          <PacingChart
+            viewType={selectedTimeframe as "Month" | "Year"} // Pass the correct view type
+            data={pacingData}
+            isLoading={isLoadingPacing}
+            error={errorPacing}
+          />
         </div>
+
+        {/* Add grid for the other charts if needed, or remove if PacingChart is the only content */}
+        {/* Example:
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+           {renderChart(marketSegments, "Revenue by Market Segment", "marketSegments")}
+           {renderChart(roomTypes, "Revenue by Room Type", "roomTypes")}
+           {renderChart(bookingChannels, "Revenue by Booking Channel", "bookingChannels")}
+           {renderChart(geoSources, "Revenue by Geo Source", "geoSources")}
+        </div>
+        */}
+
       </div>
 
       {/* Custom Dialog */}

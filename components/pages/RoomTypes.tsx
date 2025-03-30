@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -26,19 +26,14 @@ import { KpiWithChart } from '../new/KpiWithChart'
 import { Kpi } from '../new/Kpi'
 import { KpiWithSubtleChart } from '../new/KpiWithSubtleChart'
 import { ChartConfig } from '@/components/ui/chart'
-import type { CategoryTimeSeriesData } from '@/components/new/CategoriesDetailsDialog'
+import { CategoriesDetailsDialog, type CategoryTimeSeriesData } from '@/components/new/CategoriesDetailsDialog'
 import { ReservationsByDayChart } from '../new/ReservationsByDayChart'
 import { HorizontalBarChart } from '../new/HorizontalBarChart'
 import { HotelSelector } from '../new/HotelSelector'
 import { HorizontalBarChartMultipleDatasets } from "../new/HorizontalBarChartMultipleDatasets"
-import { PieChartWithLabels } from "@/components/new/PieChartWithLabels"
-import { addDays } from "date-fns"
-import { DistributionChart } from '../new/DistributionChart'
-import { CategoriesOverTimeChart } from '../new/CategoriesOverTimeChart'
-import { ArrowUpIcon } from 'lucide-react'
-import { CategoriesDetailContent } from '../new/CategoriesDetailContent'
-import { TopFiveMultiple } from '../new/TopFiveMultiple'
-import { RoomTypeUpgradesDowngrades } from '@/components/RoomTypeUpgradesDowngrades'
+import { HorizontalBarChartMultipleDatasetsUpgraded } from "../new/HorizontalBarChartMultipleDatasetsUpgraded"
+import { TopFiveUpgraded } from "@/components/new/TopFiveUpgraded"
+import eventBus from '@/utils/eventBus'
 
 // Dynamic import for WorldMap with loading state
 const WorldMap = dynamic(
@@ -53,75 +48,60 @@ const WorldMap = dynamic(
   }
 )
 
-const ROOM_TYPES = {
-  standard: {
-    label: "Standard Room",
+const room_typeS = {
+  direct: {
+    label: "Direct Bookings",
     color: "#18b0cc"
   },
-  deluxe: {
-    label: "Deluxe Room", 
+  booking_com: {
+    label: "Booking.com",
     color: "#1eb09a"
   },
-  suite: {
-    label: "Suite",
+  expedia: {
+    label: "Expedia",
     color: "#3b56de"
   },
-  family: {
-    label: "Family Room",
+  gds: {
+    label: "GDS",
     color: "#713ddd"
   },
-  executive: {
-    label: "Executive Room",
+  wholesalers: {
+    label: "Wholesalers",
     color: "#22a74f"
   }
 } as const;
 
-// Add this constant for country data near the top of your file with other constants
-const countryData = [
-  { country: "us", value: 285000 }, // United States
-  { country: "gb", value: 195000 }, // United Kingdom
-  { country: "de", value: 168000 }, // Germany
-  { country: "fr", value: 142000 }, // France
-  { country: "es", value: 125000 }, // Spain
-  // Add more countries with lower values to show contrast
-  { country: "it", value: 98000 },  // Italy
-  { country: "nl", value: 85000 },  // Netherlands
-  { country: "ch", value: 75000 },  // Switzerland
-  { country: "se", value: 65000 },  // Sweden
-  { country: "be", value: 55000 },  // Belgium
-];
-
-// Add country distribution data for each booking channel
+// Add country distribution data for each Room Type
 const countryDistributionByChannel = {
-  standard: [
+  direct: [
     { name: "United States", value: 95000, percentage: 32.5, fill: "hsl(246, 60%, 60%)" },
     { name: "United Kingdom", value: 75000, percentage: 25.5, fill: "hsl(180, 75%, 35%)" },
     { name: "Germany", value: 48000, percentage: 16.0, fill: "hsl(322, 65%, 55%)" },
     { name: "France", value: 42000, percentage: 14.0, fill: "hsl(15, 75%, 50%)" },
     { name: "Spain", value: 35000, percentage: 12.0, fill: "hsl(45, 90%, 45%)" },
   ],
-  deluxe: [
+  booking_com: [
     { name: "United States", value: 85000, percentage: 29.0, fill: "hsl(246, 60%, 60%)" },
     { name: "United Kingdom", value: 65000, percentage: 22.5, fill: "hsl(180, 75%, 35%)" },
     { name: "Germany", value: 58000, percentage: 20.0, fill: "hsl(322, 65%, 55%)" },
     { name: "France", value: 45000, percentage: 15.5, fill: "hsl(15, 75%, 50%)" },
     { name: "Spain", value: 38000, percentage: 13.0, fill: "hsl(45, 90%, 45%)" },
   ],
-  suite: [
+  expedia: [
     { name: "United States", value: 75000, percentage: 35.0, fill: "hsl(246, 60%, 60%)" },
     { name: "United Kingdom", value: 42000, percentage: 19.5, fill: "hsl(180, 75%, 35%)" },
     { name: "Germany", value: 38000, percentage: 17.5, fill: "hsl(322, 65%, 55%)" },
     { name: "France", value: 32000, percentage: 15.0, fill: "hsl(15, 75%, 50%)" },
     { name: "Spain", value: 28000, percentage: 13.0, fill: "hsl(45, 90%, 45%)" },
   ],
-  family: [
+  gds: [
     { name: "United States", value: 55000, percentage: 30.0, fill: "hsl(246, 60%, 60%)" },
     { name: "United Kingdom", value: 38000, percentage: 21.0, fill: "hsl(180, 75%, 35%)" },
     { name: "Germany", value: 35000, percentage: 19.0, fill: "hsl(322, 65%, 55%)" },
     { name: "France", value: 30000, percentage: 16.0, fill: "hsl(15, 75%, 50%)" },
     { name: "Spain", value: 25000, percentage: 14.0, fill: "hsl(45, 90%, 45%)" },
   ],
-  executive: [
+  wholesalers: [
     { name: "United States", value: 45000, percentage: 28.0, fill: "hsl(246, 60%, 60%)" },
     { name: "United Kingdom", value: 35000, percentage: 22.0, fill: "hsl(180, 75%, 35%)" },
     { name: "Germany", value: 32000, percentage: 20.0, fill: "hsl(322, 65%, 55%)" },
@@ -130,9 +110,9 @@ const countryDistributionByChannel = {
   ]
 };
 
-// Add country time series data for each booking channel
+// Add country time series data for each Room Type
 const countryTimeSeriesByChannel = {
-  standard: [
+  direct: [
     { 
       date: "January",
       categories: {
@@ -165,7 +145,7 @@ const countryTimeSeriesByChannel = {
       }
     }
   ],
-  deluxe: [
+  booking_com: [
     // Similar structure for booking.com
     { 
       date: "January",
@@ -190,7 +170,7 @@ const countryTimeSeriesByChannel = {
     }
   ],
   // Add similar data for expedia, gds, and wholesalers
-  suite: [
+  expedia: [
     { 
       date: "January",
       categories: {
@@ -213,7 +193,7 @@ const countryTimeSeriesByChannel = {
       }
     }
   ],
-  family: [
+  gds: [
     { 
       date: "January",
       categories: {
@@ -236,7 +216,7 @@ const countryTimeSeriesByChannel = {
       }
     }
   ],
-  executive: [
+  wholesalers: [
     { 
       date: "January",
       categories: {
@@ -263,7 +243,7 @@ const countryTimeSeriesByChannel = {
 
 // Add metrics by channel
 const countryMetricsByChannel = {
-  standard: [
+  direct: [
     {
       key: 'revenue',
       label: 'Revenue',
@@ -288,7 +268,7 @@ const countryMetricsByChannel = {
       ]
     }
   ],
-  deluxe: [
+  booking_com: [
     // Similar structure for other channels
     {
       key: 'revenue',
@@ -314,7 +294,7 @@ const countryMetricsByChannel = {
       ]
     }
   ],
-  suite: [
+  expedia: [
     {
       key: 'revenue',
       label: 'Revenue',
@@ -339,7 +319,7 @@ const countryMetricsByChannel = {
       ]
     }
   ],
-  family: [
+  gds: [
     {
       key: 'revenue',
       label: 'Revenue',
@@ -364,7 +344,7 @@ const countryMetricsByChannel = {
       ]
     }
   ],
-  executive: [  
+  wholesalers: [  
     {
       key: 'revenue',
       label: 'Revenue',
@@ -431,7 +411,7 @@ function TriangleDown({ className }: { className?: string }) {
 
 // Add this data near the top where other data is defined
 const lengthOfStayByChannelData = {
-  standard: [
+  direct: [
     { range: "1 night", current: 210, previous: 185 },
     { range: "2 nights", current: 345, previous: 310 },
     { range: "3 nights", current: 420, previous: 380 },
@@ -440,7 +420,7 @@ const lengthOfStayByChannelData = {
     { range: "6 nights", current: 95, previous: 80 },
     { range: "7+ nights", current: 120, previous: 105 }
   ],
-  deluxe: [
+  booking_com: [
     { range: "1 night", current: 230, previous: 205 },
     { range: "2 nights", current: 360, previous: 325 },
     { range: "3 nights", current: 395, previous: 355 },
@@ -449,7 +429,7 @@ const lengthOfStayByChannelData = {
     { range: "6 nights", current: 85, previous: 70 },
     { range: "7+ nights", current: 105, previous: 90 }
   ],
-  suite: [
+  expedia: [
     { range: "1 night", current: 245, previous: 220 },
     { range: "2 nights", current: 375, previous: 340 },
     { range: "3 nights", current: 380, previous: 340 },
@@ -458,7 +438,7 @@ const lengthOfStayByChannelData = {
     { range: "6 nights", current: 75, previous: 60 },
     { range: "7+ nights", current: 90, previous: 75 }
   ],
-  family: [
+  gds: [
     { range: "1 night", current: 190, previous: 165 },
     { range: "2 nights", current: 320, previous: 285 },
     { range: "3 nights", current: 450, previous: 410 },
@@ -467,7 +447,7 @@ const lengthOfStayByChannelData = {
     { range: "6 nights", current: 115, previous: 100 },
     { range: "7+ nights", current: 140, previous: 125 }
   ],
-  executive: [
+  wholesalers: [
     { range: "1 night", current: 180, previous: 155 },
     { range: "2 nights", current: 325, previous: 290 },
     { range: "3 nights", current: 435, previous: 395 },
@@ -475,104 +455,6 @@ const lengthOfStayByChannelData = {
     { range: "5 nights", current: 185, previous: 165 },
     { range: "6 nights", current: 105, previous: 90 },
     { range: "7+ nights", current: 130, previous: 115 }
-  ]
-}
-
-// Add lead time data by channel
-const leadTimeByChannelData = {
-  standard: [
-    { range: "0-7 days", current: 245, previous: 220 },
-    { range: "8-14 days", current: 312, previous: 280 },
-    { range: "15-30 days", current: 456, previous: 410 },
-    { range: "31-60 days", current: 323, previous: 290 },
-    { range: "61-90 days", current: 198, previous: 175 },
-    { range: "91-180 days", current: 148, previous: 125 },
-    { range: ">180 days", current: 87, previous: 75 }
-  ],
-  deluxe: [
-    { range: "0-7 days", current: 265, previous: 240 },
-    { range: "8-14 days", current: 332, previous: 300 },
-    { range: "15-30 days", current: 436, previous: 390 },
-    { range: "31-60 days", current: 303, previous: 270 },
-    { range: "61-90 days", current: 178, previous: 155 },
-    { range: "91-180 days", current: 128, previous: 105 },
-    { range: ">180 days", current: 67, previous: 55 }
-  ],
-  suite: [
-    { range: "0-7 days", current: 275, previous: 250 },
-    { range: "8-14 days", current: 342, previous: 310 },
-    { range: "15-30 days", current: 426, previous: 380 },
-    { range: "31-60 days", current: 293, previous: 260 },
-    { range: "61-90 days", current: 168, previous: 145 },
-    { range: "91-180 days", current: 118, previous: 95 },
-    { range: ">180 days", current: 57, previous: 45 }
-  ],
-  family: [
-    { range: "0-7 days", current: 225, previous: 200 },
-    { range: "8-14 days", current: 292, previous: 260 },
-    { range: "15-30 days", current: 476, previous: 430 },
-    { range: "31-60 days", current: 343, previous: 310 },
-    { range: "61-90 days", current: 218, previous: 195 },
-    { range: "91-180 days", current: 168, previous: 145 },
-    { range: ">180 days", current: 107, previous: 95 }
-  ],
-  executive: [
-    { range: "0-7 days", current: 215, previous: 190 },
-    { range: "8-14 days", current: 282, previous: 250 },
-    { range: "15-30 days", current: 466, previous: 420 },
-    { range: "31-60 days", current: 333, previous: 300 },
-    { range: "61-90 days", current: 208, previous: 185 },
-    { range: "91-180 days", current: 158, previous: 135 },
-    { range: ">180 days", current: 97, previous: 85 }
-  ]
-}
-
-// Add cancellation lead time data by channel near the other data definitions
-const cancellationLeadTimeByChannelData = {
-  standard: [
-    { range: "0-5 days", current: 45, previous: 52 },
-    { range: "6-10 days", current: 38, previous: 41 },
-    { range: "11-15 days", current: 32, previous: 35 },
-    { range: "16-20 days", current: 25, previous: 28 },
-    { range: "21-25 days", current: 18, previous: 20 },
-    { range: "26-30 days", current: 12, previous: 15 },
-    { range: ">30 days", current: 8, previous: 10 }
-  ],
-  deluxe: [
-    { range: "0-5 days", current: 50, previous: 57 },
-    { range: "6-10 days", current: 42, previous: 45 },
-    { range: "11-15 days", current: 36, previous: 39 },
-    { range: "16-20 days", current: 28, previous: 31 },
-    { range: "21-25 days", current: 21, previous: 23 },
-    { range: "26-30 days", current: 15, previous: 18 },
-    { range: ">30 days", current: 10, previous: 12 }
-  ],
-  suite: [
-    { range: "0-5 days", current: 52, previous: 59 },
-    { range: "6-10 days", current: 45, previous: 48 },
-    { range: "11-15 days", current: 38, previous: 41 },
-    { range: "16-20 days", current: 30, previous: 33 },
-    { range: "21-25 days", current: 23, previous: 25 },
-    { range: "26-30 days", current: 16, previous: 19 },
-    { range: ">30 days", current: 11, previous: 13 }
-  ],
-  family: [
-    { range: "0-5 days", current: 40, previous: 47 },
-    { range: "6-10 days", current: 35, previous: 38 },
-    { range: "11-15 days", current: 29, previous: 32 },
-    { range: "16-20 days", current: 22, previous: 25 },
-    { range: "21-25 days", current: 15, previous: 17 },
-    { range: "26-30 days", current: 9, previous: 12 },
-    { range: ">30 days", current: 6, previous: 8 }
-  ],
-  executive: [
-    { range: "0-5 days", current: 38, previous: 45 },
-    { range: "6-10 days", current: 32, previous: 35 },
-    { range: "11-15 days", current: 27, previous: 30 },
-    { range: "16-20 days", current: 20, previous: 23 },
-    { range: "21-25 days", current: 14, previous: 16 },
-    { range: "26-30 days", current: 8, previous: 11 },
-    { range: ">30 days", current: 5, previous: 7 }
   ]
 }
 
@@ -627,103 +509,6 @@ const reservationsByDayData = [
     staysStarting: 189,
     prevStaysStarting: 170
   },
-]
-
-// First, add these new data constants near the other data definitions
-
-// Data for room types by market segment
-const roomTypesByMarketSegmentMetrics = [
-  {
-    key: 'revenue',
-    label: 'Revenue',
-    prefix: '€',
-    data: [
-      { name: "Standard Room", value: 285000, change: 32000 },
-      { name: "Deluxe Room", value: 245000, change: -15000 },
-      { name: "Suite", value: 198000, change: 25000 },
-      { name: "Executive Room", value: 175000, change: -12000 },
-      { name: "Family Room", value: 156000, change: 18000 },
-    ]
-  },
-  {
-    key: 'rooms',
-    label: 'Rooms Sold',
-    data: [
-      { name: "Standard Room", value: 1250, change: 150 },
-      { name: "Deluxe Room", value: 980, change: -85 },
-      { name: "Suite", value: 720, change: 95 },
-      { name: "Executive Room", value: 650, change: -45 },
-      { name: "Family Room", value: 580, change: 65 },
-    ]
-  },
-  {
-    key: 'adr',
-    label: 'ADR',
-    prefix: '€',
-    data: [
-      { name: "Standard Room", value: 228, change: 15 },
-      { name: "Deluxe Room", value: 250, change: -8 },
-      { name: "Suite", value: 275, change: 20 },
-      { name: "Executive Room", value: 269, change: -10 },
-      { name: "Family Room", value: 269, change: 12 },
-    ]
-  }
-]
-
-// Data for room types by booking channel
-const roomTypesByBookingChannelMetrics = [
-  {
-    key: 'revenue',
-    label: 'Revenue',
-    prefix: '€',
-    data: [
-      { name: "Standard Room", value: 265000, change: 28000 },
-      { name: "Deluxe Room", value: 235000, change: -12000 },
-      { name: "Suite", value: 188000, change: 22000 },
-      { name: "Executive Room", value: 165000, change: -10000 },
-      { name: "Family Room", value: 146000, change: 15000 },
-    ]
-  },
-  {
-    key: 'rooms',
-    label: 'Rooms Sold',
-    data: [
-      { name: "Standard Room", value: 1150, change: 140 },
-      { name: "Deluxe Room", value: 920, change: -75 },
-      { name: "Suite", value: 680, change: 85 },
-      { name: "Executive Room", value: 610, change: -40 },
-      { name: "Family Room", value: 540, change: 55 },
-    ]
-  },
-  {
-    key: 'adr',
-    label: 'ADR',
-    prefix: '€',
-    data: [
-      { name: "Standard Room", value: 230, change: 12 },
-      { name: "Deluxe Room", value: 255, change: -6 },
-      { name: "Suite", value: 276, change: 18 },
-      { name: "Executive Room", value: 270, change: -8 },
-      { name: "Family Room", value: 270, change: 10 },
-    ]
-  }
-]
-
-// Add categories for market segments and booking channels
-const marketSegmentCategories = [
-  { key: 'leisure', label: 'Leisure' },
-  { key: 'business', label: 'Business' },
-  { key: 'groups', label: 'Groups' },
-  { key: 'corporate', label: 'Corporate' },
-  { key: 'government', label: 'Government' },
-]
-
-const bookingChannelCategories = [
-  { key: 'direct', label: 'Direct' },
-  { key: 'ota', label: 'OTA' },
-  { key: 'gds', label: 'GDS' },
-  { key: 'wholesale', label: 'Wholesale' },
-  { key: 'corporate', label: 'Corporate Portal' },
 ]
 
 export function RoomTypes() {
@@ -785,15 +570,15 @@ export function RoomTypes() {
   }
 
   // Add sample data for the TopFiveMultiple component
-  const bookingChannelCategories = [
-    { key: 'standard', label: 'Standard Room' },
-    { key: 'deluxe', label: 'Deluxe Room' },
-    { key: 'suite', label: 'Suite' },
-    { key: 'family', label: 'Family Room' },
-    { key: 'executive', label: 'Executive Room' },
+  const RoomTypeCategories = [
+    { key: 'direct', label: 'Direct Bookings' },
+    { key: 'booking_com', label: 'Booking.com' },
+    { key: 'expedia', label: 'Expedia' },
+    { key: 'gds', label: 'GDS' },
+    { key: 'wholesalers', label: 'Wholesalers' },
   ]
 
-  // Sample metrics for producers by booking channel
+  // Sample metrics for producers by Room Type
   const producerMetrics = [
     {
       key: 'revenue',
@@ -862,15 +647,70 @@ export function RoomTypes() {
     // Add more months as needed
   ]
 
-  // Add new state for selected booking channel
-  const [selectedRoomType, setSelectedRoomType] = useState<keyof typeof ROOM_TYPES>('standard');
+  // Create analysis API params similar to what's in the overview page
+  const analysisApiParams = {
+    timeframe: selectedTimeFrame.toLowerCase(),
+    viewType: selectedViewType.toLowerCase(),
+    comparison: selectedComparison.toLowerCase(), 
+    date: date.toISOString().split('T')[0],
+    hotels: selectedHotels.join(',')
+  };
+
+  const metricOptions = [
+    {
+      label: "Revenue",
+      key: "revenue",
+      prefix: "$",
+      data: []
+    },
+    {
+      label: "Rooms Sold",
+      key: "rooms",
+      data: []
+    },
+    {
+      label: "ADR",
+      key: "adr",
+      prefix: "$",
+      data: []
+    }
+  ];
+
+  // Add state for controlling the world map data - initialize as empty
+  const [currentMapData, setCurrentMapData] = useState<Array<{ country: string, value: number }>>([]);
+
+  // Subscribe to TopFiveUpgraded data update events
+  useEffect(() => {
+    // Subscribe to data updates from the 'top-countries' component
+    const unsubscribeDataUpdated = eventBus.subscribe('topfive:top-countries:dataUpdated',
+      (payload: { id: string; primaryGroup: string; metric: string; data: Array<{ name: string; value: number; code: string }> }) => {
+        console.log('RoomTypes: Received dataUpdated event:', payload);
+        if (payload.id === 'top-countries' && payload.data) {
+          // Map the received data to the format WorldMap expects
+          // IMPORTANT: Assumes payload.data items have a 'code' property (e.g., 'us', 'gb')
+          const newMapData = payload.data.map(item => ({
+            country: item.code, // Use the country code directly from the data item
+            value: item.value
+          })).filter(item => item.country); // Ensure items have a country code
+
+          console.log('RoomTypes: Updating map data:', newMapData);
+          setCurrentMapData(newMapData);
+        }
+      }
+    );
+
+    // Cleanup subscription on unmount
+    return () => {
+      unsubscribeDataUpdated();
+    };
+  }, []); // Run only once on mount
 
   return (
     <div className="flex-1 overflow-auto bg-[#f5f8ff]">
         {/* Header with Filters */}
         <div className="fixed top-0 left-[256px] right-0 z-30 flex justify-between items-center mb-6 bg-white py-6 px-12 border-b border-gray-300 shadow-sm">
           <div>
-            <h2 className="text-xl font-bold text-gray-800 mb-1">Room types</h2>
+            <h2 className="text-xl font-bold text-gray-800 mb-1">Room Types</h2>
             <span className='text-gray-400 font-ligth mt-3 pt-2 text-sm'>{`${selectedTimeFrame} ${selectedViewType}`}</span>
           </div>
 
@@ -999,37 +839,63 @@ export function RoomTypes() {
 
         {/* Add the charts */}
         <div className="mt-[140px] px-12 py-0">
-          {/* Add the existing CategoriesDetailContent component */}
+          {/* Use the correct URL pattern for CategoriesDetailsDialog */}
           <div className="mb-8">
-            <CategoriesDetailContent
+            <CategoriesDetailsDialog
+              isDialog={false}
               title="Room Types Analysis"
-              categories={ROOM_TYPES}
               prefix="€"
-              apiUrl="/api/room-types/categories-detail"
+              apiEndpoint="/api/room-types/distribution"
+              apiParams={{
+                ...analysisApiParams,
+                field: 'room_type',
+                limit: '5'
+              }}
             />
           </div>
+
           
           {/* Add the TopFiveMultiple component underneath */}
           <div className="mb-8 grid grid-cols-2 gap-6">
-            <TopFive 
-              title="Room Types by Market Segment"
-              subtitle="Performance Analysis"
-              color="blue"
-              categories={marketSegmentCategories}
-              metrics={roomTypesByMarketSegmentMetrics}
-              distributionData={producersDistributionData}
-              categoryTimeSeriesData={producersTimeSeriesData}
-            />
+            <Card className="bg-white rounded-lg overflow-hidden">
+              <CardContent className="p-0">
+                <TopFiveUpgraded
+                  title="Top Producers"
+                  subtitle="By Room Type"
+                  metrics={metricOptions}
+                  apiEndpoint="/api/room-types/distribution-upgraded"
+                  apiParams={{
+                    businessDate: date.toISOString().split('T')[0],
+                    periodType: selectedTimeFrame,
+                    viewType: selectedViewType,
+                    comparison: selectedComparison
+                  }}
+                  primaryField="room_type"
+                  secondaryField="producer"
+                  color="blue"
+                  defaultPrimaryValue="KNS"
+                  withBorder={false}
+                />
+              </CardContent>
+            </Card>
             
-            <TopFive 
-              title="Room Types by Booking Channel"
-              subtitle="Performance Analysis"
-              color="blue"
-              categories={bookingChannelCategories}
-              metrics={roomTypesByBookingChannelMetrics}
-              distributionData={producersDistributionData}
-              categoryTimeSeriesData={producersTimeSeriesData}
-            />
+            <div className="bg-white rounded-lg shadow overflow-hidden">
+              <HorizontalBarChartMultipleDatasetsUpgraded 
+                title="Length of Stay by Room Type"
+                datasetTitle="Length of Stay"
+                apiEndpoint="/api/room-types/length-of-stay"
+                apiParams={{
+                  businessDate: date.toISOString().split('T')[0],
+                  periodType: selectedTimeFrame,
+                  viewType: selectedViewType,
+                  comparison: selectedComparison
+                }}
+                defaultDataset="length_of_stay"
+                defaultCategory="SUP"
+                sort={true}
+                leftMargin={10}
+              />
+            </div>
           </div>
           
           {/* Add the new World Map with TopFiveMultiple component in a new row */}
@@ -1047,16 +913,21 @@ export function RoomTypes() {
                   {/* World Map Side */}
                   <div>
                     <div className="h-[500px] flex justify-center items-center">
-                      <WorldMap
-                        color="rgb(59, 130, 246)"
-                        title=""
-                        valueSuffix="€"
-                        size="xl"
-                        data={countryData}
-                        tooltipBgColor="black"
-                        tooltipTextColor="white"
-                        richInteraction={true}
-                      />
+                      {/* Ensure WorldMap receives the updated currentMapData */}
+                      {currentMapData.length > 0 ? (
+                        <WorldMap
+                          color="rgb(59, 130, 246)"
+                          title=""
+                          valueSuffix="€" // Adjust suffix based on actual metric if needed
+                          size="xl"
+                          data={currentMapData}
+                          tooltipBgColor="black"
+                          tooltipTextColor="white"
+                          richInteraction={true}
+                        />
+                      ) : (
+                        <div className="text-gray-500">Select data to display on map</div>
+                      )}
                     </div>
                     <div className="flex justify-center mt-4">
                       <div className="flex items-center space-x-8">
@@ -1072,16 +943,32 @@ export function RoomTypes() {
                     </div>
                   </div>
 
-                  {/* TopFiveMultiple by Room Type Side */}
+                  {/* Top Five by Country Side - ensure 'id' is set */}
                   <div className="border-l border-gray-100 pl-8">
-                    <TopFive 
-                      title="Top Countries Performance"
+                    <TopFiveUpgraded
+                      id="top-countries" // This ID is crucial for the event subscription
+                      title="Top Countries"
+                      subtitle="by Room Type"
+                      metrics={metricOptions} // Pass the metric options config
+                      apiEndpoint="/api/room-types/distribution-upgraded"
+                      apiParams={{
+                        // ... existing apiParams ...
+                        // businessDate: date.toISOString().split('T')[0], // Already included in analysisApiParams spread below? Check usage.
+                        periodType: selectedTimeFrame,
+                        viewType: selectedViewType,
+                        comparison: selectedComparison,
+                        // Add hotels if needed by this endpoint
+                        // hotels: selectedHotels.join(',')
+                      }}
+                      primaryField="room_type"
+                      secondaryField="guest_country"
+                      defaultPrimaryValue="SUP" // Or fetch the first available one
                       color="blue"
                       withBorder={false}
-                      categories={bookingChannelCategories}
-                      metrics={countryMetricsByChannel[selectedRoomType]}
-                      distributionData={countryDistributionByChannel[selectedRoomType]}
-                      categoryTimeSeriesData={countryTimeSeriesByChannel[selectedRoomType]}
+                      // Remove props related to hardcoded data
+                      // distributionData={...} // REMOVE
+                      // categoryTimeSeriesData={...} // REMOVE
+                      // chartConfig={...} // REMOVE
                     />
                   </div>
                 </div>
@@ -1093,71 +980,38 @@ export function RoomTypes() {
         {/* Add this section at the bottom of the return statement before the final closing div */}
         <div className="mt-8 px-12 pb-12 grid grid-cols-2 gap-6">
           <div className="bg-white rounded-lg shadow overflow-hidden">
-            <HorizontalBarChartMultipleDatasets 
-              datasets={[
-                {
-                  key: "cancellation",
-                  title: "Cancellation Lead Time",
-                  data: cancellationLeadTimeByChannelData[selectedRoomType]
-                },
-                {
-                  key: "leadTime",
-                  title: "Lead Time",
-                  data: leadTimeByChannelData[selectedRoomType]
-                }
-              ]}
-              defaultDataset="cancellation"
-              categories={[
-                { key: "standard", label: "Standard Room" },
-                { key: "deluxe", label: "Deluxe Room" },
-                { key: "suite", label: "Suite" },
-                { key: "family", label: "Family Room" },
-                { key: "executive", label: "Executive Room" }
-              ]}
-              defaultCategory={selectedRoomType}
+            <HorizontalBarChartMultipleDatasetsUpgraded 
+              title="Lead Times by Room Type"
+              datasetTitle="Lead Times"
+              apiEndpoint="/api/room-types/lead-times"
+              apiParams={{
+                businessDate: date.toISOString().split('T')[0],
+                periodType: selectedTimeFrame,
+                viewType: selectedViewType,
+                comparison: selectedComparison
+              }}
+              defaultDataset="cancellation_lead_time"
+              defaultCategory="SUP"
+              sort={true}
+              leftMargin={-5}
+              orientation="horizontal"
             />
           </div>
-          <ReservationsByDayChart 
-            data={reservationsByDayData} 
-            color="blue"
-            categories={[
-              { key: "standard", label: "Standard Room" },
-              { key: "deluxe", label: "Deluxe Room" },
-              { key: "suite", label: "Suite" },
-              { key: "family", label: "Family Room" },
-              { key: "executive", label: "Executive Room" }
-            ]}
-          />
-        </div>
-
-        {/* Add the new Room Type Upgrades & Downgrades chart */}
-        <div className="mt-0 px-12 pb-6">
-          <RoomTypeUpgradesDowngrades />
-        </div>
-
-        {/* Length of Stay in its own row at bottom */}
-        <div className="mt-0 px-12 pb-12">
-          <div className="w-1/2">
-            <div className="bg-white rounded-lg shadow overflow-hidden">
-              <HorizontalBarChartMultipleDatasets 
-                datasets={[
-                  {
-                    key: "lengthOfStay",
-                    title: "Length of Stay",
-                    data: lengthOfStayByChannelData[selectedRoomType]
-                  }
-                ]}
-                defaultDataset="lengthOfStay"
-                categories={[
-                  { key: "standard", label: "Standard Room" },
-                  { key: "deluxe", label: "Deluxe Room" },
-                  { key: "suite", label: "Suite" },
-                  { key: "family", label: "Family Room" },
-                  { key: "executive", label: "Executive Room" }
-                ]}
-                defaultCategory={selectedRoomType}
-              />
-            </div>
+          <div className="bg-white rounded-lg shadow overflow-hidden">
+          <HorizontalBarChartMultipleDatasetsUpgraded 
+              title="Reservation Trends (DOW)"
+              datasetTitle="Reservation Trends (DOW)"
+              apiEndpoint="/api/room-types/reservation-trends"
+              apiParams={{
+                businessDate: date.toISOString().split('T')[0],
+                periodType: selectedTimeFrame,
+                viewType: selectedViewType,
+                comparison: selectedComparison
+              }}
+              defaultDataset="occupancyByDayOfWeek"
+              leftMargin={20}
+              orientation="vertical"
+            />
           </div>
         </div>
     </div>

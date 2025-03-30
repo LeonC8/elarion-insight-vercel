@@ -49,127 +49,7 @@ import {
 // Add the COLORS constant
 const COLORS = ['rgba(59, 130, 246, 0.5)', 'rgba(34, 197, 94, 0.5)', 'rgba(234, 179, 8, 0.5)', 'rgba(239, 68, 68, 0.5)']
 
-// Add the graph data constants
-const marketSegments = [
-  { id: "Personal", value: 450000 },
-  { id: "Business", value: 350000 },
-  { id: "Corporate", value: 280000 },
-  { id: "Government", value: 150000 },
-  { id: "Other", value: 70000 },
-]
 
-const roomTypes = [
-  { id: "Standard", value: 300000 },
-  { id: "Deluxe", value: 250000 },
-  { id: "Suite", value: 180000 },
-  { id: "Executive", value: 120000 },
-  { id: "Family", value: 90000 },
-]
-
-const bookingChannels = [
-  { id: "Direct", value: 280000 },
-  { id: "OTA", value: 350000 },
-  { id: "Travel Agent", value: 180000 },
-  { id: "Corporate", value: 90000 },
-  { id: "Wholesaler", value: 60000 },
-]
-
-const geoSources = [
-  { id: "Domestic", value: 520000 },
-  { id: "Europe", value: 180000 },
-  { id: "Asia", value: 130000 },
-  { id: "North America", value: 100000 },
-  { id: "Other", value: 70000 },
-]
-
-// Add the theme constant
-const modernTheme = {
-  fontFamily: "'Geist Sans', sans-serif",
-  fontSize: 11,
-  text: {
-    fontFamily: "'Geist Sans', sans-serif",
-    fontSize: 11,
-    fontWeight: 500,
-    letterSpacing: 0.15,
-    fill: '#7d8694'
-  },
-  labels: {
-    text: {
-      fontFamily: "'Geist Sans', sans-serif",
-      fontSize: 11,
-      fontWeight: 500,
-      letterSpacing: 0.15,
-      fill: '#7d8694'
-    }
-  },
-  axis: {
-    legend: {
-      text: {
-        fontFamily: "'Geist Sans', sans-serif",
-        fontSize: 11,
-        fontWeight: 500,
-        letterSpacing: 0.15,
-        fill: '#7d8694'
-      }
-    },
-    ticks: {
-      text: {
-        fontFamily: "'Geist Sans', sans-serif",
-        fontSize: 11,
-        fontWeight: 500,
-        fill: '#7d8694'
-      }
-    }
-  },
-  legends: {
-    text: {
-      fontFamily: "'Geist Sans', sans-serif",
-      fontSize: 11,
-      fontWeight: 400,
-      fill: '#7d8694'
-    }
-  }
-}
-
-// Add helper functions
-function generateComparisonData(originalData: Array<{ id: string; value: number }>) {
-  return originalData.map(item => {
-    const changePercentage = (Math.random() * 0.4) - 0.2;
-    const newValue = Math.round(item.value * (1 + changePercentage));
-    return {
-      id: item.id,
-      value: Math.max(0, newValue)
-    };
-  });
-}
-
-const getYAxisTickValues = (data: Array<{ id: string; value: number }>) => {
-  const maxValue = Math.max(...data.map(d => d.value));
-  const roundedMax = Math.ceil(maxValue / 100000) * 100000;
-  const step = roundedMax / 5;
-  return Array.from({ length: 6 }, (_, i) => i * step);
-};
-
-const getDisplayTimeframe = (timeframe: string, forExcel: boolean = false) => {
-  if (timeframe.includes('-')) {
-    if (forExcel) {
-      return timeframe;
-    }
-    return "Custom period";
-  }
-  return timeframe;
-};
-
-// Types
-type TimeframeOption = {
-  label: string;
-  type: 'dropdown' | 'calendar';
-  options?: {
-    value: string;
-    label: string;
-  }[];
-  onClick?: () => void;
-};
 
 interface NumericalDataItem {
   title: string;
@@ -179,25 +59,6 @@ interface NumericalDataItem {
   icon: React.ElementType;
 }
 
-type DateRange = {
-  from: Date | undefined;
-  to: Date | undefined;
-};
-
-// Data
-const numericalData: NumericalDataItem[] = [
-  { title: "Rooms", value: 150, change: 5.2, comparisonValue: 142, icon: BedDoubleIcon },
-  { title: "Total Revenue", value: "$35,000", change: 3.8, comparisonValue: "$33,700", icon: DollarSignIcon },
-  { title: "Room Revenue", value: "$25,000", change: 4.5, comparisonValue: "$23,900", icon: DollarSignIcon },
-  { title: "F&B Revenue", value: "$10,000", change: 2.1, comparisonValue: "$9,800", icon: UtensilsIcon },
-  { title: "ADR", value: "$166.67", change: 3.8, comparisonValue: "$160.56", icon: TrendingUpIcon },
-  { title: "Occupancy", value: "75%", change: 1.5, comparisonValue: "73.8%", icon: PercentIcon },
-  { title: "Cancellations", value: "12", change: -2.3, comparisonValue: "10", icon: XIcon },
-  { title: "Average Length of Stay", value: "3.5", change: 0.8, comparisonValue: "3.2", icon: BarChartIcon },
-  { title: "Lead Time", value: "45", change: 2.1, comparisonValue: "42", icon: LineChartIcon },
-];
-
-// Add after imports
 
 interface ChartData {
   date: string;
@@ -209,42 +70,7 @@ interface ChartData {
   comparisonNoShows?: number;
 }
 
-const cancellationsData: ChartData[] = [
-  { date: '2023-01', cancellations: 5, revenueLost: 500 },
-  { date: '2023-02', cancellations: 8, revenueLost: 800 },
-  { date: '2023-03', cancellations: 12, revenueLost: 1200 },
-  { date: '2023-04', cancellations: 7, revenueLost: 700 },
-  { date: '2023-05', cancellations: 10, revenueLost: 1000 },
-  { date: '2023-06', cancellations: 15, revenueLost: 1500 },
-];
 
-const noShowsData: ChartData[] = [
-  { date: '2023-01', noShows: 2 },
-  { date: '2023-02', noShows: 4 },
-  { date: '2023-03', noShows: 3 },
-  { date: '2023-04', noShows: 5 },
-  { date: '2023-05', noShows: 6 },
-  { date: '2023-06', noShows: 4 },
-];
-
-// Add this function after the existing helper functions
-const generateLineChartComparisonData = (data: TimeSeriesData[]): TimeSeriesData[] => {
-  return data.map(item => ({
-    date: item.date,
-    value: item.value,
-    comparison: Math.round(item.value * (1 + (Math.random() - 0.5) * 0.4))
-  }));
-};
-
-// Add this helper function after other helper functions
-const formatCurrency = (value: number): string => {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'EUR',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(value);
-}
 
 // Add this type definition near the top with other types
 type Tab = 'All' | 'Direct' | 'OTA' | 'Travel Agent' | 'Corporate';
@@ -262,24 +88,6 @@ interface TimeSeriesData {
   comparison?: number;
 }
 
-// Add the new data constants
-const avgLengthOfStayData: TimeSeriesData[] = [
-  { date: '2023-01', value: 3.2 },
-  { date: '2023-02', value: 3.5 },
-  { date: '2023-03', value: 3.8 },
-  { date: '2023-04', value: 3.3 },
-  { date: '2023-05', value: 3.6 },
-  { date: '2023-06', value: 3.9 },
-];
-
-const leadTimeData: TimeSeriesData[] = [
-  { date: '2023-01', value: 42 },
-  { date: '2023-02', value: 45 },
-  { date: '2023-03', value: 48 },
-  { date: '2023-04', value: 43 },
-  { date: '2023-05', value: 46 },
-  { date: '2023-06', value: 49 },
-];
 
 // Add this interface for the table data
 interface BookingChannelTableData {
@@ -473,6 +281,13 @@ interface YearlyPickupData {
 
 // Add color coding helper function
 const getChangeColor = (currentValue: number | null, previousValue: number | null): string => {
+  // Handle cases where previous value was null or 0 and current value is positive
+  if (currentValue !== null && currentValue > 0) {
+    if (previousValue === null || previousValue === 0) {
+      return 'bg-green-50'; // Highlight as green if pickup appears from nothing or zero
+    }
+  }
+
   if (currentValue === null || previousValue === null || previousValue === 0) return '';
   
   const percentageChange = ((currentValue - previousValue) / previousValue) * 100;
@@ -502,16 +317,16 @@ const calculateRowSum = (rowData: { [key: string]: PickupMetrics }, metric: Metr
 };
 
 // Update the MonthlyPickupTable component to fetch data from the API
-const MonthlyPickupTable = ({ 
-  selectedMetric, 
+const MonthlyPickupTable = ({
+  selectedMetric,
   selectedDate,
   businessDate,
-  onCellClick 
-}: { 
-  selectedMetric: MetricType; 
+  onCellClick
+}: {
+  selectedMetric: MetricType;
   selectedDate: Date;
   businessDate: Date;
-  onCellClick: (date: string, month: string) => void;
+  onCellClick: (bookingDate: string, occupancyDate: string) => void;
 }) => {
   const monthDates = generateMonthDates(selectedDate);
   const today = new Date();
@@ -555,7 +370,7 @@ const MonthlyPickupTable = ({
   }, [selectedDate, businessDate]);
 
   const formatValue = (metrics: PickupMetrics | undefined) => {
-    if (!metrics || metrics[selectedMetric] === null) return '-';
+    if (!metrics || metrics[selectedMetric] === null || metrics[selectedMetric] === 0) return '-';
     switch (selectedMetric) {
       case 'soldRooms':
         return metrics.soldRooms;
@@ -624,7 +439,10 @@ const MonthlyPickupTable = ({
                     <td 
                       key={date} 
                       className={`px-6 py-4 whitespace-nowrap text-sm text-gray-500 transition-colors ${colorClass} cursor-pointer hover:bg-gray-100`}
-                      onClick={() => onCellClick(format(new Date(date), 'dd MMM yyyy'), format(new Date(date), 'MMM yyyy'))}
+                      onClick={() => onCellClick(
+                        format(new Date(row.bookingDate), 'dd MMM yyyy'),
+                        format(new Date(date), 'dd MMM yyyy')
+                      )}
                     >
                       {formatValue(dateMetrics)}
                     </td>
@@ -645,16 +463,16 @@ const MonthlyPickupTable = ({
 };
 
 // Update the YearlyPickupTable component to fetch data from the API
-const YearlyPickupTable = ({ 
-  selectedMetric, 
+const YearlyPickupTable = ({
+  selectedMetric,
   selectedDate,
   businessDate,
-  onCellClick 
-}: { 
-  selectedMetric: MetricType; 
+  onCellClick
+}: {
+  selectedMetric: MetricType;
   selectedDate: Date;
   businessDate: Date;
-  onCellClick: (date: string, month: string) => void;
+  onCellClick: (bookingDate: string, occupancyMonth: string) => void;
 }) => {
   // Get year months
   const yearMonths = generateYearMonths(selectedDate);
@@ -698,7 +516,7 @@ const YearlyPickupTable = ({
   }, [selectedDate, businessDate]);
 
   const formatValue = (metrics: PickupMetrics | undefined) => {
-    if (!metrics || metrics[selectedMetric] === null) return '-';
+    if (!metrics || metrics[selectedMetric] === null || metrics[selectedMetric] === 0) return '-';
     switch (selectedMetric) {
       case 'soldRooms':
         return metrics.soldRooms;
@@ -767,7 +585,10 @@ const YearlyPickupTable = ({
                     <td 
                       key={month} 
                       className={`px-6 py-4 whitespace-nowrap text-sm text-gray-500 transition-colors ${colorClass} cursor-pointer hover:bg-gray-100`}
-                      onClick={() => onCellClick(format(new Date(row.bookingDate), 'dd MMM yyyy'), month)}
+                      onClick={() => onCellClick(
+                        format(new Date(row.bookingDate), 'dd MMM yyyy'),
+                        month
+                      )}
                     >
                       {formatValue(dateMetrics)}
                     </td>
@@ -796,32 +617,85 @@ export function PickupDashboard() {
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const allHotels = ["Hotel 1", "Hotel 2", "Hotel 3"];
   const [showStatsModal, setShowStatsModal] = useState(false);
-  const [selectedCell, setSelectedCell] = useState<{date: string, month: string} | null>(null);
-
-  // Define the stats data structure
-  const statsData = {
-    roomsSold: 24,
-    revenue: 3850,
-    adr: 160,
-    occupancy: 86,
-    roomsCancelled: 3,
-    revenueLost: 474,
-    roomsAvailable: 32,
-    revPAR: 43,
-    // Variance data
-    roomsSoldVariance: 8,
-    revenueVariance: -13,
-    adrVariance: 14,
-    occupancyVariance: -10,
+  const [selectedCell, setSelectedCell] = useState<{bookingDate: string, occupancyDateOrMonth: string} | null>(null);
+  const [statsData, setStatsData] = useState({
+    roomsSold: 0,
+    revenue: 0,
+    adr: 0,
+    occupancy: 0,
+    roomsCancelled: 0,
+    revenueLost: 0,
+    roomsAvailable: 0,
+    revPAR: 0,
+    // Variances
+    roomsSoldVariance: 0,
+    revenueVariance: 0,
+    adrVariance: 0,
+    occupancyVariance: 0,
     roomsCancelledVariance: 0,
-    revenueLostVariance: 16,
-    roomsAvailableVariance: -6,
-    revPARVariance: -8
-  };
+    revenueLostVariance: 0,
+    roomsAvailableVariance: 0,
+    revPARVariance: 0
+  });
+  const [isLoadingStats, setIsLoadingStats] = useState(false);
 
-  const handleCellClick = (date: string, month: string) => {
-    setSelectedCell({date, month});
+  const handleCellClick = async (bookingDateStr: string, occupancyDateOrMonthStr: string) => {
+    setSelectedCell({ bookingDate: bookingDateStr, occupancyDateOrMonth: occupancyDateOrMonthStr });
     setShowStatsModal(true);
+    setIsLoadingStats(true);
+    
+    // Business date for API call is still from the dropdown
+    const apiBusinessDate = format(businessDate, 'yyyy-MM-dd'); 
+    
+    try {
+      const params = new URLSearchParams({
+        businessDate: apiBusinessDate, // Use business date from dropdown for validity check
+        bookingDate: format(new Date(bookingDateStr), 'yyyy-MM-dd') // Use clicked booking date for validity check
+      });
+      
+      if (selectedView === 'month') {
+        // Pass the clicked occupancy date
+        params.append('occupancyDate', format(new Date(occupancyDateOrMonthStr), 'yyyy-MM-dd'));
+      } else {
+        // Pass the clicked occupancy month string
+        params.append('occupancyMonth', occupancyDateOrMonthStr); 
+      }
+      
+      const response = await fetch(`/api/pickup/stats?${params.toString()}`);
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch stats data');
+      }
+      
+      const data = await response.json();
+      console.log('Stats API Response:', data);
+      
+      // Update the stats in state instead of using hardcoded values
+      setStatsData({
+        roomsSold: data.roomsSold,
+        revenue: data.revenue,
+        adr: data.adr,
+        occupancy: data.occupancy,
+        roomsCancelled: data.roomsCancelled,
+        revenueLost: data.revenueLost,
+        roomsAvailable: data.roomsAvailable,
+        revPAR: data.revPAR,
+        // Variances
+        roomsSoldVariance: data.roomsSoldVariance,
+        revenueVariance: data.revenueVariance,
+        adrVariance: data.adrVariance,
+        occupancyVariance: data.occupancyVariance,
+        roomsCancelledVariance: data.roomsCancelledVariance,
+        revenueLostVariance: data.revenueLostVariance,
+        roomsAvailableVariance: data.roomsAvailableVariance,
+        revPARVariance: data.revPARVariance
+      });
+    } catch (error) {
+      console.error('Error fetching stats data:', error);
+      // You might want to show an error message to the user
+    } finally {
+      setIsLoadingStats(false);
+    }
   };
 
   const toggleAllHotels = () => {
@@ -963,99 +837,113 @@ export function PickupDashboard() {
         </div>
       </div>
 
-      {/* Updated Dialog component with hardcoded data */}
+      {/* Updated Dialog component with correct conditional titles/subtitles */}
       <Dialog open={showStatsModal} onOpenChange={setShowStatsModal}>
         <DialogContent className="max-w-3xl">
           <DialogHeader>
             <DialogTitle className="text-2xl font-bold">
-              Statistics for {selectedCell?.date}
+              Statistics for {selectedCell?.occupancyDateOrMonth}
             </DialogTitle>
             <DialogDescription className="text-base text-gray-500 text-sm pt-2">
-              Business date: {format(businessDate, 'dd MMM yyyy')}
+              Booking date: {selectedCell?.bookingDate} 
             </DialogDescription>
           </DialogHeader>
           
-          <div className="grid grid-cols-4 gap-4 mt-6">
-            {/* Rooms Sold */}
-            <div className="rounded-lg border border-gray-100 p-5 flex flex-col items-center text-center">
-              <div className="text-sm text-gray-500 font-medium">Rooms Sold</div>
-              <div className="text-3xl font-bold mt-4 mb-8">{statsData.roomsSold}</div>
-              <div className="text-sm text-gray-500">Variance LY</div>
-              <div className={`text-md font-medium ${statsData.roomsSoldVariance >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-                {statsData.roomsSoldVariance >= 0 ? '+' : ''}{statsData.roomsSoldVariance}%
+          {isLoadingStats ? (
+            <div className="grid grid-cols-4 gap-4 mt-6">
+              {/* Create skeleton loading placeholders for each stat card */}
+              {Array.from({ length: 8 }).map((_, index) => (
+                <div key={index} className="rounded-lg border border-gray-100 p-5 flex flex-col items-center">
+                  <div className="w-24 h-4 bg-gray-200 animate-pulse rounded mb-4"></div>
+                  <div className="w-16 h-8 bg-gray-200 animate-pulse rounded mt-4 mb-8"></div>
+                  <div className="w-24 h-4 bg-gray-200 animate-pulse rounded"></div>
+                  <div className="w-12 h-4 bg-gray-200 animate-pulse rounded mt-1"></div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="grid grid-cols-4 gap-4 mt-6">
+              {/* Rooms Sold */}
+              <div className="rounded-lg border border-gray-100 p-5 flex flex-col items-center text-center">
+                <div className="text-sm text-gray-500 font-medium">Rooms Sold</div>
+                <div className="text-3xl font-bold mt-4 mb-8">{statsData.roomsSold}</div>
+                <div className="text-sm text-gray-500">Variance LY</div>
+                <div className={`text-md font-medium ${statsData.roomsSoldVariance >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                  {statsData.roomsSoldVariance >= 0 ? '+' : ''}{statsData.roomsSoldVariance}%
+                </div>
+              </div>
+              
+              {/* Revenue */}
+              <div className="rounded-lg border border-gray-100 p-5 flex flex-col items-center text-center">
+                <div className="text-sm text-gray-500 font-medium">Revenue</div>
+                <div className="text-3xl font-bold mt-4 mb-8">€{statsData.revenue}</div>
+                <div className="text-sm text-gray-500">Variance LY</div>
+                <div className={`text-md font-medium ${statsData.revenueVariance >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                  {statsData.revenueVariance >= 0 ? '+' : ''}{statsData.revenueVariance}%
+                </div>
+              </div>
+              
+              {/* ADR */}
+              <div className="rounded-lg border border-gray-100 p-5 flex flex-col items-center text-center">
+                <div className="text-sm text-gray-500 font-medium">ADR</div>
+                <div className="text-3xl font-bold mt-4 mb-8">€{statsData.adr}</div>
+                <div className="text-sm text-gray-500">Variance LY</div>
+                <div className={`text-md font-medium ${statsData.adrVariance >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                  {statsData.adrVariance >= 0 ? '+' : ''}{statsData.adrVariance}%
+                </div>
+              </div>
+              
+              {/* Occupancy */}
+              <div className="rounded-lg border border-gray-100 p-5 flex flex-col items-center text-center">
+                <div className="text-sm text-gray-500 font-medium">Occupancy</div>
+                <div className="text-3xl font-bold mt-4 mb-8">{statsData.occupancy}%</div>
+                <div className="text-sm text-gray-500">Variance LY</div>
+                <div className={`text-md font-medium ${statsData.occupancyVariance >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                  {statsData.occupancyVariance >= 0 ? '+' : ''}{statsData.occupancyVariance}%
+                </div>
+              </div>
+              
+              {/* Rooms Cancelled */}
+              <div className="rounded-lg border border-gray-100 p-5 flex flex-col items-center text-center">
+                <div className="text-sm text-gray-500 font-medium">Rooms Cancelled</div>
+                <div className="text-3xl font-bold mt-4 mb-8">{statsData.roomsCancelled}</div>
+                <div className="text-sm text-gray-500">Variance LY</div>
+                <div className={`text-md font-medium ${statsData.roomsCancelledVariance >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                  {statsData.roomsCancelledVariance >= 0 ? '+' : ''}{statsData.roomsCancelledVariance}%
+                </div>
+              </div>
+              
+              {/* Revenue Lost */}
+              <div className="rounded-lg border border-gray-100 p-5 flex flex-col items-center text-center">
+                <div className="text-sm text-gray-500 font-medium">Revenue Lost</div>
+                <div className="text-3xl font-bold mt-4 mb-8">€{statsData.revenueLost}</div>
+                <div className="text-sm text-gray-500">Variance LY</div>
+                <div className={`text-md font-medium ${statsData.revenueLostVariance >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                  {statsData.revenueLostVariance >= 0 ? '+' : ''}{statsData.revenueLostVariance}%
+                </div>
+              </div>
+              
+              {/* Rooms Available */}
+              <div className="rounded-lg border border-gray-100 p-5 flex flex-col items-center text-center">
+                <div className="text-sm text-gray-500 font-medium">Rooms Available</div>
+                <div className="text-3xl font-bold mt-4 mb-8">{statsData.roomsAvailable}</div>
+                <div className="text-sm text-gray-500">Variance LY</div>
+                <div className={`text-md font-medium ${statsData.roomsAvailableVariance >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                  {statsData.roomsAvailableVariance >= 0 ? '+' : ''}{statsData.roomsAvailableVariance}%
+                </div>
+              </div>
+              
+              {/* RevPAR */}
+              <div className="rounded-lg border border-gray-100 p-5 flex flex-col items-center text-center">
+                <div className="text-sm text-gray-500 font-medium">RevPAR</div>
+                <div className="text-3xl font-bold mt-4 mb-8">€{statsData.revPAR}</div>
+                <div className="text-sm text-gray-500">Variance LY</div>
+                <div className={`text-md font-medium ${statsData.revPARVariance >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                  {statsData.revPARVariance >= 0 ? '+' : ''}{statsData.revPARVariance}%
+                </div>
               </div>
             </div>
-            
-            {/* Revenue */}
-            <div className="rounded-lg border border-gray-100 p-5 flex flex-col items-center text-center">
-              <div className="text-sm text-gray-500 font-medium">Revenue</div>
-              <div className="text-3xl font-bold mt-4 mb-8">€{statsData.revenue}</div>
-              <div className="text-sm text-gray-500">Variance LY</div>
-              <div className={`text-md font-medium ${statsData.revenueVariance >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-                {statsData.revenueVariance >= 0 ? '+' : ''}{statsData.revenueVariance}%
-              </div>
-            </div>
-            
-            {/* ADR */}
-            <div className="rounded-lg border border-gray-100 p-5 flex flex-col items-center text-center">
-              <div className="text-sm text-gray-500 font-medium">ADR</div>
-              <div className="text-3xl font-bold mt-4 mb-8">€{statsData.adr}</div>
-              <div className="text-sm text-gray-500">Variance LY</div>
-              <div className={`text-md font-medium ${statsData.adrVariance >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-                {statsData.adrVariance >= 0 ? '+' : ''}{statsData.adrVariance}%
-              </div>
-            </div>
-            
-            {/* Occupancy */}
-            <div className="rounded-lg border border-gray-100 p-5 flex flex-col items-center text-center">
-              <div className="text-sm text-gray-500 font-medium">Occupancy</div>
-              <div className="text-3xl font-bold mt-4 mb-8">{statsData.occupancy}%</div>
-              <div className="text-sm text-gray-500">Variance LY</div>
-              <div className={`text-md font-medium ${statsData.occupancyVariance >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-                {statsData.occupancyVariance >= 0 ? '+' : ''}{statsData.occupancyVariance}%
-              </div>
-            </div>
-            
-            {/* Rooms Cancelled */}
-            <div className="rounded-lg border border-gray-100 p-5 flex flex-col items-center text-center">
-              <div className="text-sm text-gray-500 font-medium">Rooms Cancelled</div>
-              <div className="text-3xl font-bold mt-4 mb-8">{statsData.roomsCancelled}</div>
-              <div className="text-sm text-gray-500">Variance LY</div>
-              <div className={`text-md font-medium ${statsData.roomsCancelledVariance >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-                {statsData.roomsCancelledVariance >= 0 ? '+' : ''}{statsData.roomsCancelledVariance}%
-              </div>
-            </div>
-            
-            {/* Revenue Lost */}
-            <div className="rounded-lg border border-gray-100 p-5 flex flex-col items-center text-center">
-              <div className="text-sm text-gray-500 font-medium">Revenue Lost</div>
-              <div className="text-3xl font-bold mt-4 mb-8">€{statsData.revenueLost}</div>
-              <div className="text-sm text-gray-500">Variance LY</div>
-              <div className={`text-md font-medium ${statsData.revenueLostVariance >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-                {statsData.revenueLostVariance >= 0 ? '+' : ''}{statsData.revenueLostVariance}%
-              </div>
-            </div>
-            
-            {/* Rooms Available */}
-            <div className="rounded-lg border border-gray-100 p-5 flex flex-col items-center text-center">
-              <div className="text-sm text-gray-500 font-medium">Rooms Available</div>
-              <div className="text-3xl font-bold mt-4 mb-8">{statsData.roomsAvailable}</div>
-              <div className="text-sm text-gray-500">Variance LY</div>
-              <div className={`text-md font-medium ${statsData.roomsAvailableVariance >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-                {statsData.roomsAvailableVariance >= 0 ? '+' : ''}{statsData.roomsAvailableVariance}%
-              </div>
-            </div>
-            
-            {/* RevPAR */}
-            <div className="rounded-lg border border-gray-100 p-5 flex flex-col items-center text-center">
-              <div className="text-sm text-gray-500 font-medium">RevPAR</div>
-              <div className="text-3xl font-bold mt-4 mb-8">€{statsData.revPAR}</div>
-              <div className="text-sm text-gray-500">Variance LY</div>
-              <div className={`text-md font-medium ${statsData.revPARVariance >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-                {statsData.revPARVariance >= 0 ? '+' : ''}{statsData.revPARVariance}%
-              </div>
-            </div>
-          </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>

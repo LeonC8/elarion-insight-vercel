@@ -188,9 +188,18 @@ export function KpiWithChart({
   const [selectedMetric, setSelectedMetric] = React.useState<string>(allMetrics[0]?.key || '')
   const [activeMainSeries, setActiveMainSeries] = React.useState<string[]>(['current', 'previous'])
   
+  // Memoize the API parameters to prevent unnecessary re-fetches
+  const memoizedApiParams = React.useMemo(() => apiParams, [
+    // Stringify the apiParams to compare by value, not reference
+    apiParams ? JSON.stringify(apiParams) : null
+  ]);
+  
   // Fetch data from API when params change
   React.useEffect(() => {
-    if (!apiUrl || !apiParams) return;
+    if (!apiUrl || !memoizedApiParams) return;
+    
+    // Use an AbortController to cancel previous requests
+    const abortController = new AbortController();
     
     const fetchData = async () => {
       try {
@@ -199,11 +208,13 @@ export function KpiWithChart({
         
         // Build query string
         const queryParams = new URLSearchParams();
-        Object.entries(apiParams).forEach(([key, value]) => {
+        Object.entries(memoizedApiParams).forEach(([key, value]) => {
           queryParams.append(key, value);
         });
         
-        const response = await fetch(`${apiUrl}?${queryParams.toString()}`);
+        const response = await fetch(`${apiUrl}?${queryParams.toString()}`, {
+          signal: abortController.signal
+        });
         
         if (!response.ok) {
           throw new Error(`API error: ${response.status}`);
@@ -212,15 +223,23 @@ export function KpiWithChart({
         const data = await response.json();
         setApiData(data);
       } catch (err) {
-        console.error('Error fetching KPI data:', err);
-        setError(err instanceof Error ? err.message : 'An unknown error occurred');
+        // Don't show errors for aborted requests
+        if (err.name !== 'AbortError') {
+          console.error('Error fetching KPI data:', err);
+          setError(err instanceof Error ? err.message : 'An unknown error occurred');
+        }
       } finally {
         setLoading(false);
       }
     };
     
     fetchData();
-  }, [apiUrl, apiParams]);
+    
+    // Cleanup function to abort fetch on unmount or dependency change
+    return () => {
+      abortController.abort();
+    };
+  }, [apiUrl, memoizedApiParams]); // Use memoized params as dependency
   
   // Reset selected metric when metrics change
   React.useEffect(() => {

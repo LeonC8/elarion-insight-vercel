@@ -2,8 +2,9 @@ import React, { useState, useEffect } from 'react'
 import { Card, CardHeader, CardContent, CardTitle } from "@/components/ui/card"
 import { ResponsiveContainer, ComposedChart, CartesianGrid, XAxis, YAxis, Bar, Line, Tooltip, ReferenceLine } from 'recharts'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { ArrowUpIcon, ArrowDownIcon } from 'lucide-react'
-import { format, getDaysInMonth, subYears } from 'date-fns'
+import { ArrowUpIcon, ArrowDownIcon, Loader2 } from 'lucide-react'
+import { format, getDaysInMonth, subYears, parseISO, isSameDay, isSameMonth, startOfMonth, getMonth, getDate, getYear } from 'date-fns'
+import { PacingChartData } from '@/app/api/pace/route'
 
 // Define data series for tracking active state
 const dataSeriesConfig = {
@@ -12,112 +13,32 @@ const dataSeriesConfig = {
   adr: { name: "ADR", color: "#e11d48" }
 };
 
-// Define types for our data
+// Define types for our internal data structure (remains mostly the same)
 interface PacingDataItem {
-  id: string;
-  date: Date;
+  id: string; // Will be 'Day X' or 'MMM'
+  date: Date; // Parsed date object
   revenue: number;
   roomsSold: number;
   adr: number;
   lastYearRevenue: number;
   lastYearRoomsSold: number;
   lastYearAdr: number;
-  isCurrent?: boolean;
+  isCurrent: boolean; // Flag for today's date or current month
 }
-
-// Generate dummy data for month view (days of current month)
-const generateMonthData = (): PacingDataItem[] => {
-  const today = new Date();
-  const daysInMonth = getDaysInMonth(today);
-  const currentMonth = today.getMonth();
-  const currentYear = today.getFullYear();
-  const currentDay = today.getDate();
-  
-  return Array.from({ length: daysInMonth }, (_, i) => {
-    const day = i + 1;
-    const date = new Date(currentYear, currentMonth, day);
-    
-    // Base values with some randomness
-    const baseRevenue = 4000 + Math.random() * 2000;
-    const baseRoomsSold = 25 + Math.random() * 15;
-    
-    // Add some patterns - higher on weekends, mid-month peak
-    const dayOfWeek = date.getDay();
-    const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
-    const midMonthFactor = 1 + Math.sin((day / daysInMonth) * Math.PI) * 0.3;
-    
-    const revenueFactor = midMonthFactor * (isWeekend ? 1.3 : 1);
-    const roomsFactor = midMonthFactor * (isWeekend ? 1.2 : 1);
-    
-    const revenue = Math.round(baseRevenue * revenueFactor);
-    const roomsSold = Math.round(baseRoomsSold * roomsFactor);
-    const adr = Math.round(revenue / roomsSold);
-    
-    // Last year data with some variation
-    const lastYearRevenue = Math.round(revenue * (0.85 + Math.random() * 0.2));
-    const lastYearRoomsSold = Math.round(roomsSold * (0.85 + Math.random() * 0.2));
-    const lastYearAdr = Math.round(lastYearRevenue / lastYearRoomsSold);
-    
-    return {
-      id: `Day ${day}`,
-      date,
-      revenue,
-      roomsSold,
-      adr,
-      lastYearRevenue,
-      lastYearRoomsSold,
-      lastYearAdr,
-      isCurrent: day === currentDay
-    };
-  });
-};
-
-// Generate dummy data for year view (months of current year)
-const generateYearData = (): PacingDataItem[] => {
-  const today = new Date();
-  const currentMonth = today.getMonth();
-  const currentYear = today.getFullYear();
-  
-  return Array.from({ length: 12 }, (_, i) => {
-    const date = new Date(currentYear, i, 15);
-    
-    // Base values with seasonal patterns
-    const seasonalFactor = 1 + 0.3 * Math.sin((i / 11) * Math.PI * 2 - Math.PI / 2);
-    
-    const baseRevenue = 120000 * seasonalFactor;
-    const baseRoomsSold = 750 * seasonalFactor;
-    
-    // Add some randomness
-    const randomFactor = 0.9 + Math.random() * 0.2;
-    
-    const revenue = Math.round(baseRevenue * randomFactor);
-    const roomsSold = Math.round(baseRoomsSold * randomFactor);
-    const adr = Math.round(revenue / roomsSold);
-    
-    // Last year data with some variation
-    const lastYearRevenue = Math.round(revenue * (0.85 + Math.random() * 0.2));
-    const lastYearRoomsSold = Math.round(roomsSold * (0.85 + Math.random() * 0.2));
-    const lastYearAdr = Math.round(lastYearRevenue / lastYearRoomsSold);
-    
-    return {
-      id: format(date, 'MMM'),
-      date,
-      revenue,
-      roomsSold,
-      adr,
-      lastYearRevenue,
-      lastYearRoomsSold,
-      lastYearAdr,
-      isCurrent: i === currentMonth
-    };
-  });
-};
 
 interface PacingChartProps {
   viewType?: 'Month' | 'Year';
+  data: PacingChartData[]; // Accept data from parent
+  isLoading: boolean;      // Accept loading state
+  error: string | null;    // Accept error state
 }
 
-export function PacingChart({ viewType = 'Month' }: PacingChartProps) {
+export function PacingChart({
+  viewType = 'Month',
+  data,
+  isLoading,
+  error
+}: PacingChartProps) {
   // State to track active data series
   const [activeSeries, setActiveSeries] = useState<string[]>(
     Object.keys(dataSeriesConfig)
@@ -126,47 +47,112 @@ export function PacingChart({ viewType = 'Month' }: PacingChartProps) {
   // Add new state for cumulative vs fluctuation view
   const [dataViewType, setDataViewType] = useState<'fluctuation' | 'cumulative'>('fluctuation');
   
-  // State for data based on view type
-  const [pacingData, setPacingData] = useState<PacingDataItem[]>([]);
+  // State for the data mapped to the internal format
+  const [mappedPacingData, setMappedPacingData] = useState<PacingDataItem[]>([]);
+  // State for the final processed data (cumulative or fluctuation)
   const [processedData, setProcessedData] = useState<PacingDataItem[]>([]);
   
-  // Update data when view type changes
+  // Effect to map incoming API data to internal PacingDataItem format
   useEffect(() => {
-    const newData = viewType === 'Month' ? generateMonthData() : generateYearData();
-    setPacingData(newData);
-  }, [viewType]);
-  
-  // Process data when pacingData or dataViewType changes
-  useEffect(() => {
-    if (dataViewType === 'fluctuation') {
-      setProcessedData([...pacingData]);
-    } else {
-      // Create cumulative data
-      const cumulativeData = pacingData.reduce((acc: PacingDataItem[], current, index) => {
-        if (index === 0) {
-          // First item remains the same
-          acc.push({...current});
+    if (!data || isLoading || error) {
+      setMappedPacingData([]);
+      return;
+    }
+
+    const today = new Date();
+    const currentYear = today.getFullYear();
+    const mergedDataMap = new Map<string, Partial<PacingDataItem>>();
+
+    data.forEach((item) => {
+      const itemDate = parseISO(item.date);
+      let id = '';
+      let baseDateForSort: Date;
+
+      if (viewType === 'Month') {
+        const dayOfMonth = getDate(itemDate);
+        id = `Day ${dayOfMonth}`;
+        baseDateForSort = new Date(currentYear, today.getMonth(), dayOfMonth);
+      } else { // Year view
+        const monthIndex = getMonth(itemDate);
+        id = format(new Date(currentYear, monthIndex, 1), 'MMM');
+        baseDateForSort = new Date(currentYear, monthIndex, 1);
+      }
+
+      const entry = mergedDataMap.get(id) || { id: id, date: baseDateForSort };
+
+      if (item.rooms !== undefined || item.revenue !== undefined || item.adr !== undefined) {
+        // Current year data - Round here
+        entry.revenue = Math.round(item.revenue ?? entry.revenue ?? 0);
+        entry.roomsSold = Math.round(item.rooms ?? entry.roomsSold ?? 0); // Assuming rooms should be integer anyway
+        entry.adr = Math.round(item.adr ?? entry.adr ?? 0);
+        // Determine isCurrent based on the original item's date relative to today
+        if (viewType === 'Month') {
+            entry.isCurrent = isSameDay(itemDate, today);
         } else {
-          // Add current values to previous cumulative values
-          const previous = acc[index - 1];
-          acc.push({
-            ...current,
-            revenue: previous.revenue + current.revenue,
-            roomsSold: previous.roomsSold + current.roomsSold,
-            lastYearRevenue: previous.lastYearRevenue + current.lastYearRevenue,
-            lastYearRoomsSold: previous.lastYearRoomsSold + current.lastYearRoomsSold,
-            // ADR is recalculated based on cumulative values
-            adr: Math.round((previous.revenue + current.revenue) / (previous.roomsSold + current.roomsSold)),
-            lastYearAdr: Math.round((previous.lastYearRevenue + current.lastYearRevenue) / 
-                                   (previous.lastYearRoomsSold + current.lastYearRoomsSold))
-          });
+            entry.isCurrent = isSameMonth(itemDate, today);
         }
+      } else {
+        // Comparison (last year) data - Round here
+        entry.lastYearRevenue = Math.round(item.comparisonRevenue ?? entry.lastYearRevenue ?? 0);
+        entry.lastYearRoomsSold = Math.round(item.comparisonRooms ?? entry.lastYearRoomsSold ?? 0); // Assuming rooms should be integer anyway
+        entry.lastYearAdr = Math.round(item.comparisonAdr ?? entry.lastYearAdr ?? 0);
+      }
+
+      mergedDataMap.set(id, entry);
+    });
+
+    // Step 2: Convert map values to array and ensure all fields are present
+    const mapped = Array.from(mergedDataMap.values()).map(entry => ({
+      id: entry.id!,
+      date: entry.date!,
+      // Ensure values are integers after merging/defaulting
+      revenue: Math.round(entry.revenue ?? 0),
+      roomsSold: Math.round(entry.roomsSold ?? 0),
+      adr: Math.round(entry.adr ?? 0),
+      lastYearRevenue: Math.round(entry.lastYearRevenue ?? 0),
+      lastYearRoomsSold: Math.round(entry.lastYearRoomsSold ?? 0),
+      lastYearAdr: Math.round(entry.lastYearAdr ?? 0),
+      isCurrent: entry.isCurrent ?? false,
+    }));
+
+    // Step 3: Ensure correct sorting
+    mapped.sort((a, b) => a.date.getTime() - b.date.getTime());
+
+    setMappedPacingData(mapped);
+
+  }, [data, viewType, isLoading, error]);
+  
+  // Effect to process data (cumulative vs fluctuation) based on mapped data
+  useEffect(() => {
+    if (!mappedPacingData.length) {
+        setProcessedData([]);
+        return;
+    }
+
+    if (dataViewType === 'fluctuation') {
+      setProcessedData([...mappedPacingData]);
+    } else { // Cumulative
+      const cumulativeData = mappedPacingData.reduce((acc: PacingDataItem[], current, index) => {
+        const newItem = { ...current }; // Values are already rounded
+
+        if (index > 0) {
+          const previous = acc[index - 1];
+          newItem.revenue = previous.revenue + current.revenue;
+          newItem.roomsSold = previous.roomsSold + current.roomsSold;
+          newItem.lastYearRevenue = previous.lastYearRevenue + current.lastYearRevenue;
+          newItem.lastYearRoomsSold = previous.lastYearRoomsSold + current.lastYearRoomsSold;
+        }
+
+        // Recalculate cumulative ADR and round
+        newItem.adr = newItem.roomsSold > 0 ? Math.round(newItem.revenue / newItem.roomsSold) : 0;
+        newItem.lastYearAdr = newItem.lastYearRoomsSold > 0 ? Math.round(newItem.lastYearRevenue / newItem.lastYearRoomsSold) : 0;
+
+        acc.push(newItem);
         return acc;
       }, []);
-      
       setProcessedData(cumulativeData);
     }
-  }, [pacingData, dataViewType]);
+  }, [mappedPacingData, dataViewType]); // Rerun when mapped data or view type changes
   
   // Function to toggle a data series
   const toggleSeries = (seriesName: string) => {
@@ -212,7 +198,35 @@ export function PacingChart({ viewType = 'Month' }: PacingChartProps) {
     if (previous === 0) return 0;
     return ((current - previous) / previous) * 100;
   };
-  
+
+  // === Render Loading and Error States ===
+  if (isLoading) {
+    return (
+      <div className="flex flex-col gap-6">
+        <Card className="bg-white shadow-lg rounded-lg overflow-hidden w-full border border-gray-300 min-h-[600px] flex items-center justify-center">
+          <div className="flex flex-col items-center text-gray-500">
+            <Loader2 className="h-12 w-12 animate-spin mb-4" />
+            <p>Loading Pacing Data...</p>
+          </div>
+        </Card>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex flex-col gap-6">
+        <Card className="bg-white shadow-lg rounded-lg overflow-hidden w-full border border-red-300 min-h-[600px] flex items-center justify-center">
+          <div className="text-center text-red-600">
+            <p className="font-semibold mb-2">Error loading pacing data</p>
+            <p className="text-sm">{error}</p>
+          </div>
+        </Card>
+      </div>
+    );
+  }
+  // === End Loading and Error States ===
+
   return (
     <div className="flex flex-col gap-6">
       <Card className="bg-white shadow-lg rounded-lg overflow-hidden w-full border border-gray-300">
@@ -304,12 +318,17 @@ export function PacingChart({ viewType = 'Month' }: PacingChartProps) {
                 />
                 <Tooltip 
                   formatter={(value, name, props) => {
+                    // Ensure value is treated as number before formatting
+                    const numValue = typeof value === 'number' ? value : 0;
+                    // Format rounded value with locale string for thousands separators
+                    const formattedValue = Math.round(numValue).toLocaleString();
+
                     if (name === "revenue" || name === "lastYearRevenue") {
-                      return [`€${Number(value).toLocaleString()}`, name === "lastYearRevenue" ? "Revenue LY" : "Revenue"];
+                      return [`€${formattedValue}`, name === "lastYearRevenue" ? "Revenue LY" : "Revenue"];
                     } else if (name === "adr" || name === "lastYearAdr") {
-                      return [`€${value}`, name === "lastYearAdr" ? "ADR LY" : "ADR"];
+                      return [`€${formattedValue}`, name === "lastYearAdr" ? "ADR LY" : "ADR"];
                     } else {
-                      return [value, name === "lastYearRoomsSold" ? "Rooms Sold LY" : "Rooms Sold"];
+                      return [formattedValue, name === "lastYearRoomsSold" ? "Rooms Sold LY" : "Rooms Sold"];
                     }
                   }}
                   labelFormatter={(label) => {
@@ -516,7 +535,6 @@ export function PacingChart({ viewType = 'Month' }: PacingChartProps) {
               </TableHeader>
               <TableBody>
                 {processedData.map((row, idx) => {
-                  // Calculate changes
                   const revenueChange = calculateChange(row.revenue, row.lastYearRevenue);
                   const roomsChange = calculateChange(row.roomsSold, row.lastYearRoomsSold);
                   const adrChange = calculateChange(row.adr, row.lastYearAdr);
@@ -529,10 +547,10 @@ export function PacingChart({ viewType = 'Month' }: PacingChartProps) {
                           : format(row.date, 'MMMM')}
                       </TableCell>
                       <TableCell className="w-[9%] text-right border-r border-[#d0d7e3]">
-                        €{row.revenue.toLocaleString()}
+                        €{Math.round(row.revenue).toLocaleString()}
                       </TableCell>
                       <TableCell className="w-[9%] text-right border-r border-[#d0d7e3]">
-                        €{row.lastYearRevenue.toLocaleString()}
+                        €{Math.round(row.lastYearRevenue).toLocaleString()}
                       </TableCell>
                       <TableCell className={`w-[9%] text-right border-r border-[#d0d7e3] ${
                         revenueChange > 0 ? "text-emerald-500" : revenueChange < 0 ? "text-red-500" : ""
@@ -547,10 +565,10 @@ export function PacingChart({ viewType = 'Month' }: PacingChartProps) {
                         </div>
                       </TableCell>
                       <TableCell className="w-[9%] text-right border-r border-[#d0d7e3]">
-                        {row.roomsSold.toLocaleString()}
+                        {Math.round(row.roomsSold).toLocaleString()}
                       </TableCell>
                       <TableCell className="w-[9%] text-right border-r border-[#d0d7e3]">
-                        {row.lastYearRoomsSold.toLocaleString()}
+                        {Math.round(row.lastYearRoomsSold).toLocaleString()}
                       </TableCell>
                       <TableCell className={`w-[9%] text-right border-r border-[#d0d7e3] ${
                         roomsChange > 0 ? "text-emerald-500" : roomsChange < 0 ? "text-red-500" : ""
@@ -565,10 +583,10 @@ export function PacingChart({ viewType = 'Month' }: PacingChartProps) {
                         </div>
                       </TableCell>
                       <TableCell className="w-[9%] text-right border-r border-[#d0d7e3]">
-                        €{row.adr.toLocaleString()}
+                        €{Math.round(row.adr).toLocaleString()}
                       </TableCell>
                       <TableCell className="w-[9%] text-right border-r border-[#d0d7e3]">
-                        €{row.lastYearAdr.toLocaleString()}
+                        €{Math.round(row.lastYearAdr).toLocaleString()}
                       </TableCell>
                       <TableCell className={`w-[9%] text-right ${
                         adrChange > 0 ? "text-emerald-500" : adrChange < 0 ? "text-red-500" : ""
@@ -594,17 +612,18 @@ export function PacingChart({ viewType = 'Month' }: PacingChartProps) {
                     </TableCell>
                     {/* Revenue Totals */}
                     {(() => {
-                      const totalRevenue = processedData.reduce((sum, item) => sum + item.revenue, 0);
-                      const totalLastYearRevenue = processedData.reduce((sum, item) => sum + item.lastYearRevenue, 0);
+                      const lastItem = processedData[processedData.length - 1];
+                      const totalRevenue = dataViewType === 'cumulative' ? lastItem.revenue : processedData.reduce((sum, item) => sum + item.revenue, 0);
+                      const totalLastYearRevenue = dataViewType === 'cumulative' ? lastItem.lastYearRevenue : processedData.reduce((sum, item) => sum + item.lastYearRevenue, 0);
                       const totalRevenueChange = calculateChange(totalRevenue, totalLastYearRevenue);
                       
                       return (
                         <>
                           <TableCell className="w-[9%] text-right border-r border-[#d0d7e3]">
-                            €{totalRevenue.toLocaleString()}
+                            €{Math.round(totalRevenue).toLocaleString()}
                           </TableCell>
                           <TableCell className="w-[9%] text-right border-r border-[#d0d7e3]">
-                            €{totalLastYearRevenue.toLocaleString()}
+                            €{Math.round(totalLastYearRevenue).toLocaleString()}
                           </TableCell>
                           <TableCell className={`w-[9%] text-right border-r border-[#d0d7e3] ${
                             totalRevenueChange > 0 ? "text-emerald-500" : totalRevenueChange < 0 ? "text-red-500" : ""
@@ -624,17 +643,18 @@ export function PacingChart({ viewType = 'Month' }: PacingChartProps) {
                     
                     {/* Rooms Sold Totals */}
                     {(() => {
-                      const totalRoomsSold = processedData.reduce((sum, item) => sum + item.roomsSold, 0);
-                      const totalLastYearRoomsSold = processedData.reduce((sum, item) => sum + item.lastYearRoomsSold, 0);
+                      const lastItem = processedData[processedData.length - 1];
+                      const totalRoomsSold = dataViewType === 'cumulative' ? lastItem.roomsSold : processedData.reduce((sum, item) => sum + item.roomsSold, 0);
+                      const totalLastYearRoomsSold = dataViewType === 'cumulative' ? lastItem.lastYearRoomsSold : processedData.reduce((sum, item) => sum + item.lastYearRoomsSold, 0);
                       const totalRoomsChange = calculateChange(totalRoomsSold, totalLastYearRoomsSold);
                       
                       return (
                         <>
                           <TableCell className="w-[9%] text-right border-r border-[#d0d7e3]">
-                            {totalRoomsSold.toLocaleString()}
+                            {Math.round(totalRoomsSold).toLocaleString()}
                           </TableCell>
                           <TableCell className="w-[9%] text-right border-r border-[#d0d7e3]">
-                            {totalLastYearRoomsSold.toLocaleString()}
+                            {Math.round(totalLastYearRoomsSold).toLocaleString()}
                           </TableCell>
                           <TableCell className={`w-[9%] text-right border-r border-[#d0d7e3] ${
                             totalRoomsChange > 0 ? "text-emerald-500" : totalRoomsChange < 0 ? "text-red-500" : ""
@@ -654,13 +674,14 @@ export function PacingChart({ viewType = 'Month' }: PacingChartProps) {
                     
                     {/* ADR Totals */}
                     {(() => {
-                      const totalRevenue = processedData.reduce((sum, item) => sum + item.revenue, 0);
-                      const totalRoomsSold = processedData.reduce((sum, item) => sum + item.roomsSold, 0);
-                      const totalLastYearRevenue = processedData.reduce((sum, item) => sum + item.lastYearRevenue, 0);
-                      const totalLastYearRoomsSold = processedData.reduce((sum, item) => sum + item.lastYearRoomsSold, 0);
+                      const lastItem = processedData[processedData.length - 1];
+                      const totalRevenue = dataViewType === 'cumulative' ? lastItem.revenue : processedData.reduce((sum, item) => sum + item.revenue, 0);
+                      const totalRoomsSold = dataViewType === 'cumulative' ? lastItem.roomsSold : processedData.reduce((sum, item) => sum + item.roomsSold, 0);
+                      const totalLastYearRevenue = dataViewType === 'cumulative' ? lastItem.lastYearRevenue : processedData.reduce((sum, item) => sum + item.lastYearRevenue, 0);
+                      const totalLastYearRoomsSold = dataViewType === 'cumulative' ? lastItem.lastYearRoomsSold : processedData.reduce((sum, item) => sum + item.lastYearRoomsSold, 0);
                       
-                      const avgAdr = Math.round(totalRevenue / totalRoomsSold);
-                      const avgLastYearAdr = Math.round(totalLastYearRevenue / totalLastYearRoomsSold);
+                      const avgAdr = totalRoomsSold > 0 ? Math.round(totalRevenue / totalRoomsSold) : 0;
+                      const avgLastYearAdr = totalLastYearRoomsSold > 0 ? Math.round(totalLastYearRevenue / totalLastYearRoomsSold) : 0;
                       const adrChange = calculateChange(avgAdr, avgLastYearAdr);
                       
                       return (

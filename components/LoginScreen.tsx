@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { LockIcon, UserIcon, BarChart2Icon } from 'lucide-react';
+import { loginWithEmailAndPassword } from '@/app/lib/firebase';
 
 interface LoginScreenProps {
   onLogin: (email: string, password: string) => void;
@@ -10,10 +11,26 @@ interface LoginScreenProps {
 export function LoginScreen({ onLogin }: LoginScreenProps) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    onLogin(email, password);
+    setError('');
+    setIsLoading(true);
+    
+    try {
+      const result = await loginWithEmailAndPassword(email, password);
+      if (result.success) {
+        onLogin(email, password);
+      } else {
+        setError('Invalid email or password');
+      }
+    } catch (err) {
+      setError('Login failed. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -30,6 +47,11 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
+            {error && (
+              <div className="p-3 bg-red-100 border border-red-400 text-red-700 rounded">
+                {error}
+              </div>
+            )}
             <div className="space-y-2">
               <label htmlFor="email" className="text-sm font-medium text-gray-700">Email</label>
               <div className="relative">
@@ -60,8 +82,12 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
                 <LockIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
               </div>
             </div>
-            <Button type="submit" className="w-full bg-slate-900 hover:bg-slate-800">
-              Log in
+            <Button 
+              type="submit" 
+              className="w-full bg-slate-900 hover:bg-slate-800"
+              disabled={isLoading}
+            >
+              {isLoading ? 'Logging in...' : 'Log in'}
             </Button>
           </form>
         </CardContent>

@@ -15,25 +15,31 @@ export interface MonthlyPickupResponse {
   };
 }
 
+// Helper to get month names for UTC formatting
+const MONTH_NAMES_SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
 export async function GET(request: Request) {
   // Parse query parameters
   const { searchParams } = new URL(request.url);
-  const dateParam = searchParams.get('date') || new Date().toISOString().split('T')[0];
-  const businessDateParam = searchParams.get('businessDate') || new Date().toISOString().split('T')[0];
-  
-  // Ensure we're using the exact date string provided in the parameter
-  // instead of converting it through a Date object which can cause timezone issues
-  const selectedDate = new Date(dateParam);
-  
-  // Get year and month for filtering
-  const year = selectedDate.getFullYear();
-  const month = selectedDate.getMonth();
-  const today = new Date();
-  
-  // Format dates for query
-  const monthStart = new Date(year, month, 1).toISOString().split('T')[0];
-  const monthEnd = new Date(year, month + 1, 0).toISOString().split('T')[0];
-  const todayStr = today.toISOString().split('T')[0];
+  // const dateParam = searchParams.get('date'); // No longer the primary source for month context
+  const businessDateParam = searchParams.get('businessDate');
+
+  if (!businessDateParam) {
+    return NextResponse.json({ error: 'businessDate parameter is required' }, { status: 400 });
+  }
+
+  // Use businessDate to define the context (month and upper limit for booking dates)
+  // Parse the date string and treat components as UTC
+  const [yearStr, monthStr, dayStr] = businessDateParam.split('-').map(Number);
+  const businessDateUTC = new Date(Date.UTC(yearStr, monthStr - 1, dayStr)); // Month is 0-indexed
+
+  const year = businessDateUTC.getUTCFullYear();
+  const month = businessDateUTC.getUTCMonth(); // 0-indexed
+
+  // Format dates for query (using UTC dates)
+  const monthStart = formatDateUTC(new Date(Date.UTC(year, month, 1)));
+  const monthEnd = formatDateUTC(new Date(Date.UTC(year, month + 1, 0)));
+  const businessDateStr = formatDateUTC(businessDateUTC); // Use the formatted UTC date string
 
   // Initialize client variable before try block
   let client: ClickHouseClient | undefined;
@@ -46,22 +52,20 @@ export async function GET(request: Request) {
       password: process.env.CLICKHOUSE_PASSWORD || 'elarion'
     });
 
-   
     const query = `
-      SELECT 
+      SELECT
         toDate(booking_date) AS booking_date,
         toDate(occupancy_date) AS occupancy_date,
         sold_rooms,
         roomRevenue AS room_revenue
-      FROM SAND01CN.hotel_level_pace
-      WHERE 
-        toDate(booking_date) BETWEEN '${monthStart}' AND '${todayStr}'
+      FROM SAND01CN.insights
+      WHERE
+        toDate(booking_date) BETWEEN '${monthStart}' AND '${businessDateStr}'
         AND toDate(occupancy_date) BETWEEN '${monthStart}' AND '${monthEnd}'
-        AND date(scd_valid_from) <= DATE('${businessDateParam}') 
-        AND DATE('${businessDateParam}') < date(scd_valid_to)
       ORDER BY booking_date, occupancy_date
     `;
 
+    console.log(query);
 
     const resultSet = await client.query({
       query,
@@ -70,29 +74,24 @@ export async function GET(request: Request) {
 
     const data = await resultSet.json();
 
-    // Transform data into the format expected by the frontend
-    const bookingDates = generateDatesInMonth(selectedDate, today);
-    const occupancyDates = generateAllDatesInMonth(selectedDate);
-    
-    const result: MonthlyPickupResponse[] = bookingDates.map(bookingDate => {
+    // Use businessDateUTC for generating dates
+    const bookingDates = generateDatesInMonthUTC(businessDateUTC); // Generate row headers
+    const occupancyDates = generateAllDatesInMonthUTC(businessDateUTC); // Generate column headers
+
+    const result: MonthlyPickupResponse[] = bookingDates.map(bookingDateString => {
       const pickupData: { [key: string]: PickupMetric } = {};
-      
+
       // Initialize all occupancy dates with null values
       occupancyDates.forEach(occupancyDate => {
-        pickupData[occupancyDate] = {
-          soldRooms: null,
-          revenue: null,
-          adr: null
-        };
+        pickupData[occupancyDate] = { soldRooms: null, revenue: null, adr: null };
       });
-      
+
       // Find the actual data for this booking date
       data.forEach((row: any) => {
-        if (row.booking_date === bookingDate) {
-          // Convert string values to numbers
+        if (row.booking_date === bookingDateString) {
           const rooms = parseFloat(row.sold_rooms) || 0;
           const revenue = parseFloat(row.room_revenue) || 0;
-          
+
           pickupData[row.occupancy_date] = {
             soldRooms: rooms,
             revenue: revenue,
@@ -100,9 +99,9 @@ export async function GET(request: Request) {
           };
         }
       });
-      
+
       return {
-        bookingDate,
+        bookingDate: bookingDateString,
         pickupData
       };
     });
@@ -122,34 +121,55 @@ export async function GET(request: Request) {
   }
 }
 
-// Helper function to generate dates from start of month to today
-function generateDatesInMonth(selectedDate: Date, today: Date): string[] {
-  const year = selectedDate.getFullYear();
-  const month = selectedDate.getMonth();
-  const startDay = 1;
-  const endDay = Math.min(
-    new Date(year, month + 1, 0).getDate(),  // Last day of month
-    today.getDate()
-  );
-  
-  return Array.from({ length: endDay - startDay + 1 }, (_, i) => {
-    const day = startDay + i;
-    return formatDate(new Date(year, month, day));
-  });
+// --- UTC Helper Functions ---
+
+// Generates dates from the 1st of the month of the given UTC date up to that date.
+function generateDatesInMonthUTC(targetDateUTC: Date): string[] {
+  const year = targetDateUTC.getUTCFullYear();
+  const month = targetDateUTC.getUTCMonth();
+
+  const firstDayOfMonth = new Date(Date.UTC(year, month, 1));
+  const dates: string[] = [];
+  let currentDate = firstDayOfMonth;
+
+  // Loop while currentDate is less than or equal to targetDateUTC
+  // Use getTime() for reliable comparison
+  while (currentDate.getTime() <= targetDateUTC.getTime()) {
+    dates.push(formatDateUTC(currentDate));
+    // Increment date carefully in UTC
+    currentDate = new Date(Date.UTC(currentDate.getUTCFullYear(), currentDate.getUTCMonth(), currentDate.getUTCDate() + 1));
+  }
+
+  return dates;
 }
 
-// Helper function to generate all dates in a month
-function generateAllDatesInMonth(selectedDate: Date): string[] {
-  const year = selectedDate.getFullYear();  
-  const month = selectedDate.getMonth();
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
-  
+// Generates all dates in the month of the given UTC date.
+function generateAllDatesInMonthUTC(targetDateUTC: Date): string[] {
+  const year = targetDateUTC.getUTCFullYear();
+  const month = targetDateUTC.getUTCMonth();
+  // Get the last day of the month in UTC
+  const daysInMonth = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+
   return Array.from({ length: daysInMonth }, (_, i) => {
-    return formatDate(new Date(year, month, i + 1));
+    // Generate each date in UTC
+    return formatDateUTC(new Date(Date.UTC(year, month, i + 1)));
   });
 }
 
-// Helper function to format date as YYYY-MM-DD
-function formatDate(date: Date): string {
-  return date.toISOString().split('T')[0];
+// Formats a UTC Date object as YYYY-MM-DD string.
+function formatDateUTC(date: Date): string {
+  const year = date.getUTCFullYear();
+  // Month is 0-indexed, add 1 and pad
+  const month = (date.getUTCMonth() + 1).toString().padStart(2, '0');
+  // Day needs padding
+  const day = date.getUTCDate().toString().padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+// Formats a UTC Date object as MMM YYYY string (needed for yearly view).
+function formatMonthYearUTC(date: Date): string {
+  const monthIndex = date.getUTCMonth(); // 0-11
+  const month = MONTH_NAMES_SHORT[monthIndex];
+  const year = date.getUTCFullYear();
+  return `${month} ${year}`;
 } 

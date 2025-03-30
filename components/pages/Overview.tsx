@@ -31,7 +31,6 @@ import { ReservationsByDayChart } from '../new/ReservationsByDayChart'
 import { HorizontalBarChart } from '../new/HorizontalBarChart'
 import { HotelSelector } from '../new/HotelSelector'
 import { HorizontalBarChartMultipleDatasets } from "../new/HorizontalBarChartMultipleDatasets"
-import { PieChartWithLabels } from "@/components/new/PieChartWithLabels"
 import { addDays } from "date-fns"
 import { OccupancyAnalysisChart } from '../new/OccupancyAnalysisChart'
 import { KpiResponse } from '@/app/api/overview/general/route'
@@ -2049,7 +2048,15 @@ export function Overview() {
                   { name: "Government", value: 520, change: 45 },
                   { name: "Airlines", value: 480, change: 55 },
                 ]
-              }
+              },
+              // Add the ADR metric definition
+              { 
+                key: 'adr', 
+                label: 'ADR', 
+                prefix: '€', 
+                // You can leave the data array empty as it's fetched via API
+                data: [] 
+              } 
             ]}
             distributionData={segmentsDistributionData}
             categoryTimeSeriesData={segmentsTimeSeriesData}
@@ -2066,29 +2073,9 @@ export function Overview() {
             title="Booking Channels"
             color="blue"
             metrics={[
-              {
-                key: 'revenue',
-                label: 'Revenue',
-                prefix: '€',
-                data: [
-                  { name: "Direct Booking", value: 165000, change: 20000 },
-                  { name: "Booking.com", value: 142000, change: 17000 },
-                  { name: "Expedia", value: 98000, change: -5000 },
-                  { name: "Hotels.com", value: 76000, change: 8500 },
-                  { name: "Airbnb", value: 48000, change: 6200 },
-                ]
-              },
-              {
-                key: 'rooms',
-                label: 'Rooms Sold',
-                data: [
-                  { name: "Direct Booking", value: 1100, change: 150 },
-                  { name: "Booking.com", value: 950, change: 120 },
-                  { name: "Expedia", value: 680, change: -40 },
-                  { name: "Hotels.com", value: 520, change: 60 },
-                  { name: "Airbnb", value: 320, change: 45 },
-                ]
-              }
+              { key: 'revenue', label: 'Revenue', prefix: '€', data: [] },
+              { key: 'rooms', label: 'Rooms Sold', data: [] },
+              { key: 'adr', label: 'ADR', prefix: '€', data: [] } // <-- ADR is present
             ]}
             distributionData={bookingChannelsDistributionData}
             categoryTimeSeriesData={bookingChannelsTimeSeriesData}
@@ -2105,29 +2092,9 @@ export function Overview() {
             title="Room Types"
             color="green"
             metrics={[
-              {
-                key: 'revenue',
-                label: 'Revenue',
-                prefix: '€',  
-                data: [
-                  { name: "Deluxe Suite", value: 156000, change: 18500 },
-                  { name: "Executive Room", value: 128000, change: 15200 },
-                  { name: "Standard Double", value: 95000, change: -5500 },
-                  { name: "Family Room", value: 82000, change: 9800 },
-                  { name: "Standard Single", value: 67000, change: 7200 },
-                ]
-              },
-              {
-                key: 'rooms',
-                label: 'Rooms Sold',
-                data: [
-                  { name: "Deluxe Suite", value: 850, change: 95 },
-                  { name: "Executive Room", value: 920, change: 110 },
-                  { name: "Standard Double", value: 1150, change: -75 },
-                  { name: "Family Room", value: 580, change: 65 },
-                  { name: "Standard Single", value: 780, change: 85 },
-                ]
-              }
+              { key: 'revenue', label: 'Revenue', prefix: '€', data: [] },
+              { key: 'rooms', label: 'Rooms Sold', data: [] },
+              { key: 'adr', label: 'ADR', prefix: '€', data: [] } // <-- ADR is present
             ]}
             distributionData={roomTypesDistributionData}
             categoryTimeSeriesData={roomTypesTimeSeriesData}

@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { ClickHouseClient, createClient } from '@clickhouse/client';
 import { calculateDateRanges, calculateComparisonDateRanges } from '@/lib/dateUtils';
+import * as fs from 'fs';
+import * as path from 'path';
 
 // Interface for top categories in each KPI
 interface CategorySummary {
@@ -18,24 +20,34 @@ interface FluctuationDataPoint {
   change: number;
 }
 
-// Interface for the API response
+// Updated interface for the API response
 export interface FluctuationResponse {
+  metrics: {
+    [key: string]: {
+      name: string;
+      config: {
+        supportsPie: boolean;
+        supportsBar: boolean;
+        supportsNormal: boolean;
+        supportsStacked: boolean;
+        prefix?: string;
+        suffix?: string;
+      }
+    }
+  };
   kpis: {
-    revenue: CategorySummary[];
-    roomsSold: CategorySummary[];
-    adr: CategorySummary[];
+    [key: string]: CategorySummary[];
   };
   fluctuationData: {
-    revenue: Record<string, FluctuationDataPoint[]>;
-    roomsSold: Record<string, FluctuationDataPoint[]>;
-    adr: Record<string, FluctuationDataPoint[]>;
+    [key: string]: Record<string, FluctuationDataPoint[]>;
   };
   timeScale: 'day' | 'month' | 'year';
   actualGranularity: 'day';
 }
 
-// Helper function to round numbers
-function roundValue(value: number): number {
+// Helper function to round numbers - add null checks and default values
+function roundValue(value: number | null | undefined): number {
+  if (value === null || value === undefined) return 0;
   return value >= 100 ? Math.round(value) : Number(value.toFixed(2));
 }
 
@@ -80,9 +92,147 @@ function generateDateRange(startDate: string, endDate: string, intervalType: 'da
   return dates;
 }
 
+// Helper function to convert date to index in a range
+const datesToIndex = (startDate: string, endDate: string, date: string): number => {
+  const start = new Date(startDate).getTime();
+  const end = new Date(endDate).getTime();
+  const target = new Date(date).getTime();
+  
+  if (target < start || target > end) return -1;
+  
+  return Math.floor((target - start) / (24 * 60 * 60 * 1000));
+};
+
+// --- START CACHING LOGIC ---
+
+interface CacheEntryData {
+  body: any; // Store the parsed JSON body
+  status: number;
+  headers: Record<string, string>;
+}
+
+interface CacheEntry {
+  data: CacheEntryData;
+  expiresAt: number;
+}
+
+// File-based cache configuration
+const CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
+const CACHE_DIR = path.join(process.cwd(), '.cache');
+
+// Ensure cache directory exists
+try {
+  if (!fs.existsSync(CACHE_DIR)) {
+    fs.mkdirSync(CACHE_DIR, { recursive: true });
+  }
+} catch (error) {
+  console.error('Error creating cache directory:', error);
+}
+
+// File-based cache functions
+function getCacheFilePath(key: string): string {
+  // Create a safe filename from the key
+  const safeKey = Buffer.from(key).toString('base64').replace(/[/\\?%*:|"<>]/g, '_');
+  return path.join(CACHE_DIR, `${safeKey}.json`);
+}
+
+async function getCacheEntry(key: string): Promise<CacheEntry | null> {
+  try {
+    const filePath = getCacheFilePath(key);
+    if (fs.existsSync(filePath)) {
+      const data = fs.readFileSync(filePath, 'utf8');
+      return JSON.parse(data);
+    }
+    return null;
+  } catch (error) {
+    console.error(`Cache read error:`, error);
+    return null;
+  }
+}
+
+async function setCacheEntry(key: string, entry: CacheEntry): Promise<void> {
+  try {
+    const filePath = getCacheFilePath(key);
+    fs.writeFileSync(filePath, JSON.stringify(entry), 'utf8');
+  } catch (error) {
+    console.error(`Cache write error:`, error);
+  }
+}
+
+async function deleteCacheEntry(key: string): Promise<void> {
+  try {
+    const filePath = getCacheFilePath(key);
+    if (fs.existsSync(filePath)) {
+      fs.unlinkSync(filePath);
+    }
+  } catch (error) {
+    console.error(`Cache delete error:`, error);
+  }
+}
+
+/**
+ * Generates a cache key based on relevant query parameters for the fluctuation route.
+ * Ensures the key is consistent regardless of parameter order.
+ */
+function generateCacheKey(params: URLSearchParams): string {
+  const relevantParams = [
+    'businessDate',
+    'periodType',
+    'viewType',
+    'comparison',
+    'field',
+    'limit' // Fluctuation uses limit differently
+  ];
+  const keyParts: string[] = [];
+
+  relevantParams.forEach(key => {
+    // Use default values if parameter is missing, mirroring the route's logic
+    let value: string | null = null;
+    switch (key) {
+        case 'businessDate': value = params.get(key) || new Date().toISOString().split('T')[0]; break;
+        case 'periodType': value = params.get(key) || 'Month'; break;
+        case 'viewType': value = params.get(key) || 'Actual'; break;
+        case 'comparison': value = params.get(key) || 'Last year - OTB'; break;
+        case 'field': value = params.get(key) || 'guest_country'; break;
+        case 'limit': value = params.get(key) || '5'; break; // Default limit for fluctuation
+        default: value = params.get(key);
+    }
+    if (value !== null) {
+        keyParts.push(`${key}=${value}`);
+    }
+  });
+
+  // Sort parts to ensure consistent key regardless of parameter order
+  keyParts.sort();
+  return keyParts.join('&');
+}
+
+// --- END CACHING LOGIC ---
+
 export async function GET(request: Request) {
   // Parse query parameters
   const { searchParams } = new URL(request.url);
+
+  // --- CHECK CACHE ---
+  const cacheKey = `distribution-fluctuation:${generateCacheKey(searchParams)}`;
+  const cachedEntry = await getCacheEntry(cacheKey);
+
+  if (cachedEntry && cachedEntry.expiresAt > Date.now()) {
+    console.log(`[Cache HIT] Returning cached response for key: ${cacheKey.substring(0, 100)}...`);
+    // Reconstruct the response from cached data
+    return new NextResponse(JSON.stringify(cachedEntry.data.body), {
+      status: cachedEntry.data.status,
+      headers: cachedEntry.data.headers,
+    });
+  } else if (cachedEntry) {
+    // Entry exists but is expired
+    console.log(`[Cache EXPIRED] Removing expired entry for key: ${cacheKey.substring(0, 100)}...`);
+    await deleteCacheEntry(cacheKey);
+  } else {
+    console.log(`[Cache MISS] No valid cache entry for key: ${cacheKey.substring(0, 100)}...`);
+  }
+  // --- END CACHE CHECK ---
+
   const businessDateParam = searchParams.get('businessDate') || new Date().toISOString().split('T')[0];
   const periodType = searchParams.get('periodType') || 'Month'; // Month, Year, Day
   const viewType = searchParams.get('viewType') || 'Actual'; // Actual, OTB, Projected
@@ -91,8 +241,8 @@ export async function GET(request: Request) {
   // Get the field to analyze
   const field = searchParams.get('field') || 'guest_country';
   
-  // Limit for number of items to return
-  const limit = parseInt(searchParams.get('limit') || '5', 10);
+  // Limit for number of items for fluctuation data only
+  const fluctuationLimit = parseInt(searchParams.get('limit') || '5', 10);
   
   // Calculate date ranges
   const { startDate, endDate } = calculateDateRanges(
@@ -181,44 +331,43 @@ export async function GET(request: Request) {
       return fieldValue.toString();
     };
 
-    // First, we need to get the top categories for each KPI
-    // This is similar to the original query, but we'll use it to identify the top categories
+    // First, get ALL categories for KPIs (remove the LIMIT clause from summary queries)
     const summaryQuery = `
-      SELECT 
+      SELECT
         ${field} AS field_name,
         SUM(sold_rooms) AS rooms_sold,
         SUM(roomRevenue) AS room_revenue,
         SUM(fbRevenue) AS fb_revenue,
         SUM(otherRevenue) AS other_revenue,
-        SUM(totalRevenue) AS total_revenue
+        SUM(totalRevenue) AS total_revenue,
+        SUM(cancelled_rooms) AS cancelled_rooms
       FROM SAND01CN.insights
-      WHERE 
+      WHERE
         toDate(occupancy_date) BETWEEN '${startDate}' AND '${endDate}'
-        AND date(scd_valid_from) <= DATE('${businessDateParam}') 
+        AND date(scd_valid_from) <= DATE('${businessDateParam}')
         AND DATE('${businessDateParam}') < date(scd_valid_to)
         ${fieldFilters}
       GROUP BY ${field}
       ORDER BY total_revenue DESC
-      LIMIT ${limit}
     `;
 
     const prevSummaryQuery = `
-      SELECT 
+      SELECT
         ${field} AS field_name,
         SUM(sold_rooms) AS rooms_sold,
         SUM(roomRevenue) AS room_revenue,
         SUM(fbRevenue) AS fb_revenue,
         SUM(otherRevenue) AS other_revenue,
-        SUM(totalRevenue) AS total_revenue
+        SUM(totalRevenue) AS total_revenue,
+        SUM(cancelled_rooms) AS cancelled_rooms
       FROM SAND01CN.insights
-      WHERE 
+      WHERE
         toDate(occupancy_date) BETWEEN '${prevStartDate}' AND '${prevEndDate}'
-        AND date(scd_valid_from) <= DATE('${prevBusinessDateParam}') 
+        AND date(scd_valid_from) <= DATE('${prevBusinessDateParam}')
         AND DATE('${prevBusinessDateParam}') < date(scd_valid_to)
         ${fieldFilters}
       GROUP BY ${field}
       ORDER BY total_revenue DESC
-      LIMIT ${limit}
     `;
 
     // Execute the summary queries
@@ -241,7 +390,30 @@ export async function GET(request: Request) {
       prevSummaryMap.set(item.field_name, item);
     });
 
-    // Process top categories for each KPI
+    // Create a separate query to get the top categories just for fluctuations
+    const topCategoriesQuery = `
+      SELECT
+        ${field} AS field_name,
+        SUM(totalRevenue) AS total_revenue
+      FROM SAND01CN.insights
+      WHERE
+        toDate(occupancy_date) BETWEEN '${startDate}' AND '${endDate}'
+        AND date(scd_valid_from) <= DATE('${businessDateParam}')
+        AND DATE('${businessDateParam}') < date(scd_valid_to)
+        ${fieldFilters}
+      GROUP BY ${field}
+      ORDER BY total_revenue DESC
+      LIMIT ${fluctuationLimit}
+    `;
+
+    const topCategoriesResultSet = await client.query({
+      query: topCategoriesQuery,
+      format: 'JSONEachRow'
+    });
+
+    const topCategoriesData = await topCategoriesResultSet.json() as any[];
+
+    // Process top categories for each KPI using the *full* summaryData
     const revenueTopCategories = summaryData.map(item => {
       const prevItem = prevSummaryMap.get(item.field_name) || {
         total_revenue: 0
@@ -305,10 +477,8 @@ export async function GET(request: Request) {
       };
     });
 
-    // Extract the top category names for each KPI for the fluctuation query
-    const topCategoryNames = Array.from(new Set([
-      ...summaryData.map(item => item.field_name)
-    ]));
+    // Extract the top category names *only* for the fluctuation query
+    const topCategoryNames = topCategoriesData.map(item => item.field_name);
 
     // Define the time granularity for the query - MODIFIED to always use daily granularity
     const timeGroupingClause = "toString(toDate(occupancy_date)) AS date_period";
@@ -442,23 +612,12 @@ export async function GET(request: Request) {
       });
     });
 
-    // Helper function to convert date to index in a range
-    function datesToIndex(startDate: string, endDate: string, date: string): number {
-      const start = new Date(startDate).getTime();
-      const end = new Date(endDate).getTime();
-      const target = new Date(date).getTime();
-      
-      if (target < start || target > end) return -1;
-      
-      return Math.floor((target - start) / (24 * 60 * 60 * 1000));
-    }
-
-    // Generate complete fluctuation data for each category and KPI
+    // Generate complete fluctuation data for each category and KPI - using only topCategoryNames
     const revenueFluctuationData: Record<string, FluctuationDataPoint[]> = {};
     const roomsSoldFluctuationData: Record<string, FluctuationDataPoint[]> = {};
     const adrFluctuationData: Record<string, FluctuationDataPoint[]> = {};
     
-    // For each category, create a time series with all dates
+    // For each *top* category, create a time series with all dates
     topCategoryNames.forEach(category => {
       const displayName = getDisplayName(category);
       const revenueSeries: FluctuationDataPoint[] = [];
@@ -512,14 +671,53 @@ export async function GET(request: Request) {
         });
       });
       
-      // Add series for this category to the output data using the display name as the key
+      // Add series for this category to the output data using display name
       revenueFluctuationData[displayName] = revenueSeries;
       roomsSoldFluctuationData[displayName] = roomsSoldSeries;
       adrFluctuationData[displayName] = adrSeries;
     });
 
-    // Construct the response
+    // Define metric configurations
+    const metricConfigs = {
+      revenue: {
+        name: "Revenue",
+        config: {
+          supportsPie: true,
+          supportsBar: true,
+          supportsNormal: true,
+          supportsStacked: true,
+          prefix: "€",
+          suffix: ""
+        }
+      },
+      roomsSold: {
+        name: "Rooms Sold",
+        config: {
+          supportsPie: true,
+          supportsBar: true,
+          supportsNormal: true,
+          supportsStacked: true,
+          prefix: "",
+          suffix: ""
+        }
+      },
+      adr: {
+        name: "ADR",
+        config: {
+          supportsPie: false,
+          supportsBar: true,
+          supportsNormal: true,
+          supportsStacked: false,
+          prefix: "€",
+          suffix: ""
+        }
+      }
+    };
+
+    // Construct the response with the new structure
+    // kpis now contain *all* categories, fluctuationData contains *top* categories
     const response: FluctuationResponse = {
+      metrics: metricConfigs,
       kpis: {
         revenue: revenueTopCategories,
         roomsSold: roomsSoldTopCategories,
@@ -534,9 +732,24 @@ export async function GET(request: Request) {
       actualGranularity: 'day'
     };
 
+    // --- STORE IN CACHE ---
+    const cacheEntry: CacheEntry = {
+      data: {
+        body: response,
+        status: 200,
+        headers: { 'Content-Type': 'application/json' }
+      },
+      expiresAt: Date.now() + CACHE_DURATION
+    };
+
+    await setCacheEntry(cacheKey, cacheEntry);
+    console.log(`[Cache SET] Stored response data for key: ${cacheKey.substring(0, 100)}...`);
+    // --- END STORE IN CACHE ---
+
     return NextResponse.json(response);
   } catch (error) {
     console.error('Error querying ClickHouse:', error);
+    // Do not cache errors
     return NextResponse.json(
       { error: `Failed to fetch ${field} fluctuation data from ClickHouse` },
       { status: 500 }
