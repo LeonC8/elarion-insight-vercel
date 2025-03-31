@@ -42,7 +42,30 @@ export interface HorizontalBarChartMultipleDatasetsProps {
   leftMargin?: number
   loading?: boolean
   error?: string | null
+  sort?: boolean
 }
+
+// Extract number from a string (e.g., "3 night" -> 3, "7+ nights" -> 7.5)
+const extractNumber = (str: string): number => {
+  // Special case handling for common patterns
+  if (str.includes('7+') || str.includes('7 +') || str.includes('7-plus') || str.toLowerCase().includes('seven plus')) {
+    return 7.5; // Make "7+" sort after "7" but before "8"
+  }
+  
+  // Default number extraction
+  const match = str.match(/(\d+)/);
+  if (match && match.index !== undefined) {
+    const num = parseInt(match[1], 10);
+    // Additional check for plus sign after the number
+    if (str.includes('+', match.index + match[0].length)) {
+      return num + 0.5; // Make "N+" sort after "N" but before "N+1"
+    }
+    return num;
+  }
+  
+  // No numbers found, put at end of sort
+  return Number.MAX_SAFE_INTEGER;
+};
 
 export function HorizontalBarChartMultipleDatasets({ 
   datasets,
@@ -51,7 +74,8 @@ export function HorizontalBarChartMultipleDatasets({
   defaultCategory = categories?.[0]?.key,
   leftMargin = -10,
   loading = false,
-  error = null
+  error = null,
+  sort = true // Sorting is enabled by default
 }: HorizontalBarChartMultipleDatasetsProps) {
   const [selectedDataset, setSelectedDataset] = useState(defaultDataset)
   const [selectedCategory, setSelectedCategory] = useState(defaultCategory)
@@ -77,6 +101,16 @@ export function HorizontalBarChartMultipleDatasets({
         </div>
       </div>
     )
+  }
+
+  // Create a copy of the data to sort
+  let sortedData = [...(currentDataset?.data || [])];
+
+  // Sort data by extracted numbers if enabled (on by default)
+  if (sort !== false && sortedData.length > 0) {
+    sortedData.sort((a, b) => {
+      return extractNumber(a.range) - extractNumber(b.range);
+    });
   }
 
   return (
@@ -129,7 +163,7 @@ export function HorizontalBarChartMultipleDatasets({
         </DropdownMenu>
       </div>
       <HorizontalBarChart 
-        data={currentDataset.data}
+        data={sortedData}
         title={currentDataset.title}
         leftMargin={leftMargin}
       />

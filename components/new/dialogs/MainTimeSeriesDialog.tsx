@@ -206,7 +206,7 @@ export function MainTimeSeriesDialog({
         open={fullScreenTable.isOpen}
         onOpenChange={(open) => setFullScreenTable({ isOpen: open, type: open ? 'main' : null })}
         title={`${title} Over Time`}
-        headers={['Month', 'Selected Period', 'Comparison period', 'Change']}
+        headers={['Date', 'Selected Period', 'Comparison period', 'Change']}
         data={mainTimeSeriesData}
         renderRow={(row) => (
           <>
@@ -376,7 +376,7 @@ export function MainTimeSeriesDialog({
                 <Table>
                   <TableHeader>
                     <TableRow className="hover:bg-transparent">
-                      <TableHead className="bg-[#f0f4fa]/60 w-[25%] text-left">Month</TableHead>
+                      <TableHead className="bg-[#f0f4fa]/60 w-[25%] text-left">Date </TableHead>
                       <TableHead className="bg-[#f0f4fa]/60 w-[25%] text-left">Selected Period</TableHead>
                       <TableHead className="bg-[#f0f4fa]/60 w-[25%] text-left">Comparison Period</TableHead>
                       <TableHead className="bg-[#f0f4fa]/60 w-[25%] text-left">Change</TableHead>
