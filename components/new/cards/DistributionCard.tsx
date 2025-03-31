@@ -158,7 +158,10 @@ export function DistributionCard({
 
   // Add helper function to determine if the currency symbol should be shown
   const shouldShowCurrency = React.useMemo(() => {
-    return selectedPieKPI !== 'roomsSold' && selectedPieKPI !== 'cancellations';
+    return selectedPieKPI !== 'roomsSold' && 
+           selectedPieKPI !== 'cancellations' && 
+           selectedPieKPI !== 'lengthOfStay' &&
+           selectedPieKPI !== 'bookingLeadTime';
   }, [selectedPieKPI]);
 
   // Get effective prefix and suffix based on the selected KPI

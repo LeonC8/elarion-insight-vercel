@@ -11,7 +11,7 @@ start_time = time.time()
 # Execute query with date filter
 res = client.query("""
     SELECT * 
-    FROM SAND01CN.insights
+    FROM SAND01CN.lenght_of_stay_distribution
 """)
 df = pd.DataFrame(res.result_set, columns=res.column_names)
 

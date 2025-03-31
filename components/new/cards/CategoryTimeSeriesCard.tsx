@@ -281,7 +281,7 @@ export function CategoryTimeSeriesCard({
         </ChartContainer>
 
         {/* Categories Over Time Legend - Moved below chart */}
-        <div className="flex justify-center gap-3 mt-6 flex-wrap">
+        <div className="flex justify-center gap-3 mt-14 flex-wrap">
           {Object.keys(colorizedCategoryConfig).map((key) => (
             <div
               key={key}
@@ -387,7 +387,7 @@ export function CategoryTimeSeriesCard({
           </div>
         </CardHeader>
         <CardContent>
-          <ChartContent bottom={30} />
+          <ChartContent bottom={0} />
         </CardContent>
       </Card>
       
