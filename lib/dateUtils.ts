@@ -20,9 +20,8 @@ export function calculateDateRanges(
     const month = businessDate.getMonth();
     
     if (viewType === 'Actual') {
-      // From beginning of month to business date - add one day to the start date
+      // From beginning of month to business date
       const firstDayOfMonth = new Date(year, month, 1);
-      firstDayOfMonth.setDate(firstDayOfMonth.getDate() + 1); // Add one day
       startDate = firstDayOfMonth.toISOString().split('T')[0];
       endDate = businessDateParam;
     } else if (viewType === 'OTB') {
@@ -42,9 +41,8 @@ export function calculateDateRanges(
     const year = businessDate.getFullYear();
     
     if (viewType === 'Actual') {
-      // From beginning of year to business date - add one day to the start date
+      // From beginning of year to business date
       const firstDayOfYear = new Date(year, 0, 1);
-      firstDayOfYear.setDate(firstDayOfYear.getDate() + 1); // Add one day
       startDate = firstDayOfYear.toISOString().split('T')[0];
       endDate = businessDateParam;
     } else if (viewType === 'OTB') {

@@ -12,8 +12,7 @@ interface CacheEntryData {
   headers: Record<string, string>;
 }
 
-interface CacheEntry {
-  data: CacheEntryData;
+interface CacheEntry {  data: CacheEntryData;
   expiresAt: number;
 }
 

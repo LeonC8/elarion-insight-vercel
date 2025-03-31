@@ -207,10 +207,10 @@ export function MarketSegments() {
 
   // Create analysis API params similar to what's in the overview page
   const analysisApiParams = {
-    timeframe: selectedTimeFrame.toLowerCase(),
-    viewType: selectedViewType.toLowerCase(),
-    comparison: selectedComparison.toLowerCase(), 
-    date: date.toISOString().split('T')[0],
+    periodType: selectedTimeFrame,
+    viewType: selectedViewType,
+    comparison: selectedComparison, 
+    businessDate: date.toISOString().split('T')[0],
     hotels: selectedHotels.join(',')
   };
 

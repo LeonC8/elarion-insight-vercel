@@ -156,26 +156,6 @@ export async function GET(request: Request) {
   // Parse query parameters
   const { searchParams } = new URL(request.url);
   
-  // --- CHECK CACHE ---
-  const cacheKey = `general:${generateCacheKey(searchParams)}`;
-  const cachedEntry = await getCacheEntry(cacheKey);
-
-  if (cachedEntry && cachedEntry.expiresAt > Date.now()) {
-    console.log(`[Cache HIT] Returning cached response for key: ${cacheKey.substring(0, 100)}...`);
-    // Reconstruct the response from cached data
-    return new NextResponse(JSON.stringify(cachedEntry.data.body), {
-      status: cachedEntry.data.status,
-      headers: cachedEntry.data.headers,
-    });
-  } else if (cachedEntry) {
-    // Entry exists but is expired
-    console.log(`[Cache EXPIRED] Removing expired entry for key: ${cacheKey.substring(0, 100)}...`);
-    await deleteCacheEntry(cacheKey);
-  } else {
-    console.log(`[Cache MISS] No valid cache entry for key: ${cacheKey.substring(0, 100)}...`);
-  }
-  // --- END CACHE CHECK ---
-  
   const businessDateParam = searchParams.get('businessDate') || new Date().toISOString().split('T')[0];
   const periodType = searchParams.get('periodType') || 'Month'; // Month, Year, Day
   const viewType = searchParams.get('viewType') || 'Actual'; // Actual, OTB, Projected
@@ -322,6 +302,9 @@ export async function GET(request: Request) {
       AND date(scd_valid_from) <= DATE('${prevBusinessDateParam}') 
       AND DATE('${prevBusinessDateParam}') < date(scd_valid_to)
     `;
+
+    console.log('Aggregate Query:');
+    console.log(aggregateQuery)
 
     // Combined query for daily data (combines 4 queries into 1)
     const dailyQuery = `
@@ -677,20 +660,6 @@ export async function GET(request: Request) {
       },
       hotelCapacity: roomsAvailable,
     };
-
-    // --- STORE IN CACHE ---
-    const cacheEntry: CacheEntry = {
-      data: {
-        body: response,
-        status: 200,
-        headers: { 'Content-Type': 'application/json' }
-      },
-      expiresAt: Date.now() + CACHE_DURATION
-    };
-
-    await setCacheEntry(cacheKey, cacheEntry);
-    console.log(`[Cache SET] Stored response data for key: ${cacheKey.substring(0, 100)}...`);
-    // --- END STORE IN CACHE ---
 
     return NextResponse.json(response);
   } catch (error) {

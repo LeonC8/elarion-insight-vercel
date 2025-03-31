@@ -47,6 +47,18 @@ export async function GET(request: Request) {
       password: process.env.CLICKHOUSE_PASSWORD || 'elarion'
     });
 
+    console.log('Business Date:', businessDateParam);
+
+    console.log('Current Period:');
+    console.log('  Start Date:', startDate);
+    console.log('  End Date:', endDate);
+
+    console.log('Previous Period:');
+    console.log('  Start Date:', prevStartDate);
+    console.log('  End Date:', prevEndDate);
+    console.log('  Business Date:', prevBusinessDateParam);
+
+
     // Build the query for current period
     const currentQuery = `
       SELECT 
@@ -70,6 +82,8 @@ export async function GET(request: Request) {
           ELSE 8
         END ASC
     `;
+
+    console.log('Current Query:', currentQuery);
 
     // Build the query for previous period
     const previousQuery = `

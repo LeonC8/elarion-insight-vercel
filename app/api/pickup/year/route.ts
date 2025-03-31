@@ -86,7 +86,11 @@ export async function GET(request: Request) {
       format: 'JSONEachRow'
     });
 
+
+
     const data = await resultSet.json();
+
+    console.log("Year Pickup Data:", data);
 
     // Use businessDateUTC for generating rows and columns
     const bookingDates = generateDatesInMonthUTC(businessDateUTC); // Rows: Dates in the business month up to business date

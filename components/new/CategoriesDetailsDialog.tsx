@@ -440,11 +440,11 @@ export function CategoriesDetails({
     })) || [];
   }, [fluctuationData, selectedPieKPI, availableMetrics]);
   
-  // Keep all data but only filter to top 5 for visualization
+  // Update the processedDistributionData memo to calculate percentage changes
   const processedDistributionData = React.useMemo(() => {
     if (!apiDistributionData || apiDistributionData.length === 0) {
-      console.log("No distribution data available for:", selectedPieKPI);
-      return [];
+        console.log("No distribution data available for:", selectedPieKPI);
+        return [];
     }
     
     console.log(`Processing ${apiDistributionData.length} items for ${selectedPieKPI}`);
@@ -454,20 +454,33 @@ export function CategoriesDetails({
     
     // Calculate percentages for ALL data
     const totalValue = sortedData.reduce((sum, item) => sum + item.value, 0);
-    const withPercentages = sortedData.map(item => ({
-      ...item,
-      percentage: totalValue > 0 ? Number(((item.value / totalValue) * 100).toFixed(1)) : 0
-    }));
+    const withPercentages = sortedData.map(item => {
+        // Calculate the previous value using the absolute change
+        const previousValue = item.value - item.change;
+        
+        // Calculate percentage change
+        // If previousValue is 0, and current value is positive, it's a new entry (100% increase)
+        // If previousValue is 0, and current value is 0, it's 0% change
+        const percentageChange = previousValue === 0 
+            ? (item.value > 0 ? 100 : 0)
+            : (item.change / Math.abs(previousValue)) * 100;
+
+        return {
+            ...item,
+            percentage: totalValue > 0 ? Number(((item.value / totalValue) * 100).toFixed(1)) : 0,
+            // Store both absolute and percentage change if needed
+            absoluteChange: item.change,
+            change: percentageChange
+        };
+    });
     
     // Assign colors to each item dynamically from the palette
     return withPercentages.map((item, index) => ({
-      ...item,
-      fill: item.name === "Other" ? "#999999" : COLOR_PALETTE[index % COLOR_PALETTE.length],
-      // Ensure change is always provided
-      change: typeof item.change === 'number' ? item.change : Math.floor(Math.random() * 40 + 10)
+        ...item,
+        fill: item.name === "Other" ? "#999999" : COLOR_PALETTE[index % COLOR_PALETTE.length]
     }));
     
-  }, [apiDistributionData, selectedPieKPI]);
+}, [apiDistributionData, selectedPieKPI]);
 
   React.useEffect(() => {
     if (apiDistributionData && processedDistributionData.length > 0) {

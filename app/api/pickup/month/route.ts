@@ -56,12 +56,13 @@ export async function GET(request: Request) {
       SELECT
         toDate(booking_date) AS booking_date,
         toDate(occupancy_date) AS occupancy_date,
-        sold_rooms,
-        roomRevenue AS room_revenue
+        SUM(sold_rooms) as sold_rooms,
+        SUM(roomRevenue) AS room_revenue
       FROM SAND01CN.insights
       WHERE
         toDate(booking_date) BETWEEN '${monthStart}' AND '${businessDateStr}'
         AND toDate(occupancy_date) BETWEEN '${monthStart}' AND '${monthEnd}'
+      GROUP BY booking_date, occupancy_date
       ORDER BY booking_date, occupancy_date
     `;
 
