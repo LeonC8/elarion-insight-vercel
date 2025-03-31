@@ -76,7 +76,7 @@ export function OccupancyAnalysisChart({
   totalRooms = 100,
   loading = false
 }: OccupancyAnalysisChartProps) {
-  const [viewType, setViewType] = useState<'period' | 'dow'>('period')
+  const [viewType, setViewType] = useState<'period' | 'dow'>('dow')
   const [activeSeries, setActiveSeries] = React.useState<string[]>([
     'occupied',
     'free'

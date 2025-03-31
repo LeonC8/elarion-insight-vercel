@@ -114,6 +114,35 @@ export function CategoryTimeSeriesCard({
   // Add state for fullscreen dialog
   const [isFullscreenOpen, setIsFullscreenOpen] = React.useState(false);
   
+  // Add a function to calculate left margin based on the maximum value
+  const getLeftMargin = React.useCallback(() => {
+    // Find the largest number in all categories
+    let maxNumber = 0;
+    
+    effectiveCategoryData.forEach(dataPoint => {
+      Object.keys(dataPoint.categories)
+        .filter(cat => activeCategories.includes(cat))
+        .forEach(cat => {
+          maxNumber = Math.max(maxNumber, dataPoint.categories[cat].current);
+        });
+    });
+    
+    // Convert to string and count digits
+    const numLength = Math.round(maxNumber).toString().replace(/,/g, '').length;
+
+    // Map number length to margin values
+    const marginMap: { [key: number]: number } = {
+      3: -5,  // 100-999
+      4: 3,   // 1,000-9,999
+      5: 9,   // 10,000-99,999
+      6: 18,  // 100,000-999,999
+      7: 27   // 1,000,000-9,999,999
+    };
+
+    // Return the appropriate margin or default to 3 if not found
+    return marginMap[numLength] || 3;
+  }, [effectiveCategoryData, activeCategories]);
+  
   // Create the chart content component to reuse in both normal and fullscreen mode
   const ChartContent = React.useCallback(({ bottom = 30 }: { bottom?: number }) => {
     // Calculate the maximum value in the data for Y-axis scaling
@@ -156,7 +185,7 @@ export function CategoryTimeSeriesCard({
               top: 30,
               right: 10,
               bottom: bottom,
-              left: getCategoriesLeftMargin(timeSeriesDatasets[0].data),
+              left: getLeftMargin(),
             }}
           >
             <defs>
@@ -281,7 +310,7 @@ export function CategoryTimeSeriesCard({
         </div>
       </>
     );
-  }, [effectiveCategoryData, colorizedCategoryConfig, categoryChartMode, activeCategories, timeSeriesDatasets, prefix, getCategoriesLeftMargin, setActiveCategories]);
+  }, [effectiveCategoryData, colorizedCategoryConfig, categoryChartMode, activeCategories, timeSeriesDatasets, prefix, getLeftMargin, setActiveCategories]);
   
   return (
     <>

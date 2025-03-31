@@ -31,9 +31,8 @@ export function calculateDateRanges(
       startDate = nextDay.toISOString().split('T')[0];
       endDate = new Date(year, month + 1, 0).toISOString().split('T')[0];
     } else { // Projected
-      // Full month - add one day to the start date
+      // Full month - use the first day of month
       const firstDayOfMonth = new Date(year, month, 1);
-      firstDayOfMonth.setDate(firstDayOfMonth.getDate() + 1); // Add one day
       startDate = firstDayOfMonth.toISOString().split('T')[0];
       endDate = new Date(year, month + 1, 0).toISOString().split('T')[0];
     }
@@ -52,9 +51,8 @@ export function calculateDateRanges(
       startDate = nextDay.toISOString().split('T')[0];
       endDate = new Date(year, 11, 31).toISOString().split('T')[0];
     } else { // Projected
-      // Full year - add one day to the start date
+      // Full year - use the first day of year
       const firstDayOfYear = new Date(year, 0, 1);
-      firstDayOfYear.setDate(firstDayOfYear.getDate() + 1); // Add one day
       startDate = firstDayOfYear.toISOString().split('T')[0];
       endDate = new Date(year, 11, 31).toISOString().split('T')[0];
     }

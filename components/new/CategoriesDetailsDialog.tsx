@@ -541,19 +541,26 @@ export function CategoriesDetails({
     
     if (otherItems.length > 0) {
       if (selectedPieKPI === 'adr') {
-        // For ADR, calculate weighted average based on rooms sold
-        const totalRoomsSold = otherItems.reduce((sum, item) => sum + item.roomsSold, 0);
-        const weightedADR = otherItems.reduce((sum, item) => 
-          sum + (item.value * (item.roomsSold / totalRoomsSold)), 0);
+        // For ADR, we need to:
+        // 1. Sum up total revenue for others
+        const totalRevenue = otherItems.reduce((sum, item) => sum + (item.revenue || 0), 0);
+        // 2. Sum up total rooms sold for others
+        const totalRoomsSold = otherItems.reduce((sum, item) => sum + (item.roomsSold || 0), 0);
+        // 3. Calculate ADR only if we have rooms sold
+        const otherADR = totalRoomsSold > 0 ? totalRevenue / totalRoomsSold : 0;
         
-        const otherChange = otherItems.reduce((sum, item) => sum + item.change, 0) / otherItems.length;
-        
+        // Calculate average change for others
+        const otherChange = otherItems.reduce((sum, item) => sum + (item.change || 0), 0) / otherItems.length;
+
         top5.push({
-          name: "Others",
-          value: weightedADR,
-          percentage: 0,
-          fill: "#999999",
-          change: otherChange
+            name: "Others",
+            value: otherADR,
+            percentage: 0,
+            fill: "#999999",
+            change: otherChange,
+            // Store these in case we need them
+            revenue: totalRevenue,
+            roomsSold: totalRoomsSold
         });
       } else {
         // For revenue and rooms sold, sum the values
