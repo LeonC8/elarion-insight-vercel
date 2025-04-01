@@ -700,83 +700,65 @@ export function PaceDashboard() {
 
   // Add the new CustomDialog for metrics near the end of the component, alongside the existing dialogs
   return (
-    <div className="flex-1 overflow-auto bg-[#f7f9fc]">
-      <div className="sticky top-0 z-10 bg-[#f7f9fc] pb-2 border-b border-gray-200 shadow-sm">
-        <div className="p-8 pb-4">
-          {/* Header */}
-          <div className="flex flex-col mb-6">
-            <div className="flex justify-between items-center">  
-              <div className="flex items-center">
-                <h2 className="text-3xl font-bold text-gray-800">Pace</h2>
-              </div>
-              <div className="flex space-x-4 items-center">
-                {/* View type dropdown */}
-                <div className="flex flex-col">
-                  <span className="text-xs text-gray-500 mb-2">View type</span>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        className="bg-[#f2f8ff] hover:bg-[#f2f8ff] text-[#342630] rounded-full px-4"
-                      >
-                        {selectedTimeframe === "Month" ? 'Month View' : 'Year View'} <ChevronDownIcon className="ml-2 h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent>
-                      <DropdownMenuItem onSelect={() => setSelectedTimeframe('Month')}>
-                        Month View
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onSelect={() => setSelectedTimeframe('Year')}>
-                        Year View
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
+    <div className="flex-1 overflow-auto bg-[#f5f8ff]">
+      <div className="fixed top-0 left-[256px] right-0 z-30 flex justify-between items-center mb-6 bg-white py-6 px-12 border-b border-gray-300 shadow-sm">
+        <div>
+          <h2 className="text-xl font-bold text-gray-800 mb-1">Pace</h2>
+        </div>
+        <div className="flex space-x-8 items-center">
+          <div className="flex flex-col">
+            <span className="text-xs text-gray-500 mb-2">View type</span>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  className="bg-[#f2f8ff] hover:bg-[#f2f8ff] text-[#342630] rounded-full px-4"
+                >
+                  {selectedTimeframe === "Month" ? 'Month View' : 'Year View'} <ChevronDownIcon className="ml-2 h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent>
+                <DropdownMenuItem onSelect={() => setSelectedTimeframe('Month')}>
+                  Month View
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => setSelectedTimeframe('Year')}>
+                  Year View
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
 
-                {/* Advanced Hotel Selector from Pickup page */}
-                <div className="flex flex-col">
-                  <span className="text-xs text-gray-500 mb-2">Property</span>
-                  <HotelSelector 
-                    selectedHotels={selectedHotels}
-                    setSelectedHotels={setSelectedHotels}
-                  />
-                </div>
-                
-                {/* Keep the comparison type dropdown */}
-                <div className="flex flex-col">
-                  <span className="text-xs text-gray-500 mb-2">Compare with</span>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button 
-                        variant="ghost" 
-                        className="bg-[#f2f8ff] hover:bg-[#f2f8ff] text-[#342630] rounded-full px-4"
-                      >
-                        {comparisonType} <ChevronDownIcon className="ml-2 h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent>
-                      <DropdownMenuItem onSelect={() => setComparisonType('Last year')}>
-                        Last year
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onSelect={() => setComparisonType('Budget')}>
-                        Budget
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onSelect={() => setComparisonType('No comparison')}>
-                        No comparison
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
-              </div>
-            </div>
+          <div className="flex flex-col">
+            <span className="text-xs text-gray-500 mb-2">Property</span>
+            <HotelSelector 
+              selectedHotels={selectedHotels}
+              setSelectedHotels={setSelectedHotels}
+            />
+          </div>
+          
+          <div className="flex flex-col">
+            <span className="text-xs text-gray-500 mb-2">Compare with</span>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button 
+                  variant="ghost" 
+                  className="bg-[#f2f8ff] hover:bg-[#f2f8ff] text-[#342630] rounded-full px-4"
+                >
+                  {comparisonType} <ChevronDownIcon className="ml-2 h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent>
+                <DropdownMenuItem onSelect={() => setComparisonType('Last year')}>
+                  Last year
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
       </div>
 
-      <div className="p-8 pt-4">
-        {/* Main Content - Pacing Chart */}
+      <div className="p-8 px-12 pt-[140px]">
         <div className="mt-2">
-          {/* Pass the fetched data and loading/error states to PacingChart */}
           <PacingChart
             viewType={selectedTimeframe as "Month" | "Year"} 
             data={pacingData}
@@ -784,11 +766,8 @@ export function PaceDashboard() {
             error={errorPacing}
           />
         </div>
-
-        {/* Additional charts if needed */}
       </div>
 
-      {/* Dialogs */}
       <CustomDialog
         selectedCard={selectedCard}
         closeDialog={closeDialog}

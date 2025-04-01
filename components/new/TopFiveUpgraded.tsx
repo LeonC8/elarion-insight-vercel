@@ -97,6 +97,7 @@ interface TopFiveUpgradedProps {
   secondaryField?: string
   onMetricChange?: (metric: string) => void
   id?: string
+  useCategoriesDialog?: boolean
 }
 
 type FilterType = 'top' | 'bottom' | 'rising' | 'falling';
@@ -154,6 +155,7 @@ export function TopFiveUpgraded({
   secondaryField = 'producer',
   onMetricChange,
   id = 'default',
+  useCategoriesDialog = false,
 }: TopFiveUpgradedProps) {
   const [showPercentage, setShowPercentage] = useState(false)
   const [filterType, setFilterType] = useState<FilterType>('top')
@@ -607,7 +609,7 @@ export function TopFiveUpgraded({
                 <Button
                   variant="ghost"
                   className="text-blue-600 hover:text-blue-800 font-medium text-sm"
-                  onClick={() => setShowDetailsTable(true)}
+                  onClick={() => useCategoriesDialog ? setShowDetails(true) : setShowDetailsTable(true)}
                 >
                   View Details
                 </Button>
@@ -617,20 +619,27 @@ export function TopFiveUpgraded({
         </CardContent>
       </Card>
 
-      <CategoriesDetailsDialog 
-        open={showDetails}
-        onOpenChange={setShowDetails}
-        title={`${title} - ${currentPrimaryGroupLabel}`}
-        prefix={currentMetric?.prefix || ''}
-        apiEndpoint={apiEndpoint}
-        apiParams={{
-          ...apiParams,
-          primaryField,
-          secondaryField,
-          primaryGroup: selectedPrimaryGroup
-        }}
-      />
+      {/* CategoriesDetailsDialog - show when useCategoriesDialog is true */}
+      {useCategoriesDialog && (
+        <CategoriesDetailsDialog 
+          open={showDetails}
+          onOpenChange={setShowDetails}
+          title={`${title} - ${currentPrimaryGroupLabel}`}
+          prefix={currentMetric?.prefix || ''}
+          apiEndpoint={apiEndpoint}
+          apiParams={{
+            ...apiParams,
+            primaryField,
+            secondaryField,
+            field: secondaryField,
+            primaryGroup: selectedPrimaryGroup,
+            primaryValue: selectedPrimaryGroup,
+            primaryFilterField: primaryField
+          }}
+        />
+      )}
 
+      {/* Simple table dialog - show when useCategoriesDialog is false */}
       <Dialog open={showDetailsTable} onOpenChange={setShowDetailsTable}>
         <DialogContent className="max-w-[45vw] max-h-[90vh] flex flex-col p-0">
           <DialogHeader className="flex-none py-6 pb-2" showBorder={true}>

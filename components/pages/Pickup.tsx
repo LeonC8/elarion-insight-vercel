@@ -319,16 +319,14 @@ const calculateRowSum = (rowData: { [key: string]: PickupMetrics }, metric: Metr
 // Update the MonthlyPickupTable component to fetch data from the API
 const MonthlyPickupTable = ({
   selectedMetric,
-  selectedDate,
   businessDate,
   onCellClick
 }: {
   selectedMetric: MetricType;
-  selectedDate: Date;
   businessDate: Date;
   onCellClick: (bookingDate: string, occupancyDate: string) => void;
 }) => {
-  const monthDates = generateMonthDates(selectedDate);
+  const monthDates = generateMonthDatesUTC(businessDate);
   const today = new Date();
   const [pickupData, setPickupData] = useState<MonthlyPickupData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -339,14 +337,12 @@ const MonthlyPickupTable = ({
       setIsLoading(true);
       setError(null);
       try {
-        const dateParam = selectedDate.toISOString().split('T')[0];
-        
         const year = businessDate.getFullYear();
         const month = String(businessDate.getMonth() + 1).padStart(2, '0');
         const day = String(businessDate.getDate()).padStart(2, '0');
         const businessDateParam = `${year}-${month}-${day}`;
         
-        const response = await fetch(`/api/pickup/month?date=${dateParam}&businessDate=${businessDateParam}`);
+        const response = await fetch(`/api/pickup/month?businessDate=${businessDateParam}`);
         
         if (!response.ok) {
           throw new Error('Failed to fetch pickup data');
@@ -354,7 +350,7 @@ const MonthlyPickupTable = ({
         
         const data = await response.json();
         console.log('Monthly Pickup API Response:', {
-          endpoint: `/api/pickup/month?date=${dateParam}&businessDate=${businessDateParam}`,
+          endpoint: `/api/pickup/month?businessDate=${businessDateParam}`,
           data: data
         });
         setPickupData(data);
@@ -367,7 +363,7 @@ const MonthlyPickupTable = ({
     };
 
     fetchData();
-  }, [selectedDate, businessDate]);
+  }, [businessDate]);
 
   const formatValue = (metrics: PickupMetrics | undefined) => {
     if (!metrics || metrics[selectedMetric] === null || metrics[selectedMetric] === 0) return '-';
@@ -402,11 +398,14 @@ const MonthlyPickupTable = ({
             <th className="sticky left-0 top-0 z-30 bg-gray-50 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-r border-b">
               Booking Date
             </th>
-            {monthDates.map(date => (
-              <th key={date} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">
-                {format(new Date(date), 'd MMM')}
-              </th>
-            ))}
+            {monthDates.map(dateString => {
+              const displayDate = new Date(dateString + 'T00:00:00Z');
+              return (
+                <th key={dateString} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">
+                  {format(displayDate, 'd MMM')}
+                </th>
+              );
+            })}
             <th className="sticky right-0 top-0 z-30 bg-gray-50 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-l border-b">
               SUM
             </th>
@@ -419,10 +418,10 @@ const MonthlyPickupTable = ({
             return (
               <tr key={row.bookingDate}>
                 <td className="sticky left-0 z-10 bg-white px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 border-r">
-                  {format(new Date(row.bookingDate), 'd MMM')}
+                  {format(new Date(row.bookingDate + 'T00:00:00Z'), 'd MMM')}
                 </td>
-                {monthDates.map(date => {
-                  const dateMetrics = row.pickupData[date] || {
+                {monthDates.map(dateString => {
+                  const dateMetrics = row.pickupData[dateString] || {
                     soldRooms: null,
                     revenue: null,
                     adr: null
@@ -430,18 +429,18 @@ const MonthlyPickupTable = ({
                   
                   const currentValue = getCellValue(dateMetrics);
                   const previousValue = rowIndex > 0 ? 
-                    getCellValue(pickupData[rowIndex - 1]?.pickupData?.[date]) : 
+                    getCellValue(pickupData[rowIndex - 1]?.pickupData?.[dateString]) : 
                     null;
                   
                   const colorClass = getChangeColor(currentValue, previousValue);
                   
                   return (
                     <td 
-                      key={date} 
+                      key={dateString} 
                       className={`px-6 py-4 whitespace-nowrap text-sm text-gray-500 transition-colors ${colorClass} cursor-pointer hover:bg-gray-100`}
                       onClick={() => onCellClick(
-                        format(new Date(row.bookingDate), 'dd MMM yyyy'),
-                        format(new Date(date), 'dd MMM yyyy')
+                        format(new Date(row.bookingDate + 'T00:00:00Z'), 'dd MMM yyyy'),
+                        format(new Date(dateString + 'T00:00:00Z'), 'dd MMM yyyy')
                       )}
                     >
                       {formatValue(dateMetrics)}
@@ -465,17 +464,15 @@ const MonthlyPickupTable = ({
 // Update the YearlyPickupTable component to fetch data from the API
 const YearlyPickupTable = ({
   selectedMetric,
-  selectedDate,
   businessDate,
   onCellClick
 }: {
   selectedMetric: MetricType;
-  selectedDate: Date;
   businessDate: Date;
   onCellClick: (bookingDate: string, occupancyMonth: string) => void;
 }) => {
   // Get year months
-  const yearMonths = generateYearMonths(selectedDate);
+  const yearMonths = generateYearMonths(businessDate);
   const [pickupData, setPickupData] = useState<YearlyPickupData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -485,14 +482,12 @@ const YearlyPickupTable = ({
       setIsLoading(true);
       setError(null);
       try {
-        const dateParam = selectedDate.toISOString().split('T')[0];
-        
         const year = businessDate.getFullYear();
         const month = String(businessDate.getMonth() + 1).padStart(2, '0');
         const day = String(businessDate.getDate()).padStart(2, '0');
         const businessDateParam = `${year}-${month}-${day}`;
         
-        const response = await fetch(`/api/pickup/year?date=${dateParam}&businessDate=${businessDateParam}`);
+        const response = await fetch(`/api/pickup/year?businessDate=${businessDateParam}`);
         
         if (!response.ok) {
           throw new Error('Failed to fetch yearly pickup data');
@@ -500,7 +495,7 @@ const YearlyPickupTable = ({
         
         const data = await response.json();
         console.log('Yearly Pickup API Response:', {
-          endpoint: `/api/pickup/year?date=${dateParam}&businessDate=${businessDateParam}`,
+          endpoint: `/api/pickup/year?businessDate=${businessDateParam}`,
           data: data
         });
         setPickupData(data);
@@ -513,7 +508,7 @@ const YearlyPickupTable = ({
     };
 
     fetchData();
-  }, [selectedDate, businessDate]);
+  }, [businessDate]);
 
   const formatValue = (metrics: PickupMetrics | undefined) => {
     if (!metrics || metrics[selectedMetric] === null || metrics[selectedMetric] === 0) return '-';
@@ -612,7 +607,7 @@ export function PickupDashboard() {
   const [selectedMetric, setSelectedMetric] = useState<MetricType>('soldRooms');
   const [selectedView, setSelectedView] = useState<ViewType>('month');
   const [selectedHotels, setSelectedHotels] = useState<string[]>(["Hotel 1"]);
-  const [selectedDate] = useState(new Date());
+  const [selectedDate, setSelectedDate] = useState(new Date());
   const [businessDate, setBusinessDate] = useState<Date>(new Date());
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const allHotels = ["Hotel 1", "Hotel 2", "Hotel 3"];
@@ -639,25 +634,26 @@ export function PickupDashboard() {
   });
   const [isLoadingStats, setIsLoadingStats] = useState(false);
 
+  useEffect(() => {
+    setSelectedDate(new Date());
+  }, [businessDate]);
+
   const handleCellClick = async (bookingDateStr: string, occupancyDateOrMonthStr: string) => {
     setSelectedCell({ bookingDate: bookingDateStr, occupancyDateOrMonth: occupancyDateOrMonthStr });
     setShowStatsModal(true);
     setIsLoadingStats(true);
     
-    // Business date for API call is still from the dropdown
     const apiBusinessDate = format(businessDate, 'yyyy-MM-dd'); 
     
     try {
       const params = new URLSearchParams({
-        businessDate: apiBusinessDate, // Use business date from dropdown for validity check
-        bookingDate: format(new Date(bookingDateStr), 'yyyy-MM-dd') // Use clicked booking date for validity check
+        businessDate: apiBusinessDate,
+        bookingDate: format(new Date(bookingDateStr), 'yyyy-MM-dd')
       });
       
       if (selectedView === 'month') {
-        // Pass the clicked occupancy date
         params.append('occupancyDate', format(new Date(occupancyDateOrMonthStr), 'yyyy-MM-dd'));
       } else {
-        // Pass the clicked occupancy month string
         params.append('occupancyMonth', occupancyDateOrMonthStr); 
       }
       
@@ -670,7 +666,6 @@ export function PickupDashboard() {
       const data = await response.json();
       console.log('Stats API Response:', data);
       
-      // Update the stats in state instead of using hardcoded values
       setStatsData({
         roomsSold: data.roomsSold,
         revenue: data.revenue,
@@ -680,7 +675,6 @@ export function PickupDashboard() {
         revenueLost: data.revenueLost,
         roomsAvailable: data.roomsAvailable,
         revPAR: data.revPAR,
-        // Variances
         roomsSoldVariance: data.roomsSoldVariance,
         revenueVariance: data.revenueVariance,
         adrVariance: data.adrVariance,
@@ -692,7 +686,6 @@ export function PickupDashboard() {
       });
     } catch (error) {
       console.error('Error fetching stats data:', error);
-      // You might want to show an error message to the user
     } finally {
       setIsLoadingStats(false);
     }
@@ -712,7 +705,6 @@ export function PickupDashboard() {
     );
   };
 
-  // Function to close the modal
   const closeStatsModal = () => {
     setShowStatsModal(false);
   };
@@ -726,7 +718,6 @@ export function PickupDashboard() {
               <h2 className="text-3xl font-bold text-gray-800">Pickup</h2>
             </div>
             <div className="flex space-x-4 items-center">
-              {/* Business Date Selector */}
               <div className="flex flex-col">
                 <span className="text-xs text-gray-500 mb-2">Business Date</span>
                 <DropdownMenu open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
@@ -756,7 +747,6 @@ export function PickupDashboard() {
                 </DropdownMenu>
               </div>
 
-              {/* View Type Dropdown */}
               <div className="flex flex-col">
                 <span className="text-xs text-gray-500 mb-2">View type</span>
                 <DropdownMenu>
@@ -779,7 +769,6 @@ export function PickupDashboard() {
                 </DropdownMenu>
               </div>
 
-              {/* New style dropdown for metric selection */}
               <div className="flex flex-col">
                 <span className="text-xs text-gray-500 mb-2">Metric</span>
                 <DropdownMenu>
@@ -806,7 +795,6 @@ export function PickupDashboard() {
                 </DropdownMenu>
               </div>
 
-              {/* Advanced Hotel Selector from Overview page */}
               <div className="flex flex-col">
                 <span className="text-xs text-gray-500 mb-2">Property</span>
                 <HotelSelector 
@@ -820,16 +808,14 @@ export function PickupDashboard() {
 
         <div className="mt-6">
           {selectedView === 'month' ? (
-            <MonthlyPickupTable 
-              selectedMetric={selectedMetric} 
-              selectedDate={selectedDate}
+            <MonthlyPickupTable
+              selectedMetric={selectedMetric}
               businessDate={businessDate}
               onCellClick={handleCellClick}
             />
           ) : (
-            <YearlyPickupTable 
-              selectedMetric={selectedMetric} 
-              selectedDate={selectedDate}
+            <YearlyPickupTable
+              selectedMetric={selectedMetric}
               businessDate={businessDate}
               onCellClick={handleCellClick}
             />
@@ -837,7 +823,6 @@ export function PickupDashboard() {
         </div>
       </div>
 
-      {/* Updated Dialog component with correct conditional titles/subtitles */}
       <Dialog open={showStatsModal} onOpenChange={setShowStatsModal}>
         <DialogContent className="max-w-3xl">
           <DialogHeader>
@@ -851,7 +836,6 @@ export function PickupDashboard() {
           
           {isLoadingStats ? (
             <div className="grid grid-cols-4 gap-4 mt-6">
-              {/* Create skeleton loading placeholders for each stat card */}
               {Array.from({ length: 8 }).map((_, index) => (
                 <div key={index} className="rounded-lg border border-gray-100 p-5 flex flex-col items-center">
                   <div className="w-24 h-4 bg-gray-200 animate-pulse rounded mb-4"></div>
@@ -863,7 +847,6 @@ export function PickupDashboard() {
             </div>
           ) : (
             <div className="grid grid-cols-4 gap-4 mt-6">
-              {/* Rooms Sold */}
               <div className="rounded-lg border border-gray-100 p-5 flex flex-col items-center text-center">
                 <div className="text-sm text-gray-500 font-medium">Rooms Sold</div>
                 <div className="text-3xl font-bold mt-4 mb-8">{statsData.roomsSold}</div>
@@ -873,7 +856,6 @@ export function PickupDashboard() {
                 </div>
               </div>
               
-              {/* Revenue */}
               <div className="rounded-lg border border-gray-100 p-5 flex flex-col items-center text-center">
                 <div className="text-sm text-gray-500 font-medium">Revenue</div>
                 <div className="text-3xl font-bold mt-4 mb-8">€{statsData.revenue}</div>
@@ -883,7 +865,6 @@ export function PickupDashboard() {
                 </div>
               </div>
               
-              {/* ADR */}
               <div className="rounded-lg border border-gray-100 p-5 flex flex-col items-center text-center">
                 <div className="text-sm text-gray-500 font-medium">ADR</div>
                 <div className="text-3xl font-bold mt-4 mb-8">€{statsData.adr}</div>
@@ -893,7 +874,6 @@ export function PickupDashboard() {
                 </div>
               </div>
               
-              {/* Occupancy */}
               <div className="rounded-lg border border-gray-100 p-5 flex flex-col items-center text-center">
                 <div className="text-sm text-gray-500 font-medium">Occupancy</div>
                 <div className="text-3xl font-bold mt-4 mb-8">{statsData.occupancy}%</div>
@@ -903,7 +883,6 @@ export function PickupDashboard() {
                 </div>
               </div>
               
-              {/* Rooms Cancelled */}
               <div className="rounded-lg border border-gray-100 p-5 flex flex-col items-center text-center">
                 <div className="text-sm text-gray-500 font-medium">Rooms Cancelled</div>
                 <div className="text-3xl font-bold mt-4 mb-8">{statsData.roomsCancelled}</div>
@@ -913,7 +892,6 @@ export function PickupDashboard() {
                 </div>
               </div>
               
-              {/* Revenue Lost */}
               <div className="rounded-lg border border-gray-100 p-5 flex flex-col items-center text-center">
                 <div className="text-sm text-gray-500 font-medium">Revenue Lost</div>
                 <div className="text-3xl font-bold mt-4 mb-8">€{statsData.revenueLost}</div>
@@ -923,7 +901,6 @@ export function PickupDashboard() {
                 </div>
               </div>
               
-              {/* Rooms Available */}
               <div className="rounded-lg border border-gray-100 p-5 flex flex-col items-center text-center">
                 <div className="text-sm text-gray-500 font-medium">Rooms Available</div>
                 <div className="text-3xl font-bold mt-4 mb-8">{statsData.roomsAvailable}</div>
@@ -933,7 +910,6 @@ export function PickupDashboard() {
                 </div>
               </div>
               
-              {/* RevPAR */}
               <div className="rounded-lg border border-gray-100 p-5 flex flex-col items-center text-center">
                 <div className="text-sm text-gray-500 font-medium">RevPAR</div>
                 <div className="text-3xl font-bold mt-4 mb-8">€{statsData.revPAR}</div>
@@ -950,18 +926,30 @@ export function PickupDashboard() {
   );
 }
 
-// Helper function to generate dates for the current month
-const generateMonthDates = (selectedDate: Date) => {
-  const year = selectedDate.getFullYear();
-  const month = selectedDate.getMonth();
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
-  
+// Helper function to generate UTC date strings for the month of the given date
+// Renamed from generateMonthDates and updated for UTC consistency
+const generateMonthDatesUTC = (referenceDate: Date): string[] => {
+  // Use UTC components of the reference date (passed as businessDate)
+  const year = referenceDate.getUTCFullYear();
+  const month = referenceDate.getUTCMonth(); // 0-indexed UTC month
+
+  // Calculate the number of days in the month using UTC
+  // new Date(Date.UTC(year, month + 1, 0)) gives the last day of the target month in UTC
+  const daysInMonth = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+
   return Array.from({ length: daysInMonth }, (_, i) => {
-    return format(new Date(year, month, i + 1), 'yyyy-MM-dd');
+    // Generate each date within the month using UTC
+    const dateUTC = new Date(Date.UTC(year, month, i + 1));
+
+    // Format the UTC date as YYYY-MM-DD string, matching backend keys
+    const y = dateUTC.getUTCFullYear();
+    const m = (dateUTC.getUTCMonth() + 1).toString().padStart(2, '0'); // Pad month
+    const d = dateUTC.getUTCDate().toString().padStart(2, '0'); // Pad day
+    return `${y}-${m}-${d}`;
   });
 };
 
-// Helper function to generate months for the year
+// Helper function to generate months for the year (ensure consistency if needed, seems ok for now)
 const generateYearMonths = (selectedDate: Date) => {
   const year = selectedDate.getFullYear();
   const currentMonth = selectedDate.getMonth();

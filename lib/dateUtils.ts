@@ -19,11 +19,20 @@ export function calculateDateRanges(
     const year = businessDate.getFullYear();
     const month = businessDate.getMonth();
     
+    // Check if it's the first day of the month
+    const isFirstDayOfMonth = businessDate.getDate() === 1;
+    
     if (viewType === 'Actual') {
-      // From beginning of month to business date
-      const firstDayOfMonth = new Date(year, month, 1);
-      startDate = firstDayOfMonth.toISOString().split('T')[0];
-      endDate = businessDateParam;
+      if (isFirstDayOfMonth) {
+        // If it's the first day of the month, use only that day
+        startDate = businessDateParam;
+        endDate = businessDateParam;
+      } else {
+        // From beginning of month to business date
+        const firstDayOfMonth = new Date(year, month, 2);
+        startDate = firstDayOfMonth.toISOString().split('T')[0];
+        endDate = businessDateParam;
+      }
     } else if (viewType === 'OTB') {
       // From day after business date to end of month
       const nextDay = new Date(businessDate);
@@ -32,18 +41,25 @@ export function calculateDateRanges(
       endDate = new Date(year, month + 1, 0).toISOString().split('T')[0];
     } else { // Projected
       // Full month - use the first day of month
-      const firstDayOfMonth = new Date(year, month, 1);
+      const firstDayOfMonth = new Date(year, month, 2);
       startDate = firstDayOfMonth.toISOString().split('T')[0];
-      endDate = new Date(year, month + 1, 0).toISOString().split('T')[0];
+      endDate = new Date(year, month + 1, 1).toISOString().split('T')[0];
     }
   } else { // Year
     const year = businessDate.getFullYear();
+    const isFirstDayOfYear = businessDate.getMonth() === 0 && businessDate.getDate() === 1;
     
     if (viewType === 'Actual') {
-      // From beginning of year to business date
-      const firstDayOfYear = new Date(year, 0, 1);
-      startDate = firstDayOfYear.toISOString().split('T')[0];
-      endDate = businessDateParam;
+      if (isFirstDayOfYear) {
+        // If it's the first day of the year, use only that day
+        startDate = businessDateParam;
+        endDate = businessDateParam;
+      } else {
+        // From beginning of year to business date
+        const firstDayOfYear = new Date(year, 0, 2);
+        startDate = firstDayOfYear.toISOString().split('T')[0];
+        endDate = businessDateParam;
+      }
     } else if (viewType === 'OTB') {
       // From day after business date to end of year
       const nextDay = new Date(businessDate);
@@ -73,6 +89,9 @@ export function calculateComparisonDateRanges(
   // Extract comparison method and data type from the comparison string
   const useMatchingDayOfWeek = comparisonType.includes('match day of week');
   const useOTBBusinessDate = comparisonType.includes('- OTB');
+  
+  // Check if we're dealing with a single day range (meaning it's the 1st of the month)
+  const isSingleDayRange = startDate === endDate;
 
   // Calculate previous period date range based on comparison type
   let prevStartDate: Date, prevEndDate: Date;
@@ -87,6 +106,21 @@ export function calculateComparisonDateRanges(
     prevStartDate.setFullYear(prevStartDate.getFullYear() - 1);
     prevEndDate = new Date(endDate);
     prevEndDate.setFullYear(prevEndDate.getFullYear() - 1);
+    
+    // If this is a first-day-of-month case (single day range),
+    // make sure the comparison is also a single day
+    if (isSingleDayRange) {
+      // For the first day of the month case, use the first day of the same month last year
+      const businessDate = new Date(businessDateParam);
+      const prevYear = businessDate.getFullYear() - 1;
+      const month = businessDate.getMonth();
+      const day = businessDate.getDate(); // This should be 1 for first day of month
+      
+      // Create a date for the 1st of the same month last year
+      const firstDayLastYear = new Date(prevYear, month, day);
+      prevStartDate = firstDayLastYear;
+      prevEndDate = firstDayLastYear;
+    }
   }
 
   // Determine which business date to use for the previous period
@@ -95,8 +129,13 @@ export function calculateComparisonDateRanges(
     // Use the business date from the beginning of the previous period
     prevBusinessDateParam = prevStartDate.toISOString().split('T')[0];
   } else {
-    // Use the same business date as the current period
-    prevBusinessDateParam = businessDateParam;
+    // For single day ranges, use the exact previous period date
+    if (isSingleDayRange) {
+      prevBusinessDateParam = prevStartDate.toISOString().split('T')[0];
+    } else {
+      // Use the same business date as the current period for multi-day ranges
+      prevBusinessDateParam = businessDateParam;
+    }
   }
   
   return {

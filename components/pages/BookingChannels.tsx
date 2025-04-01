@@ -349,6 +349,7 @@ export function BookingChannels() {
                   primaryField="booking_channel"
                   secondaryField="producer"
                   color="blue"
+                  useCategoriesDialog={true}
                   withBorder={false}
                 />
               </CardContent>
@@ -427,8 +428,7 @@ export function BookingChannels() {
                       metrics={metricOptions} // Pass the metric options config
                       apiEndpoint="/api/booking-channels/distribution-upgraded"
                       apiParams={{
-                        // ... existing apiParams ...
-                        // businessDate: date.toISOString().split('T')[0], // Already included in analysisApiParams spread below? Check usage.
+                        businessDate: date.toISOString().split('T')[0],
                         periodType: selectedTimeFrame,
                         viewType: selectedViewType,
                         comparison: selectedComparison,
@@ -440,10 +440,7 @@ export function BookingChannels() {
                       defaultPrimaryValue="WEB" // Or fetch the first available one
                       color="blue"
                       withBorder={false}
-                      // Remove props related to hardcoded data
-                      // distributionData={...} // REMOVE
-                      // categoryTimeSeriesData={...} // REMOVE
-                      // chartConfig={...} // REMOVE
+                      useCategoriesDialog={true}
                     />
                   </div>
                 </div>
