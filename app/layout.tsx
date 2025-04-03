@@ -5,7 +5,7 @@ import { AuthProvider } from './context/AuthContext'
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata = {
-  title: 'Hotel Dashboard',
+  title: 'Elarion Insights',
   description: 'Hotel Management Dashboard',
 }
 
