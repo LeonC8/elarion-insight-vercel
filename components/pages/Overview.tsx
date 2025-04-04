@@ -1252,20 +1252,7 @@ export function Overview() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  // Add state for length of stay data
-  const [lengthOfStayData, setLengthOfStayData] = useState<any[]>([]);
-  const [lengthOfStayLoading, setLengthOfStayLoading] = useState(true);
-  const [lengthOfStayError, setLengthOfStayError] = useState<string | null>(null);
-
-  // Add length of stay API params
-  const [lengthOfStayApiParams, setLengthOfStayApiParams] = useState({
-    businessDate: date.toISOString().split('T')[0],
-    periodType: selectedTimeFrame,
-    viewType: selectedViewType,
-    comparison: selectedComparison
-  });
-
-  // Keep one set of API params that can be used for all analysis endpoints
+  // Keep analysisApiParams
   const [analysisApiParams, setAnalysisApiParams] = useState({
     businessDate: date.toISOString().split('T')[0],
     periodType: selectedTimeFrame,
@@ -1273,7 +1260,6 @@ export function Overview() {
     comparison: selectedComparison
   });
 
-  // Update API params when filters change
   useEffect(() => {
     setAnalysisApiParams({
       businessDate: date.toISOString().split('T')[0],
@@ -1290,6 +1276,7 @@ export function Overview() {
   const fetchKpiData = async () => {
     try {
       setLoading(true)
+      setPrimaryDataLoaded(false)
       setError(null)
       
       // Format the date for the API
@@ -1316,9 +1303,6 @@ export function Overview() {
       // Mark primary data as loaded and trigger secondary data loads
       setPrimaryDataLoaded(true)
       
-      // Now fetch secondary data in parallel
-      fetchSecondaryData();
-      
     } catch (err) {
       console.error('Error fetching KPI data:', err)
       setError(err instanceof Error ? err.message : 'An unknown error occurred')
@@ -1327,108 +1311,11 @@ export function Overview() {
     }
   }
 
-  // Create a function to fetch all secondary data in parallel
-  const fetchSecondaryData = () => {
-    fetchLengthOfStayData();
-    fetchLeadTimesData();
-    fetchReservationTrendsData();
-    // Add other secondary data fetches here
-  }
-
   // Update the initial data loading useEffect
   useEffect(() => {
     fetchKpiData()
-    // Remove other fetch calls from here - they'll be triggered after primary data loads
+    // Only fetch primary data here
   }, [date, selectedTimeFrame, selectedViewType, selectedComparison])
-
-  // Function to fetch length of stay data
-  const fetchLengthOfStayData = async () => {
-    try {
-      setLengthOfStayLoading(true);
-      setLengthOfStayError(null);
-      
-      // Format the date for the API
-      const formattedDate = date.toISOString().split('T')[0];
-      
-      // Construct the query parameters
-      const params = new URLSearchParams({
-        businessDate: formattedDate,
-        periodType: selectedTimeFrame,
-        viewType: selectedViewType,
-        comparison: selectedComparison
-      });
-      
-      // Fetch data from the API
-      const response = await fetch(`/api/overview/length-of-stay?${params.toString()}`);
-      
-      if (!response.ok) {
-        throw new Error(`Failed to fetch length of stay data: ${response.status}`);
-      }
-      
-      const data = await response.json();
-      setLengthOfStayData(data.data);
-    } catch (err) {
-      console.error('Error fetching length of stay data:', err);
-      setLengthOfStayError(err instanceof Error ? err.message : 'An unknown error occurred');
-    } finally {
-      setLengthOfStayLoading(false);
-    }
-  };
-
-  // Fetch length of stay data on initial load and when filters change
-  useEffect(() => {
-    fetchLengthOfStayData();
-  }, [date, selectedTimeFrame, selectedViewType, selectedComparison]);
-
-  // Add state for lead times data
-  const [leadTimesData, setLeadTimesData] = useState<{ 
-    bookingLeadTime: any[]; 
-    cancellationLeadTime: any[] 
-  }>({ 
-    bookingLeadTime: [], 
-    cancellationLeadTime: [] 
-  });
-  const [leadTimesLoading, setLeadTimesLoading] = useState(true);
-  const [leadTimesError, setLeadTimesError] = useState<string | null>(null);
-
-  // Function to fetch lead times data
-  const fetchLeadTimesData = async () => {
-    try {
-      setLeadTimesLoading(true);
-      setLeadTimesError(null);
-      
-      // Format the date for the API
-      const formattedDate = date.toISOString().split('T')[0];
-      
-      // Construct the query parameters
-      const params = new URLSearchParams({
-        businessDate: formattedDate,
-        periodType: selectedTimeFrame,
-        viewType: selectedViewType,
-        comparison: selectedComparison
-      });
-      
-      // Fetch data from the API
-      const response = await fetch(`/api/overview/lead-times?${params.toString()}`);
-      
-      if (!response.ok) {
-        throw new Error(`Failed to fetch lead times data: ${response.status}`);
-      }
-      
-      const data = await response.json();
-      setLeadTimesData(data);
-    } catch (err) {
-      console.error('Error fetching lead times data:', err);
-      setLeadTimesError(err instanceof Error ? err.message : 'An unknown error occurred');
-    } finally {
-      setLeadTimesLoading(false);
-    }
-  };
-
-  // Fetch lead times data on initial load and when filters change
-  useEffect(() => {
-    fetchLeadTimesData();
-  }, [date, selectedTimeFrame, selectedViewType, selectedComparison]);
 
   const toggleHotel = (hotel: string) => {
     setSelectedHotels(prev => 
@@ -1468,20 +1355,6 @@ export function Overview() {
     }
   }
 
-  // Prepare the datasets for the HorizontalBarChartMultipleDatasets
-  const barChartDatasets = [
-    {
-      key: "leadtime",
-      title: "Booking Lead Time",
-      data: leadTimeData // Your existing leadTimeData
-    },
-    {
-      key: "cancellation",
-      title: "Cancellation Lead Time",
-      data: cancellationLeadTimeData // Your existing cancellationLeadTimeData
-    }
-  ]
-
   // Add date change handler
   const handleDateChange = (newDate: Date | undefined) => {
     if (newDate) {
@@ -1489,69 +1362,6 @@ export function Overview() {
       // Data will be fetched via the useEffect
     }
   }
-
-  // Add state for reservation trends data
-  const [reservationTrendsData, setReservationTrendsData] = useState<Array<{
-    dayOfWeek: string;
-    bookingsCreated: number;
-    prevBookingsCreated: number;
-    staysStarting: number;
-    prevStaysStarting: number;
-  }>>([]);
-  const [reservationTrendsLoading, setReservationTrendsLoading] = useState(true);
-  const [reservationTrendsError, setReservationTrendsError] = useState<string | null>(null);
-
-  // Function to fetch reservation trends data
-  const fetchReservationTrendsData = async () => {
-    try {
-      setReservationTrendsLoading(true);
-      setReservationTrendsError(null);
-      
-      // Format the date for the API
-      const formattedDate = date.toISOString().split('T')[0];
-      
-      // Construct the query parameters
-      const params = new URLSearchParams({
-        businessDate: formattedDate,
-        periodType: selectedTimeFrame,
-        viewType: selectedViewType,
-        comparison: selectedComparison
-      });
-      
-      // Fetch data from the API
-      const response = await fetch(`/api/overview/reservation-trends?${params.toString()}`);
-      
-      if (!response.ok) {
-        throw new Error(`Failed to fetch reservation trends data: ${response.status}`);
-      }
-      
-      const data = await response.json();
-      
-      // Transform API response to match the format expected by ReservationsByDayChart
-      const transformedData = data.occupancyByDayOfWeek.map((occupancyItem: any, index: number) => {
-        const bookingItem = data.bookingsByDayOfWeek[index];
-        return {
-          dayOfWeek: occupancyItem.day,
-          bookingsCreated: bookingItem.current,
-          prevBookingsCreated: bookingItem.previous,
-          staysStarting: occupancyItem.current,
-          prevStaysStarting: occupancyItem.previous
-        };
-      });
-      
-      setReservationTrendsData(transformedData);
-    } catch (err) {
-      console.error('Error fetching reservation trends data:', err);
-      setReservationTrendsError(err instanceof Error ? err.message : 'An unknown error occurred');
-    } finally {
-      setReservationTrendsLoading(false);
-    }
-  };
-
-  // Fetch reservation trends data on initial load and when filters change
-  useEffect(() => {
-    fetchReservationTrendsData();
-  }, [date, selectedTimeFrame, selectedViewType, selectedComparison]);
 
   // Add new state for world map data
   const [worldMapData, setWorldMapData] = useState<Array<{ country: string; value: number }>>([]);
@@ -1728,23 +1538,16 @@ export function Overview() {
 
 
       <div className="p-8 px-12 pt-[140px]">
-        {/* Remove the black overlay loading spinner */}
-        {/* {loading && (
-          <div className="flex justify-center items-center h-20">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
-          </div>
-        )} */}
-        
-        {error && (
+        {/* Show primary error if it exists */}
+        {error && !loading && ( // Only show if primary loading is done and error exists
           <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-6">
-            <p>Error loading data: {error}</p>
+            <p>Error loading main KPIs: {error}</p>
           </div>
         )}
 
-        {/* KPI Grid - using KpiWithAlignedChart with skeleton loading */}
+        {/* KPI Grid - Use primary loading state */}
         <div className="grid grid-cols-4 gap-6 mb-8">
-          {loading ? (
-            // Skeleton loaders for the KPI grid
+          {loading ? ( // Use primary loading state for KPI skeletons
             <>
               {[...Array(4)].map((_, index) => (
                 <Card key={index} className="bg-white p-6">
@@ -1797,10 +1600,9 @@ export function Overview() {
           )}
         </div>
 
-        {/* Second Row - KPIs without Charts */}
+        {/* Second Row - KPIs without Charts - Use primary loading state */}
         <div className="grid grid-cols-5 gap-4 mb-8">
-          {loading ? (
-            // Skeleton loaders for the second row of KPIs
+          {loading ? ( // Use primary loading state for KPI skeletons
             <>
               {[...Array(5)].map((_, index) => (
                 <Card key={index} className="bg-white p-4">
@@ -2111,49 +1913,35 @@ export function Overview() {
 
         {/* Horizontal Bar Chart and Reservations by Day */}
         <div className="grid gap-4 grid-cols-2 pt-8">
-          <HorizontalBarChartMultipleDatasets 
-            datasets={[
-              {
-                key: "leadtime",
-                title: "Booking Lead Time",
-                data: leadTimesData.bookingLeadTime.map(item => ({
-                  range: item.bucket,
-                  current: item.current,
-                  previous: item.previous
-                }))
-              },
-              {
-                key: "cancellation",
-                title: "Cancellation Lead Time",
-                data: leadTimesData.cancellationLeadTime.map(item => ({
-                  range: item.bucket,
-                  current: item.current,
-                  previous: item.previous
-                }))
-              }
-            ]}
-            defaultDataset="leadtime"
-            loading={leadTimesLoading}
-            error={leadTimesError}
-            leftMargin={-10} // Set left margin to -10 for lead times
+          {/* Use url and apiParams for Lead Times chart */}
+          <HorizontalBarChartMultipleDatasets
+            // REMOVE datasets prop
+            // datasets={ ... }
+            url="/api/overview/lead-times" // Pass the URL
+            apiParams={analysisApiParams} // Pass the common API parameters
+            defaultDataset="bookingLeadTime" // Use the key defined in the API response
+            // REMOVE loading/error props - handled internally by component
+            // loading={leadTimesLoading}
+            // error={leadTimesError}
+            leftMargin={-10}
           />
-          <ReservationsByDayChart 
-            data={reservationTrendsLoading ? [] : reservationTrendsData} 
+           {/* Update ReservationsByDayChart to fetch its own data */}
+          <ReservationsByDayChart
+             // REMOVE data prop
+             // data={reservationTrendsLoading ? [] : reservationTrendsData}
+             url="/api/overview/reservation-trends" // Pass the URL
+             apiParams={analysisApiParams} // Pass the common API parameters
           />
         </div>
 
-        {/* New KPIs - moved outside the previous grid */}
+        {/* New KPIs section */}
         <div className="grid grid-cols-2 gap-6 mt-8">
+           {/* KpiWithChart already fetches its own data */}
           <KpiWithChart
             title="Booking Status"
             color="blue"
             apiUrl="/api/overview/cancellations"
-            apiParams={{
-              businessDate: date.toISOString().split('T')[0],
-              periodType: selectedTimeFrame,
-              viewType: selectedViewType,
-              comparison: selectedComparison
-            }}
+            apiParams={analysisApiParams} // Use common params
             fieldMapping={[
               {
                 apiField: "cancelledRooms",
@@ -2172,21 +1960,19 @@ export function Overview() {
               }
             ]}
           />
-          <HorizontalBarChartMultipleDatasets 
-            datasets={[
-              {
-                key: "lengthOfStay",
-                title: "Length of Stay Distribution",
-                data: lengthOfStayLoading ? [] : lengthOfStayData
-              }
-            ]}
-            defaultDataset="lengthOfStay"
-            loading={lengthOfStayLoading}
-            error={lengthOfStayError}
-            leftMargin={10} // Set left margin to 10 for length of stay
+           {/* Update HorizontalBarChartMultipleDatasets for Length of Stay */}
+          <HorizontalBarChartMultipleDatasets
+            // REMOVE datasets prop
+            // datasets={ ... }
+            url="/api/overview/length-of-stay" // Pass the URL
+            apiParams={analysisApiParams} // Pass the common API parameters
+            defaultDataset="lengthOfStay" // Assume API returns a dataset with this key
+            // REMOVE loading/error props - handled internally
+            // loading={lengthOfStayLoading}
+            // error={lengthOfStayError}
+            leftMargin={10}
           />
         </div>
-
       </div>
     </div>
   )

@@ -1,18 +1,7 @@
 import { NextResponse } from 'next/server';
 import { ClickHouseClient, createClient } from '@clickhouse/client';
 import { calculateDateRanges, calculateComparisonDateRanges } from '@/lib/dateUtils';
-
-// Interfaces for lead time distribution data
-interface LeadTimeItem {
-  bucket: string;
-  current: number;
-  previous: number;
-}
-
-export interface LeadTimesResponse {
-  bookingLeadTime: LeadTimeItem[];
-  cancellationLeadTime: LeadTimeItem[];
-}
+import type { DataSet } from '@/components/new/HorizontalBarChartMultipleDatasets';
 
 export async function GET(request: Request) {
   // Parse query parameters
@@ -150,115 +139,97 @@ export async function GET(request: Request) {
 
     
 
-    // Execute queries
-    const currentBookingResultSet = await client.query({
-      query: currentBookingQuery,
-      format: 'JSONEachRow'
-    });
-
-    const previousBookingResultSet = await client.query({
-      query: previousBookingQuery,
-      format: 'JSONEachRow'
-    });
-
-    const currentCancellationResultSet = await client.query({
-      query: currentCancellationQuery,
-      format: 'JSONEachRow'
-    });
-
-    const previousCancellationResultSet = await client.query({
-      query: previousCancellationQuery,
-      format: 'JSONEachRow'
-    });
+    // Execute queries in parallel
+    const [
+      currentBookingResultSet,
+      previousBookingResultSet,
+      currentCancellationResultSet,
+      previousCancellationResultSet
+    ] = await Promise.all([
+      client.query({ query: currentBookingQuery, format: 'JSONEachRow' }),
+      client.query({ query: previousBookingQuery, format: 'JSONEachRow' }),
+      client.query({ query: currentCancellationQuery, format: 'JSONEachRow' }),
+      client.query({ query: previousCancellationQuery, format: 'JSONEachRow' })
+    ]);
 
     const currentBookingData = await currentBookingResultSet.json() as any[];
     const previousBookingData = await previousBookingResultSet.json() as any[];
     const currentCancellationData = await currentCancellationResultSet.json() as any[];
     const previousCancellationData = await previousCancellationResultSet.json() as any[];
 
-    // Process booking lead time data
-    const previousBookingDataMap = new Map();
-    previousBookingData.forEach(item => {
-      previousBookingDataMap.set(item.lead_time_bucket, item);
-    });
+    // Define a helper function to merge and transform data
+    const processLeadTimeData = (
+        currentData: any[],
+        previousData: any[],
+        bucketField: string = 'lead_time_bucket',
+        countField: string = 'count'
+    ): Array<{ range: string; current: number; previous: number }> => {
 
-    const bookingLeadTimeData: LeadTimeItem[] = currentBookingData.map(item => {
-      const prevItem = previousBookingDataMap.get(item.lead_time_bucket) || { count: 0 };
-      
-      return {
-        bucket: item.lead_time_bucket,
-        current: parseInt(item.count || '0', 10),
-        previous: parseInt(prevItem.count || '0', 10)
+      const previousDataMap = new Map();
+      previousData.forEach(item => {
+        previousDataMap.set(item[bucketField], item);
+      });
+
+      const combinedDataMap = new Map<string, { current: number; previous: number }>();
+
+      // Process current data
+      currentData.forEach(item => {
+        const bucket = item[bucketField];
+        const currentCount = parseInt(item[countField] || '0', 10);
+        const prevItem = previousDataMap.get(bucket);
+        const previousCount = parseInt(prevItem?.[countField] || '0', 10);
+        combinedDataMap.set(bucket, { current: currentCount, previous: previousCount });
+      });
+
+      // Add any buckets from previous data not in current data
+      previousData.forEach(prevItem => {
+        const bucket = prevItem[bucketField];
+        if (!combinedDataMap.has(bucket)) {
+          combinedDataMap.set(bucket, {
+            current: 0,
+            previous: parseInt(prevItem[countField] || '0', 10)
+          });
+        }
+      });
+
+      // Convert map to array and transform bucket to range
+      const result = Array.from(combinedDataMap.entries()).map(([bucket, counts]) => ({
+        range: bucket, // Map 'bucket' to 'range'
+        current: counts.current,
+        previous: counts.previous
+      }));
+
+      // Sort data by the correct order of lead time buckets
+      const bucketOrder = {
+        '0-7 days': 1, '8-14 days': 2, '15-30 days': 3, '31-60 days': 4,
+        '61-90 days': 5, '91-180 days': 6, '181-365 days': 7, '365+ days': 8
       };
-    });
 
-    // Add any buckets from previous booking data that might not be in current data
-    previousBookingData.forEach(prevItem => {
-      const exists = bookingLeadTimeData.some(item => item.bucket === prevItem.lead_time_bucket);
-      if (!exists) {
-        bookingLeadTimeData.push({
-          bucket: prevItem.lead_time_bucket,
-          current: 0,
-          previous: parseInt(prevItem.count || '0', 10)
-        });
-      }
-    });
+      result.sort((a, b) => {
+        return (bucketOrder[a.range as keyof typeof bucketOrder] || 99) -
+               (bucketOrder[b.range as keyof typeof bucketOrder] || 99);
+      });
 
-    // Process cancellation lead time data
-    const previousCancellationDataMap = new Map();
-    previousCancellationData.forEach(item => {
-      previousCancellationDataMap.set(item.lead_time_bucket, item);
-    });
-
-    const cancellationLeadTimeData: LeadTimeItem[] = currentCancellationData.map(item => {
-      const prevItem = previousCancellationDataMap.get(item.lead_time_bucket) || { count: 0 };
-      
-      return {
-        bucket: item.lead_time_bucket,
-        current: parseInt(item.count || '0', 10),
-        previous: parseInt(prevItem.count || '0', 10)
-      };
-    });
-
-    // Add any buckets from previous cancellation data that might not be in current data
-    previousCancellationData.forEach(prevItem => {
-      const exists = cancellationLeadTimeData.some(item => item.bucket === prevItem.lead_time_bucket);
-      if (!exists) {
-        cancellationLeadTimeData.push({
-          bucket: prevItem.lead_time_bucket,
-          current: 0,
-          previous: parseInt(prevItem.count || '0', 10)
-        });
-      }
-    });
-
-    // Sort data by the correct order of lead time buckets
-    const bucketOrder = {
-      '0-7 days': 1,
-      '8-14 days': 2,
-      '15-30 days': 3,
-      '31-60 days': 4,
-      '61-90 days': 5,
-      '91-180 days': 6,
-      '181-365 days': 7,
-      '365+ days': 8
+      return result;
     };
 
-    bookingLeadTimeData.sort((a, b) => {
-      return (bucketOrder[a.bucket as keyof typeof bucketOrder] || 99) - 
-             (bucketOrder[b.bucket as keyof typeof bucketOrder] || 99);
-    });
+    // Process both datasets
+    const bookingLeadTimeData = processLeadTimeData(currentBookingData, previousBookingData, 'lead_time_bucket', 'count');
+    const cancellationLeadTimeData = processLeadTimeData(currentCancellationData, previousCancellationData, 'lead_time_bucket', 'count');
 
-    cancellationLeadTimeData.sort((a, b) => {
-      return (bucketOrder[a.bucket as keyof typeof bucketOrder] || 99) - 
-             (bucketOrder[b.bucket as keyof typeof bucketOrder] || 99);
-    });
-
-    // Construct response
-    const response: LeadTimesResponse = {
-      bookingLeadTime: bookingLeadTimeData,
-      cancellationLeadTime: cancellationLeadTimeData
-    };
+    // Construct the response in the DataSet[] format
+    const response: DataSet[] = [
+      {
+        key: "bookingLeadTime", // Consistent key
+        title: "Booking Lead Time",
+        data: bookingLeadTimeData
+      },
+      {
+        key: "cancellationLeadTime", // Consistent key
+        title: "Cancellation Lead Time",
+        data: cancellationLeadTimeData
+      }
+    ];
 
     return NextResponse.json(response);
   } catch (error) {

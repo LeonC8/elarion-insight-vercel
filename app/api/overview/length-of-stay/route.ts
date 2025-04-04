@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { ClickHouseClient, createClient } from '@clickhouse/client';
 import { calculateDateRanges, calculateComparisonDateRanges } from '@/lib/dateUtils';
+// Import the DataSet type
+import type { DataSet } from '@/components/new/HorizontalBarChartMultipleDatasets';
 
 // Interface for length of stay distribution data
 interface LengthOfStayItem {
@@ -131,8 +133,8 @@ export async function GET(request: Request) {
       previousDataMap.set(item.stay_range, item);
     });
 
-    // Combine current and previous data
-    const combinedData: LengthOfStayItem[] = currentData.map(item => {
+    // Combine current and previous data, mapping field names
+    const combinedData = currentData.map(item => {
       const prevItem = previousDataMap.get(item.stay_range) || { count: 0 };
       
       return {
@@ -169,12 +171,16 @@ export async function GET(request: Request) {
       return (order[a.range as keyof typeof order] || 99) - (order[b.range as keyof typeof order] || 99);
     });
 
-    // Construct response
-    const response: LengthOfStayResponse = {
-      data: combinedData
-    };
+    // Construct the response as DataSet[]
+    const response: DataSet[] = [
+      {
+        key: "lengthOfStay", // Match the defaultDataset key used in Overview.tsx
+        title: "Length of Stay Distribution",
+        data: combinedData // The processed data array
+      }
+    ];
 
-    return NextResponse.json(response);
+    return NextResponse.json(response); // Return the DataSet array directly
   } catch (error) {
     console.error('Error querying ClickHouse:', error);
     return NextResponse.json(

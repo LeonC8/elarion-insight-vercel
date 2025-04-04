@@ -9,7 +9,7 @@ import {
   ChartTooltip,
   ChartTooltipContent,
 } from "@/components/ui/chart"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -28,14 +28,23 @@ import {
   TableRow,
 } from "@/components/ui/table"
 
-interface ReservationsByDayChartProps {
-  data: Array<{
-    dayOfWeek: string
-    bookingsCreated: number
-    prevBookingsCreated: number
-    staysStarting: number
-    prevStaysStarting: number
-  }>
+interface ReservationDayData {
+  dayOfWeek: string;
+  bookingsCreated: number;
+  prevBookingsCreated: number;
+  staysStarting: number;
+  prevStaysStarting: number;
+}
+
+interface ReservationTrendsApiResponse {
+   bookingsByDayOfWeek: Array<{ day: string; current: number; previous: number }>;
+   occupancyByDayOfWeek: Array<{ day: string; current: number; previous: number }>;
+}
+
+export interface ReservationsByDayChartProps {
+  data?: ReservationDayData[]
+  url?: string
+  apiParams?: Record<string, string | number | boolean | undefined>
   color?: 'green' | 'blue'
   categories?: Array<{
     key: string
@@ -92,7 +101,19 @@ function TriangleDown({ className }: { className?: string }) {
   )
 }
 
-export function ReservationsByDayChart({ data, color = 'green', categories }: ReservationsByDayChartProps) {
+function Skeleton({ className }: { className?: string }) {
+  return (
+    <div className={`animate-pulse rounded bg-gray-200 ${className}`} />
+  )
+}
+
+export function ReservationsByDayChart({
+  data: dataProp,
+  url,
+  apiParams,
+  color = 'green',
+  categories
+}: ReservationsByDayChartProps) {
   const [dateType, setDateType] = useState<'book' | 'stay'>('book')
   const [activeSeries, setActiveSeries] = React.useState<string[]>([
     'current',
@@ -103,16 +124,130 @@ export function ReservationsByDayChart({ data, color = 'green', categories }: Re
     categories && categories.length > 0 ? categories[0].key : ''
   )
 
+  // Add internal state for data fetching
+  const [internalData, setInternalData] = useState<ReservationDayData[] | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  // Effect to fetch data if URL is provided
+  useEffect(() => {
+    if (!url) {
+      setInternalData(null); // Clear internal data if URL is removed
+      return;
+    }
+
+    const fetchData = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const fetchUrl = new URL(url, window.location.origin);
+        if (apiParams) {
+          Object.entries(apiParams).forEach(([key, value]) => {
+            if (value !== undefined) {
+              fetchUrl.searchParams.append(key, String(value));
+            }
+          });
+        }
+
+        const response = await fetch(fetchUrl.toString());
+        if (!response.ok) {
+          throw new Error(`Failed to fetch reservation trends: ${response.status} ${response.statusText}`);
+        }
+        const apiResponse: ReservationTrendsApiResponse = await response.json();
+
+        // Transform API response to the component's expected format
+        const transformedData = apiResponse.occupancyByDayOfWeek.map((occupancyItem, index) => {
+           const bookingItem = apiResponse.bookingsByDayOfWeek[index];
+           // Basic safety check: ensure items align by day or index if API guarantees order
+           if (!bookingItem || bookingItem.day !== occupancyItem.day) {
+             console.warn(`Data mismatch for day: ${occupancyItem.day}`);
+             // Handle mismatch: return a default structure or skip
+             return {
+               dayOfWeek: occupancyItem.day,
+               bookingsCreated: 0,
+               prevBookingsCreated: 0,
+               staysStarting: occupancyItem.current,
+               prevStaysStarting: occupancyItem.previous
+             };
+           }
+           return {
+             dayOfWeek: occupancyItem.day,
+             bookingsCreated: bookingItem.current,
+             prevBookingsCreated: bookingItem.previous,
+             staysStarting: occupancyItem.current,
+             prevStaysStarting: occupancyItem.previous
+           };
+         });
+
+
+        setInternalData(transformedData);
+
+      } catch (err) {
+        console.error('Error fetching data in ReservationsByDayChart:', err);
+        setError(err instanceof Error ? err.message : 'An unknown error occurred');
+        setInternalData(null);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [url, JSON.stringify(apiParams)]);
+
+  // Determine which data source to use
+  const data = url ? internalData : dataProp;
+
   // Get the appropriate data keys based on date type
   const currentKey = dateType === 'book' ? 'bookingsCreated' : 'staysStarting'
   const previousKey = dateType === 'book' ? 'prevBookingsCreated' : 'prevStaysStarting'
 
-  // Transform data for the selected date type
-  const chartData = data.map(item => ({
-    dayOfWeek: item.dayOfWeek,
-    current: item[currentKey],
-    previous: item[previousKey],
-  }))
+  // Transform data for the selected date type, handle loading/null state
+  const chartData = (!loading && data)
+    ? data.map(item => ({
+        dayOfWeek: item.dayOfWeek,
+        current: item[currentKey],
+        previous: item[previousKey],
+      }))
+    : []; // Default to empty array if loading or data is null/undefined
+
+  const CustomTooltip = ({ active, payload, label }: any) => {
+    if (active && payload && payload.length) {
+      const current = payload.find((p: any) => p.dataKey === 'current');
+      const previous = payload.find((p: any) => p.dataKey === 'previous');
+
+      // Calculate percentage change
+      let percentageChange = 0;
+      if (previous && previous.value !== 0) {
+        percentageChange = ((current.value - previous.value) / previous.value) * 100;
+      } else if (current && current.value !== 0) {
+        percentageChange = Infinity; // Handle division by zero or previous being zero
+      }
+
+      const changeText = percentageChange === Infinity
+        ? ' (New)'
+        : ` (${percentageChange >= 0 ? '+' : ''}${percentageChange.toFixed(1)}%)`;
+
+      return (
+        <div className="bg-white p-3 border border-gray-300 rounded shadow-lg text-sm">
+          <p className="font-semibold mb-1">{label}</p>
+          {current && (
+             <p style={{ color: current.color }}>
+                Current: {current.value.toLocaleString()}
+                {previous && previous.value !== 0 ? changeText : ''}
+             </p>
+          )}
+          {previous && (
+             <p style={{ color: previous.color }}>Previous: {previous.value.toLocaleString()}</p>
+          )}
+        </div>
+      );
+    }
+    return null;
+  };
+
+  const renderLegendText = (value: string) => {
+    return <span className="text-gray-600 capitalize">{value}</span>;
+  };
 
   return (
     <>
