@@ -297,35 +297,14 @@ export function KpiWithChart({
     ];
   };
 
-  if (loading) {
-    return (
-      <Card className="border-gray-300">
-        <CardHeader>
-          <CardTitle className="text-base mb-2 font-medium text-sm text-muted-foreground">
-            {title}
-          </CardTitle>
-          <div className="flex items-center justify-center h-24">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
-          </div>
-        </CardHeader>
-      </Card>
-    );
-  }
+  // Ensure data used for calculations handles the loading state
+  const chartDataForRender = loading ? [] : (currentMetricData.data || []);
 
-  if (error) {
-    return (
-      <Card className="border-gray-300">
-        <CardHeader>
-          <CardTitle className="text-base mb-2 font-medium text-sm text-muted-foreground">
-            {title}
-          </CardTitle>
-          <div className="text-red-500 p-4">
-            Error loading data: {error}
-          </div>
-        </CardHeader>
-      </Card>
-    );
-  }
+  // Calculate domain only if there's data
+  const chartDomain = chartDataForRender.length > 0 ? getChartDomain(chartDataForRender) : [0, 100]; // Default domain for empty chart
+  
+  // Calculate left margin only if there's data
+  const leftMarginForRender = chartDataForRender.length > 0 ? getLeftMargin(chartDataForRender) : 0; // Default margin for empty chart
 
   return (
     <>
@@ -374,100 +353,104 @@ export function KpiWithChart({
             )}
           </div>
         </CardHeader>
-        <CardContent className="pb-4 mt-3">
-          {currentMetricData.data?.length > 0 && (
-            <ChartContainer config={chartConfig}>
-              <AreaChart
-                data={currentMetricData.data}
-                height={300}
-                margin={{
-                  top: 10,
-                  right: 10,
-                  bottom: 20,
-                  left: leftMargin,
-                }}
-              >
-                <defs>
-                  <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor={currentGradientColor} stopOpacity={0.1}/>
-                    <stop offset="100%" stopColor={currentGradientColor} stopOpacity={0.1}/>
-                  </linearGradient>
-                  <linearGradient id={`${gradientId}-previous`} x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor={chartConfig.previous.color} stopOpacity={0.05}/>
-                    <stop offset="100%" stopColor={chartConfig.previous.color} stopOpacity={0.05}/>
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                <XAxis
-                  dataKey="date"
-                  tickLine={false}
-                  axisLine={false}
-                  tickFormatter={(value) => value}
-                  tickMargin={8}
-                  interval={Math.ceil(currentMetricData.data.length / 8) - 1}
-                />
-                <YAxis
-                  tickLine={false}
-                  axisLine={false}
-                  tickFormatter={(value) => `${Math.round(value).toLocaleString()}`}
-                  tickMargin={8}
-                  width={45}
-                  domain={getChartDomain(currentMetricData.data)}
-                  allowDecimals={false}
-                  minTickGap={20}
-                />
-                <ChartTooltip content={<ChartTooltipContent />} />
-                {/* Conditionally render the areas based on activeMainSeries */}
-                {activeMainSeries.includes("previous") && (
-                  <Area
-                    type="monotone"
-                    dataKey="previous"
-                    stroke={chartConfig.previous.color}
-                    strokeDasharray="4 4"
-                    fill={`url(#${gradientId}-previous)`}
-                    strokeWidth={2}
-                    dot={false}
-                  />
-                )}
-                {activeMainSeries.includes("current") && (
-                  <Area
-                    type="monotone"
-                    dataKey="current"
-                    stroke={currentGradientColor}
-                    fill={`url(#${gradientId})`}
-                    strokeWidth={2}
-                    dot={false}
-                  />
-                )}
-                {/* Replace existing ChartLegend with updated version */}
-                <ChartLegend 
-                  className="mt-6" 
-                  content={() => (
-                    <div className="flex justify-center gap-3 pt-10 pb-0 mb-0">
-                      {Object.keys(chartConfig).map((key) => (
-                        <div
-                          key={key}
-                          onClick={() => {
-                            if (activeMainSeries.includes(key)) {
-                              setActiveMainSeries(activeMainSeries.filter(item => item !== key))
-                            } else {
-                              setActiveMainSeries([...activeMainSeries, key])
-                            }
-                          }}
-                          className={`cursor-pointer bg-[#f0f4fa] px-3 py-1.5 rounded-full border border-[#e5eaf3] flex items-center gap-2 ${
-                            activeMainSeries.includes(key) ? '' : 'opacity-50'
-                          }`}
-                        >
-                          <div style={{ backgroundColor: chartConfig[key].color }} className="w-2 h-2 rounded-full" />
-                          <span className="text-xs text-gray-500 font-medium">{chartConfig[key].label}</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                />
-              </AreaChart>
-            </ChartContainer>
+        <CardContent className="relative pb-4 mt-3 min-h-[360px]">
+          {/* Spinner Overlay */}
+          {loading && (
+            <div className="absolute inset-0 flex items-center justify-center bg-white/80 z-20 rounded-b-lg">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+            </div>
           )}
+
+          <ChartContainer config={chartConfig}>
+            <AreaChart
+              data={chartDataForRender}
+              height={300}
+              margin={{
+                top: 10,
+                right: 10,
+                bottom: 20,
+                left: leftMarginForRender,
+              }}
+            >
+              <defs>
+                <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor={currentGradientColor} stopOpacity={0.1}/>
+                  <stop offset="100%" stopColor={currentGradientColor} stopOpacity={0.1}/>
+                </linearGradient>
+                <linearGradient id={`${gradientId}-previous`} x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor={chartConfig.previous.color} stopOpacity={0.05}/>
+                  <stop offset="100%" stopColor={chartConfig.previous.color} stopOpacity={0.05}/>
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} />
+              <XAxis
+                dataKey="date"
+                tickLine={false}
+                axisLine={false}
+                tickFormatter={(value) => value}
+                tickMargin={8}
+                interval={chartDataForRender.length > 8 ? Math.ceil(chartDataForRender.length / 8) - 1 : 0}
+              />
+              <YAxis
+                tickLine={false}
+                axisLine={false}
+                tickFormatter={(value) => `${Math.round(value).toLocaleString()}`}
+                tickMargin={8}
+                width={45}
+                domain={chartDomain}
+                allowDecimals={false}
+                minTickGap={20}
+              />
+              <ChartTooltip content={<ChartTooltipContent />} />
+              {chartDataForRender.length > 0 && activeMainSeries.includes("previous") && (
+                <Area
+                  type="monotone"
+                  dataKey="previous"
+                  stroke={chartConfig.previous.color}
+                  strokeDasharray="4 4"
+                  fill={`url(#${gradientId}-previous)`}
+                  strokeWidth={2}
+                  dot={false}
+                />
+              )}
+              {chartDataForRender.length > 0 && activeMainSeries.includes("current") && (
+                <Area
+                  type="monotone"
+                  dataKey="current"
+                  stroke={currentGradientColor}
+                  fill={`url(#${gradientId})`}
+                  strokeWidth={2}
+                  dot={false}
+                />
+              )}
+              <ChartLegend 
+                className="mt-6" 
+                content={() => (
+                  <div className="flex justify-center gap-3 pt-10 pb-0 mb-0">
+                    {Object.keys(chartConfig).map((key) => (
+                      <div
+                        key={key}
+                        onClick={() => {
+                          if (activeMainSeries.includes(key)) {
+                            setActiveMainSeries(activeMainSeries.filter(item => item !== key))
+                          } else {
+                            setActiveMainSeries([...activeMainSeries, key])
+                          }
+                        }}
+                        className={`cursor-pointer bg-[#f0f4fa] px-3 py-1.5 rounded-full border border-[#e5eaf3] flex items-center gap-2 ${
+                          activeMainSeries.includes(key) ? '' : 'opacity-50'
+                        }`}
+                      >
+                        <div style={{ backgroundColor: chartConfig[key].color }} className="w-2 h-2 rounded-full" />
+                        <span className="text-xs text-gray-500 font-medium">{chartConfig[key].label}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              />
+            </AreaChart>
+          </ChartContainer>
+          
           <div className="mt-3 pt-4 border-t border-gray-200">
             <div className="flex justify-end">
               <Button

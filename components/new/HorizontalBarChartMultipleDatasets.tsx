@@ -83,16 +83,6 @@ export function HorizontalBarChartMultipleDatasets({
   const currentDataset = datasets.find(d => d.key === selectedDataset) || datasets[0]
   const currentCategory = categories?.find(c => c.key === selectedCategory) || categories?.[0]
 
-  if (loading) {
-    return (
-      <div className="relative">
-        <div className="h-[400px] flex items-center justify-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
-        </div>
-      </div>
-    )
-  }
-
   if (error) {
     return (
       <div className="relative">
@@ -104,17 +94,23 @@ export function HorizontalBarChartMultipleDatasets({
   }
 
   // Create a copy of the data to sort
-  let sortedData = [...(currentDataset?.data || [])];
+  let sortedData = loading ? [] : [...(currentDataset?.data || [])];
 
   // Sort data by extracted numbers if enabled (on by default)
-  if (sort !== false && sortedData.length > 0) {
+  if (!loading && sort !== false && sortedData.length > 0) {
     sortedData.sort((a, b) => {
       return extractNumber(a.range) - extractNumber(b.range);
     });
   }
 
   return (
-    <div className="relative">
+    <div className="relative min-h-[400px]">
+      {loading && (
+        <div className="absolute inset-0 flex items-center justify-center bg-white/80 z-20">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+        </div>
+      )}
+
       <div className="absolute right-8 top-6 z-10 flex space-x-2">
         {categories && categories.length > 0 && (
           <DropdownMenu>
@@ -162,6 +158,7 @@ export function HorizontalBarChartMultipleDatasets({
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
+      
       <HorizontalBarChart 
         data={sortedData}
         title={currentDataset.title}

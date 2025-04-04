@@ -26,7 +26,7 @@ export function Sidebar({ onLogout }: SidebarProps) {
         <div className="flex items-center mb-8 mt-4">
           <BarChart2Icon className="h-12 w-11 text-blue-400 mr-2 pr-1" />
           <div className="flex flex-col">
-            <span className="text-md font-bold">Elarion Insight</span>
+            <span className="text-md font-bold">Elarion Insights</span>
             <span className="text-sm text-gray-400">Hospitality</span>
           </div>
         </div>

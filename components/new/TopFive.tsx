@@ -115,6 +115,13 @@ function formatNumberWithCommas(value: number | undefined): string {
   return value.toLocaleString('en-US');
 }
 
+// Add the Skeleton component definition
+function Skeleton({ className }: { className?: string }) {
+  return (
+    <div className={`animate-pulse rounded bg-gray-200 ${className}`} />
+  )
+}
+
 export function TopFive({ 
   title, 
   subtitle,
@@ -459,15 +466,38 @@ export function TopFive({
         </CardHeader>
         
         <CardContent className="pt-3">
-          {/* Loading state */}
+          {/* Loading state - Replace spinner with skeletons */}
           {apiLoading && (
-            <div className="flex justify-center items-center py-4">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+            <div className="space-y-4 pt-4"> {/* Add pt-4 to match data row padding */}
+              {Array.from({ length: 5 }).map((_, index) => (
+                <div key={`skeleton-${index}`} className="relative mb-4 last:mb-0"> {/* Match structure of data rows */}
+                  <div className="flex items-center justify-between py-4"> {/* Match padding */}
+                    {/* Skeleton for name */}
+                    <Skeleton className="h-5 w-2/5" /> 
+                    <div className="flex items-center">
+                      {/* Skeleton for value */}
+                      <Skeleton className="h-5 w-16 mr-8" /> 
+                      {/* Skeleton for change */}
+                      <Skeleton className="h-5 w-20" /> 
+                    </div>
+                  </div>
+                  {/* Skeleton for progress bar */}
+                  <div className="absolute bottom-0 left-0 right-0 h-1"> 
+                    <Skeleton className="h-full w-full" />
+                  </div>
+                </div>
+              ))}
+              {/* Skeleton for "View Details" button area to maintain height */}
+              <div className="mt-6 pt-4 border-t border-transparent"> {/* Match spacing, transparent border */}
+                 <div className="flex justify-end">
+                   <Skeleton className="h-9 w-24" /> {/* Approx size of Button */}
+                 </div>
+              </div>
             </div>
           )}
           
           {/* Error state */}
-          {apiError && (
+          {apiError && !apiLoading && (
             <div className="bg-red-50 text-red-700 p-3 rounded-md mb-4">
               <p>Error loading data: {apiError}</p>
             </div>
@@ -542,7 +572,7 @@ export function TopFive({
             </>
           )}
 
-          {/* View Details button section */}
+          {/* View Details button section - Render only when not loading and data exists */}
           {!apiLoading && !apiError && currentData.length > 0 && (
             <div className="mt-6 pt-4 border-t border-gray-200">
               <div className="flex justify-end">
@@ -555,6 +585,15 @@ export function TopFive({
                 </Button>
               </div>
             </div>
+          )}
+          {/* Add placeholder for button area if data is empty but not loading/error */}
+          {!apiLoading && !apiError && currentData.length === 0 && (
+             <div className="mt-6 pt-4 border-t border-transparent"> {/* Match spacing, transparent border */}
+               <div className="flex justify-end">
+                 {/* Empty div or subtle placeholder to maintain height if needed */}
+                 <div className="h-9 w-24"></div> 
+               </div>
+             </div>
           )}
         </CardContent>
       </Card>
