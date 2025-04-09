@@ -187,7 +187,7 @@ export function OccupancyAnalysisChart({
   // Render a loading skeleton if no data is available
   if (loading || !isRealData) {
     return (
-      <Card className="border-gray-300 h-[432px]">
+      <Card className="border-gray-300 h-full">
         <CardHeader>
           <div className="flex w-full justify-between items-center">
             <CardTitle className="text-lg font-semibold text-gray-800">
@@ -206,7 +206,7 @@ export function OccupancyAnalysisChart({
 
   return (
     <>
-      <Card className="border-gray-300">
+      <Card className="border-gray-300 h-full flex flex-col">
         <CardHeader>
           <div className="flex w-full justify-between items-center">
             <CardTitle className="text-lg font-semibold text-gray-800">
@@ -235,7 +235,7 @@ export function OccupancyAnalysisChart({
             </div>
           </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="flex-grow flex flex-col">
           <ChartContainer config={chartConfig}>
             <BarChart
               data={chartData}
@@ -307,8 +307,8 @@ export function OccupancyAnalysisChart({
             ))}
           </div>
 
-          {/* Add View Details Button */}
-          <div className="mt-3 pt-4 border-t border-gray-200">
+          {/* Push details button to the bottom */}
+          <div className="mt-auto pt-4 border-t border-gray-200">
             <div className="flex justify-end">
               <Button
                 variant="ghost"

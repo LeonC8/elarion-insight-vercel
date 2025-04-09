@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { ClickHouseClient, createClient } from '@clickhouse/client';
+import { ClickHouseClient, createClient, ResultSet, DataFormat } from '@clickhouse/client';
 import { calculateDateRanges, calculateComparisonDateRanges } from '@/lib/dateUtils';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -112,6 +112,54 @@ function generateCacheKey(params: URLSearchParams): string {
 
 // --- END CACHING LOGIC ---
 
+// --- START CLICKHOUSE HELPERS ---
+
+/**
+ * Executes a ClickHouse query with a single retry attempt on failure.
+ * Uses updated types from @clickhouse/client.
+ * @param client The ClickHouse client instance.
+ * // Adjust query type hint if necessary based on library usage
+ * @param query The query string or configuration object.
+ * @param format The desired response format.
+ * @param retryDelayMs Delay before retrying in milliseconds.
+ * @returns The query response as a ResultSet.
+ * @throws Throws an error if the query fails after the retry attempt.
+ */
+async function executeQueryWithRetry(
+    client: ClickHouseClient,
+    // Use string for query, assuming simple query strings for now
+    query: string,
+    format: DataFormat, // Use DataFormat type
+    retryDelayMs: number = 500
+    // Adjust return type to ResultSet<unknown> or a more specific type if known
+): Promise<ResultSet<unknown>> {
+    try {
+        // First attempt
+        return await client.query({
+            query: query,
+            format: format,
+            // query_params can be added here if needed
+        });
+    } catch (error) {
+        console.warn(`ClickHouse query failed, retrying in ${retryDelayMs}ms... Error:`, error);
+        // Wait before retrying
+        await new Promise(resolve => setTimeout(resolve, retryDelayMs));
+        try {
+            // Second attempt
+            return await client.query({
+                query: query,
+                format: format,
+                // query_params can be added here if needed
+            });
+        } catch (retryError) {
+            console.error('ClickHouse query failed on retry:', retryError);
+            throw retryError; // Re-throw the error after the second failure
+        }
+    }
+}
+
+// --- END CLICKHOUSE HELPERS ---
+
 // Interface for analysis data
 interface AnalysisData {
   name: string;
@@ -148,6 +196,29 @@ function roundValue(value: number): number {
 // Helper function to generate a code from a name
 function generateCode(name: string): string {
   return name.toString().toLowerCase().replace(/\s+/g, '_');
+}
+
+// Interface for raw metric data from consolidated query
+interface ConsolidatedMetricItem {
+    primary_field: string;
+    field_name: string; // This is the secondary field value
+    current_rooms_sold: number;
+    current_room_revenue: number;
+    current_total_revenue: number;
+    previous_rooms_sold: number;
+    previous_room_revenue: number;
+    previous_total_revenue: number;
+}
+
+// Interface for raw time series data from consolidated query
+interface ConsolidatedTimeSeriesItem {
+    primary_field: string;
+    date_period: string;
+    field_name: string; // This is the secondary field value
+    is_current_period: 1 | 0;
+    rooms_sold: number;
+    room_revenue: number;
+    total_revenue: number;
 }
 
 export async function GET(request: Request) {
@@ -223,24 +294,37 @@ export async function GET(request: Request) {
       AND ${secondaryField} IS NOT NULL
     `;
 
-    // Get unique values for the primary field (booking channels)
+    // Rewrite the primary field query using a CTE to avoid the subquery scope issue
     const primaryFieldQuery = `
-      SELECT DISTINCT ${primaryField} as field_value
-      FROM SAND01CN.insights
-      WHERE 
-        toDate(occupancy_date) BETWEEN '${startDate}' AND '${endDate}'
-        AND date(scd_valid_from) <= DATE('${businessDateParam}') 
-        AND DATE('${businessDateParam}') < date(scd_valid_to)
-        ${primaryFieldFilters}
+      WITH PrimaryFieldRevenue AS (
+          SELECT
+              ${primaryField} as field_value,
+              SUM(totalRevenue) as current_period_revenue
+          FROM SAND01CN.insights
+          WHERE
+              toDate(occupancy_date) BETWEEN '${startDate}' AND '${endDate}'
+              AND date(scd_valid_from) <= DATE('${businessDateParam}')
+              AND DATE('${businessDateParam}') < date(scd_valid_to)
+              ${primaryFieldFilters}
+          GROUP BY field_value
+      )
+      SELECT field_value
+      FROM PrimaryFieldRevenue
+      ORDER BY current_period_revenue DESC
+      LIMIT 10 -- Still limit to top 10 primary fields
     `;
-    
-    const primaryFieldResultSet = await client.query({
-      query: primaryFieldQuery,
-      format: 'JSONEachRow'
-    });
-    
-    const primaryFieldValues = await primaryFieldResultSet.json() as any[];
-    
+
+    // Use the retry helper
+    const primaryFieldResultSet = await executeQueryWithRetry(
+        client,
+        primaryFieldQuery,
+        'JSONEachRow' // Use DataFormat enum or string literal
+    );
+
+    // Extract only the field_value from the results
+    const primaryFieldData = await primaryFieldResultSet.json() as { field_value: string }[];
+    const primaryFieldValues = primaryFieldData.map(item => item.field_value);
+
     // Maps for name lookups (for producer names, etc)
     const nameMap = new Map<string, string>();
     
@@ -257,10 +341,12 @@ export async function GET(request: Request) {
           AND producer != -1
       `;
       
-      const producerResultSet = await client.query({
-        query: producerQuery,
-        format: 'JSONEachRow'
-      });
+      // Use the retry helper
+      const producerResultSet = await executeQueryWithRetry(
+        client,
+        producerQuery,
+        'JSONEachRow'
+      );
       
       const producerData = await producerResultSet.json() as any[];
       
@@ -270,263 +356,265 @@ export async function GET(request: Request) {
       });
     }
 
-    // Now, for each primary field value, get the data grouped by secondary field
-    const groupedData: GroupedData = {};
-    
-    for (const primaryItem of primaryFieldValues) {
-      const primaryValue = primaryItem.field_value;
-      
-      // Build the query for current period by the secondary field for this primary value
-      const currentQuery = `
-        SELECT 
-          toString(${secondaryField}) AS field_name,
-          SUM(sold_rooms) AS rooms_sold,
-          SUM(roomRevenue) AS room_revenue,
-          SUM(fbRevenue) AS fb_revenue,
-          SUM(otherRevenue) AS other_revenue,
-          SUM(totalRevenue) AS total_revenue
+    // CONSOLIDATE ALL METRICS INTO ONE QUERY
+    const consolidatedMetricsQuery = `
+      SELECT
+        ${primaryField} AS primary_field,
+        toString(${secondaryField}) AS field_name,
+        SUM(CASE WHEN is_current THEN sold_rooms ELSE 0 END) AS current_rooms_sold,
+        SUM(CASE WHEN is_current THEN roomRevenue ELSE 0 END) AS current_room_revenue,
+        SUM(CASE WHEN is_current THEN totalRevenue ELSE 0 END) AS current_total_revenue,
+        SUM(CASE WHEN NOT is_current THEN sold_rooms ELSE 0 END) AS previous_rooms_sold,
+        SUM(CASE WHEN NOT is_current THEN roomRevenue ELSE 0 END) AS previous_room_revenue,
+        SUM(CASE WHEN NOT is_current THEN totalRevenue ELSE 0 END) AS previous_total_revenue
+      FROM (
+        -- Current Period Data
+        SELECT
+          ${primaryField}, ${secondaryField}, sold_rooms, roomRevenue, totalRevenue, 1 AS is_current
         FROM SAND01CN.insights
-        WHERE 
+        WHERE
           toDate(occupancy_date) BETWEEN '${startDate}' AND '${endDate}'
-          AND date(scd_valid_from) <= DATE('${businessDateParam}') 
+          AND date(scd_valid_from) <= DATE('${businessDateParam}')
           AND DATE('${businessDateParam}') < date(scd_valid_to)
-          AND ${primaryField} = '${primaryValue}'
+          ${primaryFieldFilters}
           ${secondaryFieldFilters}
-        GROUP BY ${secondaryField}
-        ORDER BY total_revenue DESC
-      `;
+          -- Filter only for the top primary fields fetched earlier
+          AND ${primaryField} IN (${primaryFieldValues.map(v => `'${v}'`).join(',')})
 
-      // Build the query for previous period by the secondary field for this primary value
-      const previousQuery = `
-        SELECT 
-          toString(${secondaryField}) AS field_name,
-          SUM(sold_rooms) AS rooms_sold,
-          SUM(roomRevenue) AS room_revenue,
-          SUM(fbRevenue) AS fb_revenue,
-          SUM(otherRevenue) AS other_revenue,
-          SUM(totalRevenue) AS total_revenue
+        UNION ALL
+
+        -- Previous Period Data
+        SELECT
+          ${primaryField}, ${secondaryField}, sold_rooms, roomRevenue, totalRevenue, 0 AS is_current
         FROM SAND01CN.insights
-        WHERE 
+        WHERE
           toDate(occupancy_date) BETWEEN '${prevStartDate}' AND '${prevEndDate}'
-          AND date(scd_valid_from) <= DATE('${prevBusinessDateParam}') 
+          AND date(scd_valid_from) <= DATE('${prevBusinessDateParam}')
           AND DATE('${prevBusinessDateParam}') < date(scd_valid_to)
-          AND ${primaryField} = '${primaryValue}'
+          ${primaryFieldFilters}
           ${secondaryFieldFilters}
-        GROUP BY ${secondaryField}
-        ORDER BY total_revenue DESC
-      `;
-
-      // Query for time series data (by month or day depending on period type)
-      const timeScaleClause = periodType === 'Day' 
-        ? "toString(toDate(occupancy_date)) AS date_period" 
-        : "toYYYYMM(occupancy_date) AS date_period";
+          -- Filter only for the top primary fields fetched earlier
+          AND ${primaryField} IN (${primaryFieldValues.map(v => `'${v}'`).join(',')})
+      ) AS combined_data
+      GROUP BY primary_field, field_name
+    `;
+    
+    // CONSOLIDATED TIME SERIES QUERY
+    const timeScaleClause = periodType === 'Day' 
+      ? "toString(toDate(occupancy_date)) AS date_period" 
+      : "toYYYYMM(occupancy_date) AS date_period";
       
-      const timeSeriesQuery = `
-        SELECT 
-          ${timeScaleClause},
-          toString(${secondaryField}) AS field_name,
-          SUM(sold_rooms) AS rooms_sold,
-          SUM(roomRevenue) AS room_revenue,
-          SUM(totalRevenue) AS total_revenue
-        FROM SAND01CN.insights
-        WHERE 
+    const consolidatedTimeSeriesQuery = `
+      SELECT
+        ${primaryField} AS primary_field,
+        ${timeScaleClause},
+        toString(${secondaryField}) AS field_name,
+        CASE
+          WHEN toDate(occupancy_date) BETWEEN '${startDate}' AND '${endDate}'
+            AND date(scd_valid_from) <= DATE('${businessDateParam}')
+            AND DATE('${businessDateParam}') < date(scd_valid_to)
+          THEN 1
+          ELSE 0
+        END AS is_current_period,
+        SUM(sold_rooms) AS rooms_sold,
+        SUM(roomRevenue) AS room_revenue,
+        SUM(totalRevenue) AS total_revenue
+      FROM SAND01CN.insights
+      WHERE
+        (
           (
-            (
-              toDate(occupancy_date) BETWEEN '${startDate}' AND '${endDate}'
-              AND date(scd_valid_from) <= DATE('${businessDateParam}') 
-              AND DATE('${businessDateParam}') < date(scd_valid_to)
-            )
-            OR
-            (
-              toDate(occupancy_date) BETWEEN '${prevStartDate}' AND '${prevEndDate}'
-              AND date(scd_valid_from) <= DATE('${prevBusinessDateParam}') 
-              AND DATE('${prevBusinessDateParam}') < date(scd_valid_to)
-            )
+            toDate(occupancy_date) BETWEEN '${startDate}' AND '${endDate}'
+            AND date(scd_valid_from) <= DATE('${businessDateParam}')
+            AND DATE('${businessDateParam}') < date(scd_valid_to)
           )
-          AND ${primaryField} = '${primaryValue}'
-          ${secondaryFieldFilters}
-          AND toString(${secondaryField}) IN (
-            SELECT toString(${secondaryField})
-            FROM SAND01CN.insights
-            WHERE 
-              toDate(occupancy_date) BETWEEN '${startDate}' AND '${endDate}'
-              AND date(scd_valid_from) <= DATE('${businessDateParam}') 
-              AND DATE('${businessDateParam}') < date(scd_valid_to)
-              AND ${primaryField} = '${primaryValue}'
-              ${secondaryFieldFilters}
-            GROUP BY ${secondaryField}
-            ORDER BY SUM(totalRevenue) DESC
-            LIMIT ${limit}
+          OR
+          (
+            toDate(occupancy_date) BETWEEN '${prevStartDate}' AND '${prevEndDate}'
+            AND date(scd_valid_from) <= DATE('${prevBusinessDateParam}')
+            AND DATE('${prevBusinessDateParam}') < date(scd_valid_to)
           )
-        GROUP BY date_period, field_name
-        ORDER BY date_period, total_revenue DESC
-      `;
+        )
+        ${primaryFieldFilters}
+        ${secondaryFieldFilters}
+        -- Filter only for the top primary fields fetched earlier
+        AND ${primaryField} IN (${primaryFieldValues.map(v => `'${v}'`).join(',')})
+      GROUP BY primary_field, date_period, field_name, is_current_period
+    `;
 
-      // Execute queries
-      const currentResultSet = await client.query({
-        query: currentQuery,
-        format: 'JSONEachRow'
-      });
+    // Execute consolidated queries - removed streaming
+    // Assign results correctly using Promise.all
+    const [consolidatedMetricsResultSet, timeSeriesResultSet] = await Promise.all([
+      executeQueryWithRetry(client, consolidatedMetricsQuery, 'JSONEachRow'),
+      executeQueryWithRetry(client, consolidatedTimeSeriesQuery, 'JSONEachRow')
+    ]);
 
-      const previousResultSet = await client.query({
-        query: previousQuery,
-        format: 'JSONEachRow'
-      });
+    // Parse JSON data from results
+    const consolidatedMetricsData = await consolidatedMetricsResultSet.json() as ConsolidatedMetricItem[];
+    const timeSeriesRawData = await timeSeriesResultSet.json() as ConsolidatedTimeSeriesItem[];
 
-      const timeSeriesResultSet = await client.query({
-        query: timeSeriesQuery,
-        format: 'JSONEachRow'
-      });
+    // Process the consolidated data
+    const groupedData: GroupedData = {};
 
-      const currentData = await currentResultSet.json() as any[];
-      const previousData = await previousResultSet.json() as any[];
-      const timeSeriesData = await timeSeriesResultSet.json() as any[];
-
-      // Skip if no data for this primary value
-      if (currentData.length === 0) continue;
-
-      // Create a map for previous data for easier lookup
-      const previousDataMap = new Map();
-      previousData.forEach(item => {
-        previousDataMap.set(item.field_name, item);
-      });
-
-      // Helper function to get display name
-      const getDisplayName = (fieldValue: any): string => {
-        if (secondaryField === 'producer' && nameMap.has(fieldValue.toString())) {
-          return nameMap.get(fieldValue.toString()) || `Producer ${fieldValue}`;
+    // Group the metrics data by primary field first
+    const metricsByPrimaryField = new Map<string, ConsolidatedMetricItem[]>();
+    consolidatedMetricsData.forEach((item: ConsolidatedMetricItem) => {
+        const primaryValue = item.primary_field;
+        if (!metricsByPrimaryField.has(primaryValue)) {
+            metricsByPrimaryField.set(primaryValue, []);
         }
-        return fieldValue.toString();
-      };
+        metricsByPrimaryField.get(primaryValue)!.push(item);
+    });
 
-      // Process data for revenue
-      const revenueData: AnalysisData[] = currentData.slice(0, limit).map(item => {
-        const prevItem = previousDataMap.get(item.field_name) || {
-          total_revenue: 0,
-          rooms_sold: 0,
-          room_revenue: 0
-        };
-        
-        const value = parseFloat(item.total_revenue || '0');
-        const prevValue = parseFloat(prevItem.total_revenue || '0');
-        const change = value - prevValue;
-        
-        const displayName = getDisplayName(item.field_name);
-        
-        return {
-          name: displayName,
-          value: roundValue(value),
-          change: roundValue(change),
-          code: generateCode(displayName)
-        };
-      });
-
-      // Process data for rooms sold
-      const roomsSoldData: AnalysisData[] = currentData.slice(0, limit).map(item => {
-        const prevItem = previousDataMap.get(item.field_name) || {
-          total_revenue: 0,
-          rooms_sold: 0,
-          room_revenue: 0
-        };
-        
-        const value = parseFloat(item.rooms_sold || '0');
-        const prevValue = parseFloat(prevItem.rooms_sold || '0');
-        const change = value - prevValue;
-        
-        const displayName = getDisplayName(item.field_name);
-        
-        return {
-          name: displayName,
-          value: roundValue(value),
-          change: roundValue(change),
-          code: generateCode(displayName)
-        };
-      });
-
-      // Process data for ADR (Average Daily Rate)
-      const adrData: AnalysisData[] = currentData.slice(0, limit).map(item => {
-        const prevItem = previousDataMap.get(item.field_name) || {
-          rooms_sold: 0,
-          room_revenue: 0
-        };
-
-        const currentRoomsSold = parseFloat(item.rooms_sold || '0');
-        const currentRoomRevenue = parseFloat(item.room_revenue || '0');
-        const prevRoomsSold = parseFloat(prevItem.rooms_sold || '0');
-        const prevRoomRevenue = parseFloat(prevItem.room_revenue || '0');
-        
-        const currentAdr = currentRoomsSold > 0 ? currentRoomRevenue / currentRoomsSold : 0;
-        const prevAdr = prevRoomsSold > 0 ? prevRoomRevenue / prevRoomsSold : 0;
-        const change = currentAdr - prevAdr;
-        
-        const displayName = getDisplayName(item.field_name);
-        
-        return {
-          name: displayName,
-          value: roundValue(currentAdr),
-          change: roundValue(change),
-          code: generateCode(displayName)
-        };
-      });
-
-      // Process time series data
-      // First, gather all unique dates and field values
-      const dateSet = new Set<string>();
-      const fieldValueSet = new Set<string>();
-      const timeSeriesMap = new Map<string, Map<string, { current: number; previous: number }>>();
-
-      timeSeriesData.forEach(item => {
-        const date = item.date_period.toString();
-        const fieldValue = getDisplayName(item.field_name);
-        const fieldCode = generateCode(fieldValue);
-        
-        const isCurrentPeriod = true; // Simplified for this example
-
-        dateSet.add(date);
-        fieldValueSet.add(fieldCode);
-
-        if (!timeSeriesMap.has(date)) {
-          timeSeriesMap.set(date, new Map());
+    // Group the time series data by primary field
+    const timeSeriesByPrimaryField = new Map<string, ConsolidatedTimeSeriesItem[]>();
+    timeSeriesRawData.forEach((item: ConsolidatedTimeSeriesItem) => {
+        const primaryValue = item.primary_field;
+        if (!timeSeriesByPrimaryField.has(primaryValue)) {
+            timeSeriesByPrimaryField.set(primaryValue, []);
         }
+        timeSeriesByPrimaryField.get(primaryValue)!.push(item);
+    });
 
-        const dateMap = timeSeriesMap.get(date)!;
-        if (!dateMap.has(fieldCode)) {
-          dateMap.set(fieldCode, { current: 0, previous: 0 });
+    // Process each primary field's data
+    for (const primaryValue of metricsByPrimaryField.keys()) {
+        const metricsData = metricsByPrimaryField.get(primaryValue) || [];
+
+        // Skip if no data for this primary value in the current period
+        if (!metricsData.some((item: ConsolidatedMetricItem) => parseFloat(item.current_total_revenue || '0') > 0)) {
+            continue;
         }
-
-        const entry = dateMap.get(fieldCode)!;
-        const revenue = parseFloat(item.total_revenue || '0');
-
-        if (isCurrentPeriod) {
-          entry.current = revenue;
-        } else {
-          entry.previous = revenue;
-        }
-      });
-
-      // Convert the nested maps to the expected structure
-      const processedTimeSeriesData = Array.from(dateSet).map(date => {
-        const categoryMap = timeSeriesMap.get(date) || new Map();
-        const categories: Record<string, { current: number; previous: number }> = {};
-
-        Array.from(fieldValueSet).forEach(fieldCode => {
-          const data = categoryMap.get(fieldCode) || { current: 0, previous: 0 };
-          categories[fieldCode] = data;
+        
+        // Sort by current total revenue and limit to top N items
+        metricsData.sort((a: ConsolidatedMetricItem, b: ConsolidatedMetricItem) =>
+            (b.current_total_revenue || 0) - (a.current_total_revenue || 0)
+        );
+        const topNMetricsData = metricsData.slice(0, limit);
+        
+        // Helper function to get display name
+        const getDisplayName = (fieldValue: string): string => {
+            if (secondaryField === 'producer' && nameMap.has(fieldValue)) {
+                return nameMap.get(fieldValue) || `Producer ${fieldValue}`;
+            }
+            return fieldValue;
+        };
+        
+        // Process revenue data
+        const revenueData: AnalysisData[] = topNMetricsData.map((item: ConsolidatedMetricItem) => {
+            const value = parseFloat(item.current_total_revenue || '0');
+            const prevValue = parseFloat(item.previous_total_revenue || '0');
+            const change = value - prevValue;
+            const displayName = getDisplayName(item.field_name);
+            
+            return {
+                name: displayName,
+                value: roundValue(value),
+                change: roundValue(change),
+                code: generateCode(displayName)
+            };
         });
 
-        return {
-          date,
-          categories
-        };
-      });
+        // Process rooms sold data
+        const roomsSoldData: AnalysisData[] = topNMetricsData.map((item: ConsolidatedMetricItem) => {
+            const value = parseFloat(item.current_rooms_sold || '0');
+            const prevValue = parseFloat(item.previous_rooms_sold || '0');
+            const change = value - prevValue;
+            const displayName = getDisplayName(item.field_name);
 
-      // Add this primary value's data to the grouped data
-      groupedData[primaryValue] = {
-        revenue: revenueData,
-        roomsSold: roomsSoldData,
-        adr: adrData,
-        timeSeriesData: processedTimeSeriesData
-      };
+            return {
+                name: displayName,
+                value: roundValue(value),
+                change: roundValue(change),
+                code: generateCode(displayName)
+            };
+        });
+
+        // Process ADR (Average Daily Rate)
+        const adrData: AnalysisData[] = topNMetricsData.map((item: ConsolidatedMetricItem) => {
+            const currentRoomsSold = parseFloat(item.current_rooms_sold || '0');
+            const currentRoomRevenue = parseFloat(item.current_room_revenue || '0');
+            const prevRoomsSold = parseFloat(item.previous_rooms_sold || '0');
+            const prevRoomRevenue = parseFloat(item.previous_room_revenue || '0');
+            
+            const currentAdr = currentRoomsSold > 0 ? currentRoomRevenue / currentRoomsSold : 0;
+            const prevAdr = prevRoomsSold > 0 ? prevRoomRevenue / prevRoomsSold : 0;
+            const change = currentAdr - prevAdr;
+            const displayName = getDisplayName(item.field_name);
+
+            return {
+                name: displayName,
+                value: roundValue(currentAdr),
+                change: roundValue(change),
+                code: generateCode(displayName)
+            };
+        });
+        
+        // Process time series data for this primary value
+        const timeSeriesForPrimary = timeSeriesByPrimaryField.get(primaryValue) || [];
+        const timeSeriesMap = new Map<string, Map<string, { current: number; previous: number }>>();
+        const dateSet = new Set<string>();
+        const topNFieldCodes = new Set(topNMetricsData.map((item: ConsolidatedMetricItem) => generateCode(getDisplayName(item.field_name)))); // Get codes for top N fields
+
+        timeSeriesForPrimary.forEach((item: ConsolidatedTimeSeriesItem) => {
+            const date = item.date_period.toString();
+            const displayName = getDisplayName(item.field_name);
+            const fieldCode: string = generateCode(displayName); // Explicitly type fieldCode as string
+            
+            // Only process data for fields that are in the top N for the overall period
+            if (!topNFieldCodes.has(fieldCode)) {
+                return;
+            }
+
+            dateSet.add(date);
+
+            if (!timeSeriesMap.has(date)) {
+                timeSeriesMap.set(date, new Map());
+            }
+            const dateMap = timeSeriesMap.get(date)!;
+
+            if (!dateMap.has(fieldCode)) {
+                dateMap.set(fieldCode, { current: 0, previous: 0 });
+            }
+            const entry = dateMap.get(fieldCode)!;
+            const revenue = item.total_revenue || 0;
+            const isCurrent = item.is_current_period === 1; // Check the flag from the query
+
+            if (isCurrent) {
+                entry.current += revenue; // Use += in case data for same day/field/period split across rows
+            } else {
+                entry.previous += revenue;
+            }
+        });
+
+        // Convert the maps to the final structure, ensuring all top N fields are present for each date
+        const processedTimeSeriesData = Array.from(dateSet)
+            .sort() // Sort dates chronologically
+            .map(date => {
+                const categoryMap = timeSeriesMap.get(date) || new Map();
+                const categories: Record<string, { current: number; previous: number }> = {};
+
+                // Ensure all top N field codes are present, even if they have zero values for this date
+                topNFieldCodes.forEach(fieldCode => { // fieldCode is already string here
+                    const data = categoryMap.get(fieldCode) || { current: 0, previous: 0 };
+                    // Round the final values here if desired
+                    categories[fieldCode] = {
+                        current: roundValue(data.current),
+                        previous: roundValue(data.previous)
+                    };
+                });
+
+                return {
+                    date,
+                    categories
+                };
+            });
+
+        // Add to groupedData
+        groupedData[primaryValue] = {
+          revenue: revenueData,
+          roomsSold: roomsSoldData,
+          adr: adrData,
+          timeSeriesData: processedTimeSeriesData
+        };
     }
 
     // --- STORE IN CACHE ---

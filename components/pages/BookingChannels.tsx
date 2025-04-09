@@ -34,6 +34,7 @@ import { HorizontalBarChartMultipleDatasets } from "../new/HorizontalBarChartMul
 import { HorizontalBarChartMultipleDatasetsUpgraded } from "../new/HorizontalBarChartMultipleDatasetsUpgraded"
 import { TopFiveUpgraded } from "@/components/new/TopFiveUpgraded"
 import eventBus from '@/utils/eventBus'
+import { usePersistentOverviewFilters } from '@/hooks/usePersistentOverviewFilters'
 
 // Dynamic import for WorldMap with loading state
 const WorldMap = dynamic(
@@ -64,14 +65,20 @@ function TriangleDown({ className }: { className?: string }) {
 
 
 export function BookingChannels() {
-  // Add date state
-  const [date, setDate] = useState<Date>(new Date())
-  
+  // Use the custom hook to manage persistent state for common filters
+  const {
+    selectedTimeFrame,
+    setSelectedTimeFrame,
+    selectedViewType,
+    setSelectedViewType,
+    selectedComparison,
+    setSelectedComparison,
+    date,
+    setDate, // Use the setter from the hook
+  } = usePersistentOverviewFilters();
+
   // Basic state for hotel selection
   const [selectedHotels, setSelectedHotels] = useState<string[]>(["Hotel 1"])
-  const [selectedTimeFrame, setSelectedTimeFrame] = useState("Month")
-  const [selectedViewType, setSelectedViewType] = useState("Actual")
-  const [selectedComparison, setSelectedComparison] = useState("Last year - OTB")
   const allHotels = ["Hotel 1", "Hotel 2", "Hotel 3"]
 
   const toggleHotel = (hotel: string) => {
@@ -112,24 +119,22 @@ export function BookingChannels() {
     }
   }
 
-  // Add date change handler
+  // Update handleDateChange to use the setter from the hook
   const handleDateChange = (newDate: Date | undefined) => {
-    if (newDate) {
-      setDate(newDate)
-      // Here you can add any additional logic needed when the date changes
-      // For example, fetching new data for the selected date
-    }
+    // The hook's setDate handles the undefined case and checks for actual change
+    setDate(newDate);
+    // Any component relying on `date` will re-render or re-fetch via useEffect
   }
 
-
-
-  // Create analysis API params similar to what's in the overview page
+  // Create analysis API params using state from the hook and local state
+  // Note: This object is now implicitly updated whenever the hook's state changes
+  // You might want to use useMemo or useEffect to update a state variable if needed elsewhere explicitly
   const analysisApiParams = {
-    periodType: selectedTimeFrame,
-    viewType: selectedViewType,
-    comparison: selectedComparison, 
-    businessDate: date.toISOString().split('T')[0],
-    hotels: selectedHotels.join(',')
+    periodType: selectedTimeFrame,     // From hook
+    viewType: selectedViewType,       // From hook
+    comparison: selectedComparison,   // From hook
+    businessDate: date.toISOString().split('T')[0], // From hook
+    hotels: selectedHotels.join(',') // Local state
   };
 
   const metricOptions = [
@@ -287,18 +292,18 @@ export function BookingChannels() {
             {/* Date Picker with Label */}
             <div className="flex flex-col">
               <span className="text-xs text-gray-500 mb-2">Business date</span>
-              <DatePicker 
-                date={date} 
-                onDateChange={handleDateChange}
+              <DatePicker
+                date={date} // Uses date from the hook
+                onDateChange={handleDateChange} // Uses the updated handler
               />
             </div>
 
             {/* Hotel Selector with Label */}
             <div className="flex flex-col">
               <span className="text-xs text-gray-500 mb-2">Property</span>
-              <HotelSelector 
-                selectedHotels={selectedHotels}
-                setSelectedHotels={setSelectedHotels}
+              <HotelSelector
+                selectedHotels={selectedHotels} // Uses local selectedHotels
+                setSelectedHotels={setSelectedHotels} // Uses local setter
               />
             </div>
 

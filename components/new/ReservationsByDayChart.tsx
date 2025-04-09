@@ -27,6 +27,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import { useInView } from "@/hooks/useInView"
 
 interface ReservationDayData {
   dayOfWeek: string;
@@ -50,6 +51,7 @@ export interface ReservationsByDayChartProps {
     key: string
     label: string
   }>
+  lazyLoad?: boolean
 }
 
 // Updated chart configuration for current/previous period
@@ -112,7 +114,8 @@ export function ReservationsByDayChart({
   url,
   apiParams,
   color = 'green',
-  categories
+  categories,
+  lazyLoad = false,
 }: ReservationsByDayChartProps) {
   const [dateType, setDateType] = useState<'book' | 'stay'>('book')
   const [activeSeries, setActiveSeries] = React.useState<string[]>([
@@ -126,24 +129,48 @@ export function ReservationsByDayChart({
 
   // Add internal state for data fetching
   const [internalData, setInternalData] = useState<ReservationDayData[] | null>(null)
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(false) // Initialize as false
   const [error, setError] = useState<string | null>(null)
+  // Track the stringified params of the last successful fetch
+  const [fetchedParams, setFetchedParams] = useState<string | null>(null);
+
+  // Use the Intersection Observer hook
+  const { ref, isInView } = useInView<HTMLDivElement>({
+    threshold: 0.1,
+    triggerOnce: true
+  });
 
   // Effect to fetch data if URL is provided
   useEffect(() => {
-    if (!url) {
-      setInternalData(null); // Clear internal data if URL is removed
+    const currentParamsString = JSON.stringify(apiParams);
+
+    // Conditions to *not* fetch:
+    // 1. No url provided
+    // 2. Lazy loading is enabled AND the component is not in view
+    if (!url || (lazyLoad && !isInView)) {
       return;
+    }
+
+    // Condition to fetch:
+    // - The component is in view (or lazyLoad is false) AND
+    // - EITHER no fetch has happened yet (fetchedParams is null) OR
+    // - The apiParams have changed since the last successful fetch
+    const shouldFetch = (isInView || !lazyLoad) && (fetchedParams === null || fetchedParams !== currentParamsString);
+
+    if (!shouldFetch) {
+      return; // Don't fetch if params haven't changed and we've already fetched them
     }
 
     const fetchData = async () => {
       setLoading(true);
       setError(null);
+      // Don't reset internalData here
+
       try {
         const fetchUrl = new URL(url, window.location.origin);
         if (apiParams) {
           Object.entries(apiParams).forEach(([key, value]) => {
-            if (value !== undefined) {
+            if (value !== undefined) { // Filter out undefined
               fetchUrl.searchParams.append(key, String(value));
             }
           });
@@ -151,64 +178,75 @@ export function ReservationsByDayChart({
 
         const response = await fetch(fetchUrl.toString());
         if (!response.ok) {
-          throw new Error(`Failed to fetch reservation trends: ${response.status} ${response.statusText}`);
+           let errorBody = null;
+           try { errorBody = await response.json(); } catch (e) { /* Ignore */ }
+           const errorMessage = errorBody?.error || `Failed to fetch reservation trends: ${response.status} ${response.statusText}`;
+           throw new Error(errorMessage);
         }
         const apiResponse: ReservationTrendsApiResponse = await response.json();
 
         // Transform API response to the component's expected format
-        const transformedData = apiResponse.occupancyByDayOfWeek.map((occupancyItem, index) => {
-           const bookingItem = apiResponse.bookingsByDayOfWeek[index];
-           // Basic safety check: ensure items align by day or index if API guarantees order
+        // Add more robust checking for missing data
+        const transformedData = apiResponse.occupancyByDayOfWeek?.map((occupancyItem, index) => {
+           const bookingItem = apiResponse.bookingsByDayOfWeek?.[index];
+           // Ensure both items exist and days match (or use index if days aren't reliable)
            if (!bookingItem || bookingItem.day !== occupancyItem.day) {
-             console.warn(`Data mismatch for day: ${occupancyItem.day}`);
-             // Handle mismatch: return a default structure or skip
+             console.warn(`Data mismatch or missing for day: ${occupancyItem.day} at index ${index}`);
+             // Provide default values if data is incomplete
              return {
-               dayOfWeek: occupancyItem.day,
-               bookingsCreated: 0,
-               prevBookingsCreated: 0,
-               staysStarting: occupancyItem.current,
-               prevStaysStarting: occupancyItem.previous
+               dayOfWeek: occupancyItem.day || `Day ${index + 1}`, // Fallback day name
+               bookingsCreated: bookingItem?.current ?? 0,
+               prevBookingsCreated: bookingItem?.previous ?? 0,
+               staysStarting: occupancyItem.current ?? 0,
+               prevStaysStarting: occupancyItem.previous ?? 0
              };
            }
            return {
              dayOfWeek: occupancyItem.day,
-             bookingsCreated: bookingItem.current,
-             prevBookingsCreated: bookingItem.previous,
-             staysStarting: occupancyItem.current,
-             prevStaysStarting: occupancyItem.previous
+             bookingsCreated: bookingItem.current ?? 0, // Use nullish coalescing for safety
+             prevBookingsCreated: bookingItem.previous ?? 0,
+             staysStarting: occupancyItem.current ?? 0,
+             prevStaysStarting: occupancyItem.previous ?? 0
            };
-         });
+         }) ?? []; // Default to empty array if occupancyByDayOfWeek is missing
 
 
         setInternalData(transformedData);
+        setFetchedParams(currentParamsString); // Store successful fetch params
 
       } catch (err) {
         console.error('Error fetching data in ReservationsByDayChart:', err);
         setError(err instanceof Error ? err.message : 'An unknown error occurred');
-        setInternalData(null);
+        setInternalData(null); // Clear data on error
+        // Keep fetchedParams as is
       } finally {
         setLoading(false);
       }
     };
 
     fetchData();
-  }, [url, JSON.stringify(apiParams)]);
+  // Dependencies: Run when url, params, lazyLoad status, or visibility changes.
+  }, [url, JSON.stringify(apiParams), lazyLoad, isInView]);
 
   // Determine which data source to use
   const data = url ? internalData : dataProp;
+  // Determine if the skeleton should be shown
+  const showSkeleton = loading || (url && lazyLoad && !fetchedParams && !error);
 
   // Get the appropriate data keys based on date type
   const currentKey = dateType === 'book' ? 'bookingsCreated' : 'staysStarting'
   const previousKey = dateType === 'book' ? 'prevBookingsCreated' : 'prevStaysStarting'
 
   // Transform data for the selected date type, handle loading/null state
-  const chartData = (!loading && data)
+  // Data is ready if not showing skeleton and no error
+  const dataReady = !showSkeleton && !error;
+  const chartData = (dataReady && data)
     ? data.map(item => ({
         dayOfWeek: item.dayOfWeek,
         current: item[currentKey],
         previous: item[previousKey],
       }))
-    : []; // Default to empty array if loading or data is null/undefined
+    : []; // Default to empty array if not ready or data is null/undefined
 
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
@@ -251,7 +289,7 @@ export function ReservationsByDayChart({
 
   return (
     <>
-      <Card className="border-gray-300">
+      <Card ref={ref} className="border-gray-300 min-h-[440px]">
         <CardHeader>
           <div className="flex w-full justify-between items-center">
             <CardTitle className="text-lg font-semibold text-gray-800">
@@ -305,88 +343,135 @@ export function ReservationsByDayChart({
           </div>
         </CardHeader>
         <CardContent>
-          <ChartContainer config={chartConfig}>
-            <BarChart
-              data={chartData}
-              height={300}
-              margin={{
-                top: 10,
-                right: 10,
-                bottom: 20,
-                left: -20,
-              }}
-            >
-              <CartesianGrid strokeDasharray="3 3" vertical={false} />
-              <XAxis
-                dataKey="dayOfWeek"
-                tickLine={false}
-                axisLine={false}
-                tickMargin={8}
-              />
-              <YAxis
-                tickLine={false}
-                axisLine={false}
-                tickFormatter={(value) => `${Math.round(value).toLocaleString()}`}
-                tickMargin={8}
-              />
-              <ChartTooltip content={<ChartTooltipContent />} />
-              {activeSeries.includes('current') && (
-                <Bar
-                  dataKey="current"
-                  fill={chartConfig.current.color}
-                  radius={[4, 4, 0, 0]}
-                />
-              )}
-              {activeSeries.includes('previous') && (
-                <Bar
-                  dataKey="previous"
-                  fill={chartConfig.previous.color}
-                  radius={[4, 4, 0, 0]}
-                />
-              )}
-            </BarChart>
-          </ChartContainer>
-
-          {/* Clickable Legend */}
-          <div className="flex justify-center gap-3 mt-6">
-            {Object.entries(chartConfig).map(([key, config]) => (
-              <div
-                key={key}
-                onClick={() => {
-                  if (activeSeries.includes(key)) {
-                    setActiveSeries(activeSeries.filter(item => item !== key))
-                  } else {
-                    setActiveSeries([...activeSeries, key])
-                  }
-                }}
-                className={`cursor-pointer bg-[#f0f4fa] px-3 py-1.5 rounded-full border border-[#e5eaf3] flex items-center gap-2 ${
-                  activeSeries.includes(key) ? '' : 'opacity-50'
-                }`}
-              >
-                <div 
-                  style={{ backgroundColor: config.color }} 
-                  className="w-2 h-2 rounded-full" 
-                />
-                <span className="text-xs text-gray-500 font-medium">
-                  {config.label}
-                </span>
+          {/* Show Skeleton */}
+          {showSkeleton && (
+            <div className="h-[300px] w-full flex flex-col space-y-4 p-4">
+              <Skeleton className="h-6 w-3/4" />
+              <Skeleton className="h-6 w-1/2" />
+              <Skeleton className="h-6 w-5/6" />
+              <Skeleton className="h-6 w-2/3" />
+              <Skeleton className="h-6 w-3/4" />
+              <Skeleton className="h-6 w-1/2" />
+              <div className="flex justify-end pt-4 border-t border-transparent mt-auto">
+                 <Skeleton className="h-9 w-24" />
               </div>
-            ))}
-          </div>
-
-          {/* Add View Details Button */}
-          <div className="mt-3 pt-4 border-t border-gray-200">
-            <div className="flex justify-end">
-              <Button
-                variant="ghost"
-                className="text-blue-600 hover:text-blue-800 font-medium text-sm flex items-center gap-2"
-                onClick={() => setFullScreenTable(true)}
-              >
-                View Details
-                <ArrowRight className="w-4 h-4" />
-              </Button>
             </div>
-          </div>
+          )}
+
+          {/* Show Error */}
+          {error && !showSkeleton && (
+             <div className="h-[300px] flex items-center justify-center text-red-500">
+                Error loading data: {error}
+             </div>
+          )}
+
+          {/* Show Chart and Data */}
+          {/* Condition: Not skeleton, no error, AND (using API and fetch complete OR not using API) */}
+          {!showSkeleton && !error && (url ? fetchedParams === JSON.stringify(apiParams) : true) && (
+            <>
+              {/* Show "No data" message if chartData is empty */}
+              {chartData.length === 0 ? (
+                 <div className="h-[300px] flex items-center justify-center text-gray-500">
+                    No data available for the selected criteria.
+                 </div>
+              ) : (
+                 // Render the chart only if there is data
+                 <ChartContainer config={chartConfig}>
+                   <BarChart
+                     data={chartData}
+                     height={300}
+                     margin={{
+                       top: 10,
+                       right: 10,
+                       bottom: 20,
+                       left: -20,
+                     }}
+                   >
+                     <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                     <XAxis
+                       dataKey="dayOfWeek"
+                       tickLine={false}
+                       axisLine={false}
+                       tickMargin={8}
+                     />
+                     <YAxis
+                       tickLine={false}
+                       axisLine={false}
+                       tickFormatter={(value) => `${Math.round(value).toLocaleString()}`}
+                       tickMargin={8}
+                     />
+                     <ChartTooltip content={<ChartTooltipContent />} />
+                     {activeSeries.includes('current') && (
+                       <Bar
+                         dataKey="current"
+                         fill={chartConfig.current.color}
+                         radius={[4, 4, 0, 0]}
+                       />
+                     )}
+                     {activeSeries.includes('previous') && (
+                       <Bar
+                         dataKey="previous"
+                         fill={chartConfig.previous.color}
+                         radius={[4, 4, 0, 0]}
+                       />
+                     )}
+                   </BarChart>
+                 </ChartContainer>
+              )}
+
+              {/* Legend - Render even if chartData is empty initially */}
+              <div className="flex justify-center gap-3 mt-6">
+                {Object.entries(chartConfig).map(([key, config]) => (
+                  <div
+                    key={key}
+                    onClick={() => {
+                      if (activeSeries.includes(key)) {
+                        setActiveSeries(activeSeries.filter(item => item !== key))
+                      } else {
+                        setActiveSeries([...activeSeries, key])
+                      }
+                    }}
+                    className={`cursor-pointer bg-[#f0f4fa] px-3 py-1.5 rounded-full border border-[#e5eaf3] flex items-center gap-2 ${
+                      activeSeries.includes(key) ? '' : 'opacity-50'
+                    }`}
+                  >
+                    <div 
+                      style={{ backgroundColor: config.color }} 
+                      className="w-2 h-2 rounded-full" 
+                    />
+                    <span className="text-xs text-gray-500 font-medium">
+                      {config.label}
+                    </span>
+                  </div>
+                ))}
+              </div>
+
+              {/* View Details Button - Show only if data is ready and not empty */}
+              {dataReady && data && data.length > 0 && (
+                <div className="mt-3 pt-4 border-t border-gray-200">
+                  <div className="flex justify-end">
+                    <Button
+                      variant="ghost"
+                      className="text-blue-600 hover:text-blue-800 font-medium text-sm flex items-center gap-2"
+                      onClick={() => setFullScreenTable(true)}
+                      disabled={loading} // Disable if actively loading new data
+                    >
+                      View Details
+                      <ArrowRight className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
+              )}
+              {/* Placeholder for button area when data is empty or not ready */}
+              {(!dataReady || !data || data.length === 0) && (
+                 <div className="mt-3 pt-4 border-t border-transparent">
+                   <div className="flex justify-end">
+                     <div className="h-9 w-24"></div> {/* Maintain height */}
+                   </div>
+                 </div>
+              )}
+            </>
+          )}
         </CardContent>
       </Card>
 

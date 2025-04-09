@@ -482,13 +482,6 @@ export function CategoriesDetails({
     
 }, [apiDistributionData, selectedPieKPI]);
 
-  React.useEffect(() => {
-    if (apiDistributionData && processedDistributionData.length > 0) {
-      // Only set the legends once when API data is loaded
-      setActivePieLegends(processedDistributionData.map(item => item.name));
-    }
-  }, [apiDistributionData, processedDistributionData]);
-
   // Update the kpiTransformedData to handle roomRevenue specifically
   const kpiTransformedData = React.useMemo(() => {
     if (!processedDistributionData || processedDistributionData.length === 0) {
@@ -541,36 +534,30 @@ export function CategoriesDetails({
     
     if (otherItems.length > 0) {
       if (selectedPieKPI === 'adr') {
-        // For ADR, we need to:
-        // 1. Sum up total revenue for others
-        const totalRevenue = otherItems.reduce((sum, item) => sum + (item.revenue || 0), 0);
-        // 2. Sum up total rooms sold for others
-        const totalRoomsSold = otherItems.reduce((sum, item) => sum + (item.roomsSold || 0), 0);
-        // 3. Calculate ADR only if we have rooms sold
-        const otherADR = totalRoomsSold > 0 ? totalRevenue / totalRoomsSold : 0;
-        
-        // Calculate average change for others
-        const otherChange = otherItems.reduce((sum, item) => sum + (item.change || 0), 0) / otherItems.length;
+        // For ADR, calculate the average ADR and average change for "Others"
+        // LINTER FIX: Calculate average value and change for ADR 'Others'
+        const otherValue = otherItems.reduce((sum, item) => sum + item.value, 0) / otherItems.length;
+        const otherChange = otherItems.reduce((sum, item) => sum + item.change, 0) / otherItems.length;
 
         top5.push({
             name: "Others",
-            value: otherADR,
-            percentage: 0,
+            value: otherValue || 0, // Ensure value is not NaN
+            percentage: 0, // Will be calculated later
             fill: "#999999",
-            change: otherChange,
-            // Store these in case we need them
-            revenue: totalRevenue,
-            roomsSold: totalRoomsSold
+            change: otherChange || 0, // Ensure change is not NaN
         });
       } else {
         // For revenue and rooms sold, sum the values
         const otherValue = otherItems.reduce((sum, item) => sum + item.value, 0);
-        const otherChange = otherItems.reduce((sum, item) => sum + item.change, 0) / otherItems.length;
-        
+        // LINTER FIX: Calculate average change for non-ADR 'Others'
+        const otherChange = otherItems.length > 0
+          ? otherItems.reduce((sum, item) => sum + item.change, 0) / otherItems.length
+          : 0;
+
         top5.push({
           name: "Others",
           value: otherValue,
-          percentage: 0,
+          percentage: 0, // Will be calculated later
           fill: "#999999",
           change: otherChange
         });
@@ -655,13 +642,17 @@ export function CategoriesDetails({
     return Array.from(combinedData.entries()).map(([_, value]) => value);
   }, [fluctuationData, availableMetrics]);
   
-  // Update activePieLegends for the new API data
+  // ADD THIS useEffect block to correctly initialize activePieLegends
   React.useEffect(() => {
-    if (kpiTransformedData.length > 0) {
-      // Set initial active legends
+    if (kpiTransformedData && kpiTransformedData.length > 0) {
+      // Set initial active legends based on the final data structure (Top 5 + Others)
       setActivePieLegends(kpiTransformedData.map(item => item.name));
+      console.log("Updated active legends based on kpiTransformedData:", kpiTransformedData.map(item => item.name));
+    } else {
+      // Clear legends if data is empty
+      setActivePieLegends([]);
     }
-  }, [apiDistributionData]);
+  }, [kpiTransformedData]); // Depend only on kpiTransformedData
   
   // Other variables that depend on transformedDistributionData
   const activePieData = React.useMemo(() => 
@@ -874,15 +865,6 @@ export function CategoriesDetails({
     }
   }, [selectedPieKPI, pieDatasets, activePieLegends]);
 
-  // 4. Add this effect to force a refresh of activePieLegends when the KPI changes
-  React.useEffect(() => {
-    // When KPI changes, make sure we reset the active legends
-    if (processedDistributionData && processedDistributionData.length > 0) {
-      setActivePieLegends(processedDistributionData.map(item => item.name));
-      console.log("Reset active legends for:", selectedPieKPI);
-    }
-  }, [selectedPieKPI, processedDistributionData]);
-
   // Extract the main content into a separate component or variable
   const content = (
     <div className={`flex-1 overflow-y-auto ${isDialog ? "pr-6 bg-[#f2f8ff] px-4 pb-4 pt-4" : ""}`}>
@@ -958,7 +940,7 @@ export function CategoriesDetails({
               effectiveCategoryData={effectiveCategoryData}
               effectiveCategoryConfig={effectiveCategoryConfig}
               activeCategories={activeCategories as string[]}
-              setActiveCategories={(categories: string[]) => 
+              setActiveCategories={(categories: string[]) =>
                 setActiveCategories(categories as any)}
               getCategoriesLeftMargin={getCategoriesLeftMargin}
               timeSeriesDatasets={timeSeriesDatasets}
@@ -972,7 +954,6 @@ export function CategoriesDetails({
           <CategoryDataTable
             title={title}
             data={processedTableData}
-            prefix={prefix}
             availableMetrics={availableMetrics}
           />
         </div>

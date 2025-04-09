@@ -34,6 +34,7 @@ import { HorizontalBarChartMultipleDatasets } from "../new/HorizontalBarChartMul
 import { HorizontalBarChartMultipleDatasetsUpgraded } from "../new/HorizontalBarChartMultipleDatasetsUpgraded"
 import { TopFiveUpgraded } from "@/components/new/TopFiveUpgraded"
 import eventBus from '@/utils/eventBus'
+import { usePersistentOverviewFilters } from '@/hooks/usePersistentOverviewFilters'
 
 // Dynamic import for WorldMap with loading state
 const WorldMap = dynamic(
@@ -77,14 +78,20 @@ function TriangleDown({ className }: { className?: string }) {
 
 
 export function MarketSegments() {
-  // Add date state
-  const [date, setDate] = useState<Date>(new Date())
-  
+  // Use the custom hook to manage persistent state for common filters
+  const {
+    selectedTimeFrame,
+    setSelectedTimeFrame,
+    selectedViewType,
+    setSelectedViewType,
+    selectedComparison,
+    setSelectedComparison,
+    date,
+    setDate, // Use the setter from the hook
+  } = usePersistentOverviewFilters();
+
   // Basic state for hotel selection
   const [selectedHotels, setSelectedHotels] = useState<string[]>(["Hotel 1"])
-  const [selectedTimeFrame, setSelectedTimeFrame] = useState("Month")
-  const [selectedViewType, setSelectedViewType] = useState("Actual")
-  const [selectedComparison, setSelectedComparison] = useState("Last year - OTB")
   const allHotels = ["Hotel 1", "Hotel 2", "Hotel 3"]
 
   const toggleHotel = (hotel: string) => {
@@ -125,16 +132,11 @@ export function MarketSegments() {
     }
   }
 
-  // Add date change handler
+  // Update handleDateChange to use the setter from the hook
   const handleDateChange = (newDate: Date | undefined) => {
-    if (newDate) {
-      setDate(newDate)
-      // Here you can add any additional logic needed when the date changes
-      // For example, fetching new data for the selected date
-    }
+    // The hook's setDate handles the undefined case and checks for actual change
+    setDate(newDate);
   }
-
- 
 
   // Sample metrics for producers by Market Group
   const producerMetrics = [
@@ -205,13 +207,13 @@ export function MarketSegments() {
     // Add more months as needed
   ]
 
-  // Create analysis API params similar to what's in the overview page
+  // Create analysis API params using state from the hook and local state
   const analysisApiParams = {
-    periodType: selectedTimeFrame,
-    viewType: selectedViewType,
-    comparison: selectedComparison, 
-    businessDate: date.toISOString().split('T')[0],
-    hotels: selectedHotels.join(',')
+    periodType: selectedTimeFrame,     // From hook
+    viewType: selectedViewType,       // From hook
+    comparison: selectedComparison,   // From hook
+    businessDate: date.toISOString().split('T')[0], // From hook
+    hotels: selectedHotels.join(',') // Local state
   };
 
   const metricOptions = [
@@ -369,18 +371,18 @@ export function MarketSegments() {
             {/* Date Picker with Label */}
             <div className="flex flex-col">
               <span className="text-xs text-gray-500 mb-2">Business date</span>
-              <DatePicker 
-                date={date} 
-                onDateChange={handleDateChange}
+              <DatePicker
+                date={date} // Uses date from the hook
+                onDateChange={handleDateChange} // Uses the updated handler
               />
             </div>
 
             {/* Hotel Selector with Label */}
             <div className="flex flex-col">
               <span className="text-xs text-gray-500 mb-2">Property</span>
-              <HotelSelector 
-                selectedHotels={selectedHotels}
-                setSelectedHotels={setSelectedHotels}
+              <HotelSelector
+                selectedHotels={selectedHotels} // Uses local selectedHotels
+                setSelectedHotels={setSelectedHotels} // Uses local setter
               />
             </div>
 
@@ -423,15 +425,13 @@ export function MarketSegments() {
                   metrics={metricOptions}
                   apiEndpoint="/api/market-segments/distribution-upgraded"
                   apiParams={{
-                    businessDate: date.toISOString().split('T')[0],
-                    periodType: selectedTimeFrame,
-                    viewType: selectedViewType,
-                    comparison: selectedComparison
+                    ...analysisApiParams,
                   }}
                   primaryField="market_group_code"
                   secondaryField="producer"
                   color="blue"
                   withBorder={false}
+                  useCategoriesDialog={true}
                 />
               </CardContent>
             </Card>
@@ -441,12 +441,7 @@ export function MarketSegments() {
                 title="Length of Stay by Market Group"
                 datasetTitle="Length of Stay"
                 apiEndpoint="/api/market-segments/length-of-stay"
-                apiParams={{
-                  businessDate: date.toISOString().split('T')[0],
-                  periodType: selectedTimeFrame,
-                  viewType: selectedViewType,
-                  comparison: selectedComparison
-                }}
+                apiParams={analysisApiParams}
                 defaultDataset="length_of_stay"
                 defaultCategory="ALL"
                 sort={true}
@@ -454,6 +449,7 @@ export function MarketSegments() {
               />
             </div>
           </div>
+
           
           {/* Add the new World Map with TopFiveMultiple component in a new row */}
           <div className="mt-8">
@@ -508,24 +504,13 @@ export function MarketSegments() {
                       subtitle="by Market Group"
                       metrics={metricOptions} // Pass the metric options config
                       apiEndpoint="/api/market-segments/distribution-upgraded"
-                      apiParams={{
-                        // ... existing apiParams ...
-                        // businessDate: date.toISOString().split('T')[0], // Already included in analysisApiParams spread below? Check usage.
-                        periodType: selectedTimeFrame,
-                        viewType: selectedViewType,
-                        comparison: selectedComparison,
-                        // Add hotels if needed by this endpoint
-                        // hotels: selectedHotels.join(',')
-                      }}
+                      apiParams={analysisApiParams} // Use the shared analysisApiParams
                       primaryField="market_group_code"
                       secondaryField="guest_country"
                       defaultPrimaryValue="ALL" // Or fetch the first available one
                       color="blue"
                       withBorder={false}
-                      // Remove props related to hardcoded data
-                      // distributionData={...} // REMOVE
-                      // categoryTimeSeriesData={...} // REMOVE
-                      // chartConfig={...} // REMOVE
+                      useCategoriesDialog={true}
                     />
                   </div>
                 </div>
@@ -541,12 +526,7 @@ export function MarketSegments() {
               title="Lead Times by Market Group"
               datasetTitle="Lead Times"
               apiEndpoint="/api/market-segments/lead-times"
-              apiParams={{
-                businessDate: date.toISOString().split('T')[0],
-                periodType: selectedTimeFrame,
-                viewType: selectedViewType,
-                comparison: selectedComparison
-              }}
+              apiParams={analysisApiParams}
               defaultDataset="cancellation_lead_time"
               defaultCategory="ALL"
               sort={true}
@@ -559,12 +539,7 @@ export function MarketSegments() {
               title="Reservation Trends (DOW)"
               datasetTitle="Reservation Trends (DOW)"
               apiEndpoint="/api/market-segments/reservation-trends"
-              apiParams={{
-                businessDate: date.toISOString().split('T')[0],
-                periodType: selectedTimeFrame,
-                viewType: selectedViewType,
-                comparison: selectedComparison
-              }}
+              apiParams={analysisApiParams}
               defaultDataset="occupancyByDayOfWeek"
               leftMargin={20}
               defaultCategory="ALL"

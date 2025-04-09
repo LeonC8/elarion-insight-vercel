@@ -35,6 +35,7 @@ import { addDays } from "date-fns"
 import { OccupancyAnalysisChart } from '../new/OccupancyAnalysisChart'
 import { KpiResponse } from '@/app/api/overview/general/route'
 import { KpiWithAlignedChart } from '../new/KpiWithAlignedChart'
+import { usePersistentOverviewFilters } from '@/hooks/usePersistentOverviewFilters'; // Import the custom hook
 
 // Dynamic import for WorldMap with loading state
 const WorldMap = dynamic(
@@ -1237,22 +1238,31 @@ const metricKeyMapping: Record<string, string> = {
 };
 
 export function Overview() {
-  // Add date state
-  const [date, setDate] = useState<Date>(new Date())
-  
+  // Use the custom hook to manage persistent state
+  const {
+    selectedTimeFrame,
+    setSelectedTimeFrame,
+    selectedViewType,
+    setSelectedViewType,
+    selectedComparison,
+    setSelectedComparison,
+    date,
+    setDate, // Use the setter from the hook
+  } = usePersistentOverviewFilters();
+
   // Basic state for hotel selection
   const [selectedHotels, setSelectedHotels] = useState<string[]>(["Hotel 1"])
-  const [selectedTimeFrame, setSelectedTimeFrame] = useState("Month")
-  const [selectedViewType, setSelectedViewType] = useState("Actual")
-  const [selectedComparison, setSelectedComparison] = useState("Last year - Actual")
   const allHotels = ["Hotel 1", "Hotel 2", "Hotel 3"]
   
   // Add state for API data
   const [kpiData, setKpiData] = useState<KpiResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [primaryDataLoaded, setPrimaryDataLoaded] = useState(false); // Keep this
+  const [worldMapData, setWorldMapData] = useState<Array<{ country: string; value: number }>>([]); // Keep this
+  const [selectedMapMetric, setSelectedMapMetric] = useState('revenue'); // Keep this
 
-  // Keep analysisApiParams
+  // Keep analysisApiParams state and its useEffect (it now depends on the hook's state)
   const [analysisApiParams, setAnalysisApiParams] = useState({
     businessDate: date.toISOString().split('T')[0],
     periodType: selectedTimeFrame,
@@ -1262,15 +1272,12 @@ export function Overview() {
 
   useEffect(() => {
     setAnalysisApiParams({
-      businessDate: date.toISOString().split('T')[0],
-      periodType: selectedTimeFrame,
-      viewType: selectedViewType,
-      comparison: selectedComparison
+      businessDate: date.toISOString().split('T')[0], // Uses date from the hook
+      periodType: selectedTimeFrame,                 // Uses selectedTimeFrame from the hook
+      viewType: selectedViewType,                   // Uses selectedViewType from the hook
+      comparison: selectedComparison                // Uses selectedComparison from the hook
     });
-  }, [date, selectedTimeFrame, selectedViewType, selectedComparison]);
-
-  // Add a new state to track the primary data loading status separately
-  const [primaryDataLoaded, setPrimaryDataLoaded] = useState(false);
+  }, [date, selectedTimeFrame, selectedViewType, selectedComparison]); // Dependencies are now from the hook
 
   // Modify the fetchKpiData function to mark primary data as loaded
   const fetchKpiData = async () => {
@@ -1355,19 +1362,12 @@ export function Overview() {
     }
   }
 
-  // Add date change handler
+  // Update handleDateChange to use the setter from the hook
   const handleDateChange = (newDate: Date | undefined) => {
-    if (newDate) {
-      setDate(newDate)
-      // Data will be fetched via the useEffect
-    }
+    // The hook's setDate handles the undefined case and checks for actual change
+    setDate(newDate);
+    // Data fetching is handled by the main useEffect dependency change
   }
-
-  // Add new state for world map data
-  const [worldMapData, setWorldMapData] = useState<Array<{ country: string; value: number }>>([]);
-  
-  // Add state to track selected metric at the Overview level
-  const [selectedMapMetric, setSelectedMapMetric] = useState('revenue');
 
   // Modify the fetchWorldMapData function to use the mapping
   const fetchWorldMapData = async (metric: string = selectedMapMetric) => {
@@ -1510,9 +1510,9 @@ export function Overview() {
             {/* Date Picker with Label */}
             <div className="flex flex-col">
               <span className="text-xs text-gray-500 mb-2">Business date</span>
-              <DatePicker 
-                date={date} 
-                onDateChange={handleDateChange}
+              <DatePicker
+                date={date} // Uses date from the hook
+                onDateChange={handleDateChange} // Uses the updated handler
               />
             </div>
 
@@ -1711,10 +1711,13 @@ export function Overview() {
               field: 'producer',
               limit: '5'
             }}
+            lazyLoad={true}
           />
           <OccupancyAnalysisChart 
             occupancyData={kpiData?.occupancyRate.fluctuation ?? occupancyChartData}
             totalRooms={kpiData?.hotelCapacity ?? 100}
+            // Add loading prop pass-through
+            loading={loading} 
           />
         </div>
 
@@ -1815,6 +1818,7 @@ export function Overview() {
                       setSelectedMapMetric(metric);
                       fetchWorldMapData(metric);
                     }}
+                    lazyLoad={true}
                   />
                 </div>
               </div>
@@ -1870,6 +1874,7 @@ export function Overview() {
               field: 'market_group_code',
               limit: '5'
             }}
+            lazyLoad={true}
           />
           <TopFive 
             title="Booking Channels"
@@ -1889,6 +1894,7 @@ export function Overview() {
               field: 'booking_channel',
               limit: '5'
             }}
+            lazyLoad={true}
           />
           <TopFive 
             title="Room Types"
@@ -1908,6 +1914,7 @@ export function Overview() {
               field: 'room_type',
               limit: '5'
             }}
+            lazyLoad={true}
           />
         </div>
 
@@ -1915,22 +1922,18 @@ export function Overview() {
         <div className="grid gap-4 grid-cols-2 pt-8">
           {/* Use url and apiParams for Lead Times chart */}
           <HorizontalBarChartMultipleDatasets
-            // REMOVE datasets prop
-            // datasets={ ... }
+            // ... other props ...
             url="/api/overview/lead-times" // Pass the URL
             apiParams={analysisApiParams} // Pass the common API parameters
             defaultDataset="bookingLeadTime" // Use the key defined in the API response
-            // REMOVE loading/error props - handled internally by component
-            // loading={leadTimesLoading}
-            // error={leadTimesError}
             leftMargin={-10}
+            lazyLoad={true} // <-- Already added
           />
-           {/* Update ReservationsByDayChart to fetch its own data */}
+           {/* Update ReservationsByDayChart to fetch its own data and lazy load */}
           <ReservationsByDayChart
-             // REMOVE data prop
-             // data={reservationTrendsLoading ? [] : reservationTrendsData}
              url="/api/overview/reservation-trends" // Pass the URL
              apiParams={analysisApiParams} // Pass the common API parameters
+             lazyLoad={true} // <-- Add this prop
           />
         </div>
 
@@ -1971,6 +1974,7 @@ export function Overview() {
             // loading={lengthOfStayLoading}
             // error={lengthOfStayError}
             leftMargin={10}
+            lazyLoad={true} // <-- Add this
           />
         </div>
       </div>
