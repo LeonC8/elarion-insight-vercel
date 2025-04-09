@@ -1,6 +1,113 @@
 import { NextResponse } from 'next/server';
 import { ClickHouseClient, createClient } from '@clickhouse/client';
 import { calculateDateRanges, calculateComparisonDateRanges } from '@/lib/dateUtils';
+import * as fs from 'fs';
+import * as path from 'path';
+
+// --- START CACHING LOGIC ---
+
+interface CacheEntryData {
+  body: any; // Store the parsed JSON body
+  status: number;
+  headers: Record<string, string>;
+}
+
+interface CacheEntry {  data: CacheEntryData;
+  expiresAt: number;
+}
+
+// File-based cache configuration
+const CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
+const CACHE_DIR = path.join(process.cwd(), '.cache');
+
+// Ensure cache directory exists
+try {
+  if (!fs.existsSync(CACHE_DIR)) {
+    fs.mkdirSync(CACHE_DIR, { recursive: true });
+  }
+} catch (error) {
+  console.error('Error creating cache directory:', error);
+}
+
+// File-based cache functions
+function getCacheFilePath(key: string): string {
+  // Create a safe filename from the key
+  const safeKey = Buffer.from(key).toString('base64').replace(/[/\\?%*:|"<>]/g, '_');
+  return path.join(CACHE_DIR, `${safeKey}.json`);
+}
+
+async function getCacheEntry(key: string): Promise<CacheEntry | null> {
+  try {
+    const filePath = getCacheFilePath(key);
+    if (fs.existsSync(filePath)) {
+      const data = fs.readFileSync(filePath, 'utf8');
+      return JSON.parse(data);
+    }
+    return null;
+  } catch (error) {
+    console.error(`Cache read error:`, error);
+    return null;
+  }
+}
+
+async function setCacheEntry(key: string, entry: CacheEntry): Promise<void> {
+  try {
+    const filePath = getCacheFilePath(key);
+    fs.writeFileSync(filePath, JSON.stringify(entry), 'utf8');
+  } catch (error) {
+    console.error(`Cache write error:`, error);
+  }
+}
+
+async function deleteCacheEntry(key: string): Promise<void> {
+  try {
+    const filePath = getCacheFilePath(key);
+    if (fs.existsSync(filePath)) {
+      fs.unlinkSync(filePath);
+    }
+  } catch (error) {
+    console.error(`Cache delete error:`, error);
+  }
+}
+
+/**
+ * Generates a cache key based on relevant query parameters for fluctuation route.
+ * Ensures the key is consistent regardless of parameter order.
+ */
+function generateCacheKey(params: URLSearchParams): string {
+  const relevantParams = [
+    'businessDate',
+    'periodType',
+    'viewType',
+    'comparison',
+    'field',
+    'limit'
+  ];
+  const keyParts: string[] = [];
+
+  relevantParams.forEach(key => {
+    // Use default values if parameter is missing, mirroring the route's logic
+    let value: string | null = null;
+    switch (key) {
+        case 'businessDate': value = params.get(key) || new Date().toISOString().split('T')[0]; break;
+        case 'periodType': value = params.get(key) || 'Month'; break;
+        case 'viewType': value = params.get(key) || 'Actual'; break;
+        case 'comparison': value = params.get(key) || 'Last year - OTB'; break;
+        case 'field': value = params.get(key) || 'guest_country'; break;
+        case 'limit': value = params.get(key) || '5'; break; // Fluctuation route specific limit
+        default: value = params.get(key);
+    }
+    if (value !== null) {
+        keyParts.push(`${key}=${value}`);
+    }
+  });
+
+  // Sort parts to ensure consistent key regardless of parameter order
+  keyParts.sort();
+  return keyParts.join('&');
+}
+
+// --- END CACHING LOGIC ---
 
 // Interface for top categories in each KPI
 interface CategorySummary {
@@ -41,6 +148,12 @@ export interface FluctuationResponse {
   };
   timeScale: 'day' | 'month' | 'year';
   actualGranularity: 'day';
+  bookingLeadTime?: {
+    [key: string]: number;
+  };
+  lengthOfStay?: {
+    [key: string]: number;
+  }; // Add new field for length of stay data
 }
 
 // Helper function to round numbers - add null checks and default values
@@ -104,6 +217,27 @@ const datesToIndex = (startDate: string, endDate: string, date: string): number 
 export async function GET(request: Request) {
   // Parse query parameters
   const { searchParams } = new URL(request.url);
+
+  // --- CHECK CACHE ---
+  const cacheKey = `fluctuation:${generateCacheKey(searchParams)}`;
+  const cachedEntry = await getCacheEntry(cacheKey);
+
+  if (cachedEntry && cachedEntry.expiresAt > Date.now()) {
+    console.log(`[Cache HIT] Returning cached response for key: ${cacheKey.substring(0, 100)}...`);
+    // Reconstruct the response from cached data
+    return new NextResponse(JSON.stringify(cachedEntry.data.body), {
+      status: cachedEntry.data.status,
+      headers: cachedEntry.data.headers,
+    });
+  } else if (cachedEntry) {
+    // Entry exists but is expired
+    console.log(`[Cache EXPIRED] Removing expired entry for key: ${cacheKey.substring(0, 100)}...`);
+    await deleteCacheEntry(cacheKey);
+  } else {
+    console.log(`[Cache MISS] No valid cache entry for key: ${cacheKey.substring(0, 100)}...`);
+  }
+  // --- END CACHE CHECK ---
+
   const businessDateParam = searchParams.get('businessDate') || new Date().toISOString().split('T')[0];
   const periodType = searchParams.get('periodType') || 'Month'; // Month, Year, Day
   const viewType = searchParams.get('viewType') || 'Actual'; // Actual, OTB, Projected
@@ -620,6 +754,28 @@ export async function GET(request: Request) {
           prefix: "€",
           suffix: ""
         }
+      },
+      bookingLeadTime: {
+        name: "Lead Time",
+        config: {
+          supportsPie: false,
+          supportsBar: true,
+          supportsNormal: true,
+          supportsStacked: true,
+          prefix: "",
+          suffix: " days"
+        }
+      },
+      lengthOfStay: {
+        name: "Length of Stay",
+        config: {
+          supportsPie: false,
+          supportsBar: true,
+          supportsNormal: true,
+          supportsStacked: true,
+          prefix: "",
+          suffix: " nights"
+        }
       }
     };
 
@@ -746,6 +902,508 @@ export async function GET(request: Request) {
       };
     });
 
+    // Query to fetch booking lead time data - update field
+    const bookingLeadTimeQuery = `
+      SELECT 
+        market_group_code,
+        SUM(toFloat64(date_diff)) as total_date_diff,
+        SUM(toFloat64(booking_lead_num)) as total_buckets
+      FROM SAND01CN.booking_lead_time
+      WHERE 
+        toDate(occupancy_date) BETWEEN '${startDate}' AND '${endDate}'
+        AND date(scd_valid_from) <= DATE('${businessDateParam}') 
+        AND DATE('${businessDateParam}') < date(scd_valid_to)
+        AND market_group_code != 'UNDEFINED'
+        AND market_group_code != ''
+        AND market_group_code IS NOT NULL
+      GROUP BY market_group_code
+      ORDER BY total_date_diff DESC
+    `;
+
+    const bookingLeadTimeResultSet = await client.query({
+      query: bookingLeadTimeQuery,
+      format: 'JSONEachRow'
+    });
+
+    const bookingLeadTimeData = await bookingLeadTimeResultSet.json() as any[];
+
+    // Process booking lead time data
+    const bookingLeadTimeByChannel: {[key: string]: number} = {};
+    const bookingLeadTimeTopCategories: CategorySummary[] = [];
+
+    bookingLeadTimeData.forEach(item => {
+      const channel = item.market_group_code;
+      const totalDateDiff = parseFloat(item.total_date_diff || '0');
+      const totalBuckets = parseFloat(item.total_buckets || '0');
+      
+      // Calculate lead time - average days per booking
+      const leadTime = totalBuckets > 0 ? totalDateDiff / totalBuckets : 0;
+      
+      // Store calculated lead time by channel
+      bookingLeadTimeByChannel[channel] = roundValue(leadTime);
+      
+      // Create categories summary for KPIs
+      bookingLeadTimeTopCategories.push({
+        name: channel,
+        value: roundValue(leadTime),
+        change: 0, // We don't have comparison data yet for lead time
+        code: generateCode(channel, 'market_group_code')
+      });
+    });
+
+    // Update previous period query for lead time
+    const prevBookingLeadTimeQuery = `
+      SELECT 
+        market_group_code,
+        SUM(toFloat64(date_diff)) as total_date_diff,
+        SUM(toFloat64(booking_lead_num)) as total_buckets
+      FROM SAND01CN.booking_lead_time
+      WHERE 
+        toDate(occupancy_date) BETWEEN '${prevStartDate}' AND '${prevEndDate}'
+        AND date(scd_valid_from) <= DATE('${prevBusinessDateParam}') 
+        AND DATE('${prevBusinessDateParam}') < date(scd_valid_to)
+        AND market_group_code != 'UNDEFINED'
+        AND market_group_code != ''
+        AND market_group_code IS NOT NULL
+      GROUP BY market_group_code
+      ORDER BY total_date_diff DESC
+    `;
+
+    const prevBookingLeadTimeResultSet = await client.query({
+      query: prevBookingLeadTimeQuery,
+      format: 'JSONEachRow'
+    });
+
+    const prevBookingLeadTimeData = await prevBookingLeadTimeResultSet.json() as any[];
+
+    // Process previous period booking lead time data
+    const prevBookingLeadTimeByChannel: {[key: string]: number} = {};
+
+    prevBookingLeadTimeData.forEach(item => {
+      const channel = item.market_group_code;
+      const totalDateDiff = parseFloat(item.total_date_diff || '0');
+      const totalBuckets = parseFloat(item.total_buckets || '0');
+      
+      // Calculate lead time
+      const leadTime = totalBuckets > 0 ? totalDateDiff / totalBuckets : 0;
+      
+      // Store calculated lead time
+      prevBookingLeadTimeByChannel[channel] = roundValue(leadTime);
+    });
+
+    // Update the lead time KPIs with change values
+    bookingLeadTimeTopCategories.forEach(category => {
+      const prevValue = prevBookingLeadTimeByChannel[category.name] || 0;
+      category.change = roundValue(category.value - prevValue);
+    });
+
+    // Sort by value descending
+    bookingLeadTimeTopCategories.sort((a, b) => b.value - a.value);
+
+    // Update lead time fluctuation query
+    const leadTimeFluctuationQuery = `
+      SELECT 
+        toString(toDate(occupancy_date)) AS date_period,
+        market_group_code,
+        SUM(toFloat64(date_diff)) as total_date_diff,
+        SUM(toFloat64(booking_lead_num)) as total_buckets
+      FROM SAND01CN.booking_lead_time
+      WHERE 
+        toDate(occupancy_date) BETWEEN '${startDate}' AND '${endDate}'
+        AND date(scd_valid_from) <= DATE('${businessDateParam}') 
+        AND DATE('${businessDateParam}') < date(scd_valid_to)
+        AND market_group_code != 'UNDEFINED'
+        AND market_group_code != ''
+        AND market_group_code IS NOT NULL
+        AND market_group_code IN (${topCategoryNames.map(name => `'${name}'`).join(',')})
+      GROUP BY date_period, market_group_code
+      ORDER BY date_period, market_group_code
+    `;
+
+    const leadTimeFluctuationResultSet = await client.query({
+      query: leadTimeFluctuationQuery,
+      format: 'JSONEachRow'
+    });
+
+    const leadTimeFluctuationData = await leadTimeFluctuationResultSet.json() as any[];
+
+    const prevLeadTimeFluctuationQuery = `
+      SELECT 
+        toString(toDate(occupancy_date)) AS date_period,
+        market_group_code,
+        SUM(toFloat64(date_diff)) as total_date_diff,
+        SUM(toFloat64(booking_lead_num)) as total_buckets
+      FROM SAND01CN.booking_lead_time
+      WHERE 
+        toDate(occupancy_date) BETWEEN '${prevStartDate}' AND '${prevEndDate}'
+        AND date(scd_valid_from) <= DATE('${prevBusinessDateParam}') 
+        AND DATE('${prevBusinessDateParam}') < date(scd_valid_to)
+        AND market_group_code != 'UNDEFINED'
+        AND market_group_code != ''
+        AND market_group_code IS NOT NULL
+        AND market_group_code IN (${topCategoryNames.map(name => `'${name}'`).join(',')})
+      GROUP BY date_period, market_group_code
+      ORDER BY date_period, market_group_code
+    `;
+
+    const prevLeadTimeFluctuationResultSet = await client.query({
+      query: prevLeadTimeFluctuationQuery,
+      format: 'JSONEachRow'
+    });
+
+    const prevLeadTimeFluctuationData = await prevLeadTimeFluctuationResultSet.json() as any[];
+
+    // Process fluctuation data for lead time
+    const currentLeadTimeMap = new Map();
+    const prevLeadTimeMap = new Map();
+    
+    // Organize current period data
+    leadTimeFluctuationData.forEach(item => {
+      const category = item.market_group_code;
+      const datePeriod = item.date_period;
+      const key = `${category}|${datePeriod}`;
+      
+      const totalDateDiff = parseFloat(item.total_date_diff || '0');
+      const totalBuckets = parseFloat(item.total_buckets || '0');
+      const leadTime = totalBuckets > 0 ? totalDateDiff / totalBuckets : 0;
+      
+      currentLeadTimeMap.set(key, leadTime);
+    });
+    
+    // Organize previous period data
+    prevLeadTimeFluctuationData.forEach(item => {
+      const category = item.market_group_code;
+      const datePeriod = item.date_period;
+      
+      // Map previous period date to current period for comparison
+      let mappedDate;
+      if (timeScale === 'month') {
+        // For month, keep month but change year
+        const prevDate = new Date(datePeriod);
+        const currDate = new Date(prevDate);
+        currDate.setFullYear(currDate.getFullYear() + 1);
+        mappedDate = currDate.toISOString().split('T')[0].substring(0, 7) + "-01";
+      } else if (timeScale === 'day') {
+        // For day, ensure correct mapping (may need to adjust for day of week if necessary)
+        const dayDiff = (new Date(endDate).getTime() - new Date(startDate).getTime()) / 
+                        (1000 * 60 * 60 * 24);
+        const prevDayDiff = (new Date(prevEndDate).getTime() - new Date(prevStartDate).getTime()) / 
+                        (1000 * 60 * 60 * 24);
+        
+        if (dayDiff === prevDayDiff) {
+          // If periods are same length, map directly
+          const prevIdx = datesToIndex(prevStartDate, prevEndDate, datePeriod);
+          if (prevIdx !== -1) {
+            const mappedIdx = prevIdx / prevDayDiff * dayDiff;
+            const mappedMsec = new Date(startDate).getTime() + 
+                             (mappedIdx * 24 * 60 * 60 * 1000);
+            mappedDate = new Date(mappedMsec).toISOString().split('T')[0];
+          }
+        } else {
+          // If periods have different lengths, use relative positioning
+          const prevDate = new Date(datePeriod);
+          const relativePosition = (prevDate.getTime() - new Date(prevStartDate).getTime()) / 
+                                 (new Date(prevEndDate).getTime() - new Date(prevStartDate).getTime());
+          
+          const currentSpan = new Date(endDate).getTime() - new Date(startDate).getTime();
+          const mappedMsec = new Date(startDate).getTime() + (relativePosition * currentSpan);
+          mappedDate = new Date(mappedMsec).toISOString().split('T')[0];
+        }
+      } else {
+        // For year, just add the difference between periods
+        const yearDiff = new Date(startDate).getFullYear() - new Date(prevStartDate).getFullYear();
+        const prevYear = parseInt(datePeriod.substring(0, 4));
+        mappedDate = `${prevYear + yearDiff}-01-01`;
+      }
+      
+      const totalDateDiff = parseFloat(item.total_date_diff || '0');
+      const totalBuckets = parseFloat(item.total_buckets || '0');
+      const leadTime = totalBuckets > 0 ? totalDateDiff / totalBuckets : 0;
+      
+      const key = `${category}|${mappedDate}`;
+      prevLeadTimeMap.set(key, leadTime);
+    });
+
+    // Generate lead time fluctuation data
+    const leadTimeFluctuationSeries: Record<string, FluctuationDataPoint[]> = {};
+    
+    // For each top category, create a time series with all dates
+    topCategoryNames.forEach(category => {
+      const displayName = getDisplayName(category);
+      const leadTimeSeries: FluctuationDataPoint[] = [];
+      
+      allDates.forEach(date => {
+        const key = `${category}|${date}`;
+        const currentValue = currentLeadTimeMap.get(key) || 0;
+        const prevValue = prevLeadTimeMap.get(key) || 0;
+        
+        // Calculate change percentage
+        const change = prevValue !== 0 ? 
+          ((currentValue - prevValue) / prevValue) * 100 : 0;
+        
+        // Add data point to series
+        leadTimeSeries.push({
+          date,
+          value: roundValue(currentValue),
+          previousValue: roundValue(prevValue),
+          change: roundValue(change)
+        });
+      });
+      
+      // Add series for this category
+      leadTimeFluctuationSeries[displayName] = leadTimeSeries;
+    });
+
+    // Query to fetch length of stay data - update field
+    const lengthOfStayQuery = `
+      SELECT 
+        market_group_code,
+        SUM(toFloat64(date_diff)) as total_date_diff,
+        SUM(toFloat64(num)) as total_num
+      FROM SAND01CN.lenght_of_stay_distribution
+      WHERE 
+        toDate(occupancy_date) BETWEEN '${startDate}' AND '${endDate}'
+        AND date(scd_valid_from) <= DATE('${businessDateParam}') 
+        AND DATE('${businessDateParam}') < date(scd_valid_to)
+        AND market_group_code != 'UNDEFINED'
+        AND market_group_code != ''
+        AND market_group_code IS NOT NULL
+      GROUP BY market_group_code
+      ORDER BY total_date_diff DESC
+    `;
+
+    const lengthOfStayResultSet = await client.query({
+      query: lengthOfStayQuery,
+      format: 'JSONEachRow'
+    });
+
+    const lengthOfStayData = await lengthOfStayResultSet.json() as any[];
+
+    // Process length of stay data
+    const lengthOfStayByChannel: {[key: string]: number} = {};
+    const lengthOfStayTopCategories: CategorySummary[] = [];
+
+    lengthOfStayData.forEach(item => {
+      const marketGroup = item.market_group_code;
+      const totalDateDiff = parseFloat(item.total_date_diff || '0');
+      const totalNum = parseFloat(item.total_num || '0');
+      
+      // Calculate length of stay - average days per booking
+      const los = totalNum > 0 ? totalDateDiff / totalNum : 0;
+      
+      // Store calculated length of stay by channel
+      lengthOfStayByChannel[marketGroup] = roundValue(los);
+      
+      // Create categories summary for KPIs
+      lengthOfStayTopCategories.push({
+        name: marketGroup,
+        value: roundValue(los),
+        change: 0, // Will update with comparison data later
+        code: generateCode(marketGroup, 'market_group_code')
+      });
+    });
+
+    // Update previous period length of stay query
+    const prevLengthOfStayQuery = `
+      SELECT 
+        market_group_code,
+        SUM(toFloat64(date_diff)) as total_date_diff,
+        SUM(toFloat64(num)) as total_num
+      FROM SAND01CN.lenght_of_stay_distribution
+      WHERE 
+        toDate(occupancy_date) BETWEEN '${prevStartDate}' AND '${prevEndDate}'
+        AND date(scd_valid_from) <= DATE('${prevBusinessDateParam}') 
+        AND DATE('${prevBusinessDateParam}') < date(scd_valid_to)
+        AND market_group_code != 'UNDEFINED'
+        AND market_group_code != ''
+        AND market_group_code IS NOT NULL
+      GROUP BY market_group_code
+      ORDER BY total_date_diff DESC
+    `;
+
+    const prevLengthOfStayResultSet = await client.query({
+      query: prevLengthOfStayQuery,
+      format: 'JSONEachRow'
+    });
+
+    const prevLengthOfStayData = await prevLengthOfStayResultSet.json() as any[];
+
+    // Process previous period length of stay data
+    const prevLengthOfStayByChannel: {[key: string]: number} = {};
+
+    prevLengthOfStayData.forEach(item => {
+      const marketGroup = item.market_group_code;
+      const totalDateDiff = parseFloat(item.total_date_diff || '0');
+      const totalNum = parseFloat(item.total_num || '0');
+      
+      // Calculate length of stay
+      const los = totalNum > 0 ? totalDateDiff / totalNum : 0;
+      
+      // Store calculated length of stay
+      prevLengthOfStayByChannel[marketGroup] = roundValue(los);
+    });
+
+    // Update the length of stay KPIs with change values
+    lengthOfStayTopCategories.forEach(category => {
+      const prevValue = prevLengthOfStayByChannel[category.name] || 0;
+      category.change = roundValue(category.value - prevValue);
+    });
+
+    // Sort by value descending
+    lengthOfStayTopCategories.sort((a, b) => b.value - a.value);
+
+    // Update length of stay fluctuation query
+    const losFluctuationQuery = `
+      SELECT 
+        toString(toDate(occupancy_date)) AS date_period,
+        market_group_code,
+        SUM(toFloat64(date_diff)) as total_date_diff,
+        SUM(toFloat64(num)) as total_num
+      FROM SAND01CN.lenght_of_stay_distribution
+      WHERE 
+        toDate(occupancy_date) BETWEEN '${startDate}' AND '${endDate}'
+        AND date(scd_valid_from) <= DATE('${businessDateParam}') 
+        AND DATE('${businessDateParam}') < date(scd_valid_to)
+        AND market_group_code != 'UNDEFINED'
+        AND market_group_code != ''
+        AND market_group_code IS NOT NULL
+        AND market_group_code IN (${topCategoryNames.map(name => `'${name}'`).join(',')})
+      GROUP BY date_period, market_group_code
+      ORDER BY date_period, market_group_code
+    `;
+
+    const losFluctuationResultSet = await client.query({
+      query: losFluctuationQuery,
+      format: 'JSONEachRow'
+    });
+
+    const losFluctuationData = await losFluctuationResultSet.json() as any[];
+
+    const prevLosFluctuationQuery = `
+      SELECT 
+        toString(toDate(occupancy_date)) AS date_period,
+        market_group_code,
+        SUM(toFloat64(date_diff)) as total_date_diff,
+        SUM(toFloat64(num)) as total_num
+      FROM SAND01CN.lenght_of_stay_distribution
+      WHERE 
+        toDate(occupancy_date) BETWEEN '${prevStartDate}' AND '${prevEndDate}'
+        AND date(scd_valid_from) <= DATE('${prevBusinessDateParam}') 
+        AND DATE('${prevBusinessDateParam}') < date(scd_valid_to)
+        AND market_group_code != 'UNDEFINED'
+        AND market_group_code != ''
+        AND market_group_code IS NOT NULL
+        AND market_group_code IN (${topCategoryNames.map(name => `'${name}'`).join(',')})
+      GROUP BY date_period, market_group_code
+      ORDER BY date_period, market_group_code
+    `;
+
+    const prevLosFluctuationResultSet = await client.query({
+      query: prevLosFluctuationQuery,
+      format: 'JSONEachRow'
+    });
+
+    const prevLosFluctuationData = await prevLosFluctuationResultSet.json() as any[];
+
+    // Process fluctuation data for length of stay
+    const currentLosMap = new Map();
+    const prevLosMap = new Map();
+
+    // Organize current period data
+    losFluctuationData.forEach(item => {
+      const category = item.market_group_code;
+      const datePeriod = item.date_period;
+      const key = `${category}|${datePeriod}`;
+      
+      const totalDateDiff = parseFloat(item.total_date_diff || '0');
+      const totalNum = parseFloat(item.total_num || '0');
+      const los = totalNum > 0 ? totalDateDiff / totalNum : 0;
+      
+      currentLosMap.set(key, los);
+    });
+
+    // Organize previous period data using the same date mapping logic
+    prevLosFluctuationData.forEach(item => {
+      const category = item.market_group_code;
+      const datePeriod = item.date_period;
+      
+      // Map previous period date to current period for comparison - same logic as lead time
+      let mappedDate;
+      if (timeScale === 'month') {
+        const prevDate = new Date(datePeriod);
+        const currDate = new Date(prevDate);
+        currDate.setFullYear(currDate.getFullYear() + 1);
+        mappedDate = currDate.toISOString().split('T')[0].substring(0, 7) + "-01";
+      } else if (timeScale === 'day') {
+        const dayDiff = (new Date(endDate).getTime() - new Date(startDate).getTime()) / 
+                       (1000 * 60 * 60 * 24);
+        const prevDayDiff = (new Date(prevEndDate).getTime() - new Date(prevStartDate).getTime()) / 
+                       (1000 * 60 * 60 * 24);
+        
+        if (dayDiff === prevDayDiff) {
+          // If periods are same length, map directly
+          const prevIdx = datesToIndex(prevStartDate, prevEndDate, datePeriod);
+          if (prevIdx !== -1) {
+            const mappedIdx = prevIdx / prevDayDiff * dayDiff;
+            const mappedMsec = new Date(startDate).getTime() + 
+                              (mappedIdx * 24 * 60 * 60 * 1000);
+            mappedDate = new Date(mappedMsec).toISOString().split('T')[0];
+          }
+        } else {
+          // If periods have different lengths, use relative positioning
+          const prevDate = new Date(datePeriod);
+          const relativePosition = (prevDate.getTime() - new Date(prevStartDate).getTime()) / 
+                                  (new Date(prevEndDate).getTime() - new Date(prevStartDate).getTime());
+          
+          const currentSpan = new Date(endDate).getTime() - new Date(startDate).getTime();
+          const mappedMsec = new Date(startDate).getTime() + (relativePosition * currentSpan);
+          mappedDate = new Date(mappedMsec).toISOString().split('T')[0];
+        }
+      } else {
+        // For year, just add the difference between periods
+        const yearDiff = new Date(startDate).getFullYear() - new Date(prevStartDate).getFullYear();
+        const prevYear = parseInt(datePeriod.substring(0, 4));
+        mappedDate = `${prevYear + yearDiff}-01-01`;
+      }
+      
+      const totalDateDiff = parseFloat(item.total_date_diff || '0');
+      const totalNum = parseFloat(item.total_num || '0');
+      const los = totalNum > 0 ? totalDateDiff / totalNum : 0;
+      
+      const key = `${category}|${mappedDate}`;
+      prevLosMap.set(key, los);
+    });
+
+    // Generate length of stay fluctuation data
+    const losFluctuationSeries: Record<string, FluctuationDataPoint[]> = {};
+
+    // For each top category, create a time series with all dates
+    topCategoryNames.forEach(category => {
+      const displayName = getDisplayName(category);
+      const losSeries: FluctuationDataPoint[] = [];
+      
+      allDates.forEach(date => {
+        const key = `${category}|${date}`;
+        const currentValue = currentLosMap.get(key) || 0;
+        const prevValue = prevLosMap.get(key) || 0;
+        
+        // Calculate change percentage
+        const change = prevValue !== 0 ? 
+          ((currentValue - prevValue) / prevValue) * 100 : 0;
+        
+        // Add data point to series
+        losSeries.push({
+          date,
+          value: roundValue(currentValue),
+          previousValue: roundValue(prevValue),
+          change: roundValue(change)
+        });
+      });
+      
+      // Add series for this category
+      losFluctuationSeries[displayName] = losSeries;
+    });
+
     // Construct the response with the new structure
     const response: FluctuationResponse = {
       metrics: metricConfigs,
@@ -755,7 +1413,9 @@ export async function GET(request: Request) {
         adr: adrTopCategories,
         roomRevenue: roomRevenueTopCategories,
         cancellations: cancellationsTopCategories,
-        fbRevenue: fbRevenueTopCategories
+        fbRevenue: fbRevenueTopCategories,
+        bookingLeadTime: bookingLeadTimeTopCategories,
+        lengthOfStay: lengthOfStayTopCategories
       },
       fluctuationData: {
         revenue: revenueFluctuationData,
@@ -763,19 +1423,36 @@ export async function GET(request: Request) {
         adr: adrFluctuationData,
         roomRevenue: roomRevenueFluctuationData,
         cancellations: cancellationsFluctuationData,
-        fbRevenue: fbRevenueFluctuationData
+        fbRevenue: fbRevenueFluctuationData,
+        bookingLeadTime: leadTimeFluctuationSeries,
+        lengthOfStay: losFluctuationSeries
       },
       timeScale,
-      actualGranularity: 'day'
+      actualGranularity: 'day',
+      bookingLeadTime: bookingLeadTimeByChannel,
+      lengthOfStay: lengthOfStayByChannel
     };
+
+    // --- STORE IN CACHE ---
+    const cacheEntry: CacheEntry = {
+      data: {
+        body: response, // The JSON response body
+        status: 200,
+        headers: { 'Content-Type': 'application/json' }
+      },
+      expiresAt: Date.now() + CACHE_DURATION
+    };
+
+    await setCacheEntry(cacheKey, cacheEntry);
+    console.log(`[Cache SET] Stored response data for key: ${cacheKey.substring(0, 100)}...`);
+    // --- END STORE IN CACHE ---
 
     return NextResponse.json(response);
   } catch (error) {
     console.error('Error querying ClickHouse:', error);
-    return NextResponse.json(
-      { error: `Failed to fetch ${field} fluctuation data from ClickHouse` },
-      { status: 500 }
-    );
+    // Do not cache errors
+    const errorBody = { error: `Failed to fetch ${field} fluctuation data from ClickHouse` };
+    return NextResponse.json(errorBody, { status: 500 });
   } finally {
     // Close client connection if it exists
     if (client) {
