@@ -396,7 +396,7 @@ const MonthlyPickupTable = ({
         <thead className="bg-gray-50 sticky top-0 z-20">
           <tr>
             <th className="sticky left-0 top-0 z-30 bg-gray-50 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-r border-b">
-              Booking Date
+              Business Date
             </th>
             {monthDates.map(dateString => {
               const displayDate = new Date(dateString + 'T00:00:00Z');
@@ -541,7 +541,7 @@ const YearlyPickupTable = ({
         <thead className="bg-gray-50 sticky top-0 z-20">
           <tr>
             <th className="sticky left-0 top-0 z-30 bg-gray-50 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-r border-b">
-              Booking Date
+              Business Date
             </th>
             {yearMonths.map(month => (
               <th key={month} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">
@@ -827,10 +827,10 @@ export function PickupDashboard() {
         <DialogContent className="max-w-3xl">
           <DialogHeader>
             <DialogTitle className="text-2xl font-bold">
-              Statistics for {selectedCell?.occupancyDateOrMonth}
+              Performance Summary for {selectedCell?.occupancyDateOrMonth}
             </DialogTitle>
             <DialogDescription className="text-base text-gray-500 text-sm pt-2">
-              Booking date: {selectedCell?.bookingDate} 
+              Business date: {selectedCell?.bookingDate}
             </DialogDescription>
           </DialogHeader>
           

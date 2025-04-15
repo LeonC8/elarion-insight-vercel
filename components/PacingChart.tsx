@@ -233,7 +233,7 @@ export function PacingChart({
         <CardHeader className="pb-4">
           <div className="flex justify-between items-center">
             <CardTitle className="text-lg font-semibold text-gray-800">
-              Pacing Dashboard - {viewType} View
+              Pace – {viewType} View
             </CardTitle>
             
             {/* Add the new dropdown for data view type */}
@@ -378,7 +378,7 @@ export function PacingChart({
                     yAxisId="right"
                     type="monotone" 
                     dataKey="lastYearRoomsSold" 
-                    stroke="#3b56de" 
+                    stroke="#a8b3f0" 
                     strokeWidth={2}
                     strokeDasharray="5 5"
                     dot={{ r: 3 }}
@@ -405,7 +405,7 @@ export function PacingChart({
                     yAxisId="right"
                     type="monotone" 
                     dataKey="lastYearAdr" 
-                    stroke="#e11d48" 
+                    stroke="#f0a2b5" 
                     strokeWidth={2}
                     strokeDasharray="5 5"
                     dot={{ r: 3 }}
@@ -502,7 +502,7 @@ export function PacingChart({
         <CardHeader className="pb-4">
           <div className="flex justify-between items-center">
             <CardTitle className="text-lg font-semibold text-gray-800">
-              Performance Comparison with Last Year
+              Performance Comparison
             </CardTitle>
             
             {/* Add note about data view type */}

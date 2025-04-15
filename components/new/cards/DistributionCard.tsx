@@ -43,6 +43,7 @@ interface MetricConfig {
     supportsBar: boolean;
     supportsNormal: boolean;
     supportsStacked: boolean;
+    defaultChartType?: ChartType;
     prefix?: string;
     suffix?: string;
   }
@@ -385,9 +386,13 @@ export function DistributionCard({
                       key={key}
                       onClick={() => {
                         setSelectedKPI(key);
-                        // If pie chart isn't supported for this metric, switch to bar
-                        if (!metric.config.supportsPie && distributionChartType === 'pie') {
-                          setDistributionChartType('bar');
+                        // Set chart type based on the NEWLY selected KPI's default preference
+                        const defaultType = metric.config.defaultChartType;
+                        if (defaultType) {
+                          setDistributionChartType(defaultType);
+                        } else {
+                          // Fallback: If no default, prefer pie if supported, else bar
+                          setDistributionChartType(metric.config.supportsPie ? 'pie' : 'bar');
                         }
                       }}
                     >
@@ -454,8 +459,13 @@ export function DistributionCard({
                           key={key}
                           onClick={() => {
                             setSelectedKPI(key);
-                            if (!metric.config.supportsPie && distributionChartType === 'pie') {
-                              setDistributionChartType('bar');
+                            // Set chart type based on the NEWLY selected KPI's default preference
+                            const defaultType = metric.config.defaultChartType;
+                            if (defaultType) {
+                              setDistributionChartType(defaultType);
+                            } else {
+                              // Fallback: If no default, prefer pie if supported, else bar
+                              setDistributionChartType(metric.config.supportsPie ? 'pie' : 'bar');
                             }
                           }}
                         >
