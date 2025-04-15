@@ -35,9 +35,6 @@ function TriangleDown({ className }: { className?: string }) {
 // Add type for chart display type
 type ChartType = 'pie' | 'bar';
 
-// Add type for pie chart KPI selection
-type PieChartKPIType = 'revenue' | 'roomsSold' | 'adr';
-
 // Interface for metric configuration
 interface MetricConfig {
   name: string;
@@ -63,8 +60,8 @@ interface DistributionCardProps {
   }>;
   distributionChartType: ChartType;
   setDistributionChartType: (type: ChartType) => void;
-  selectedPieKPI: string;
-  setSelectedPieKPI: (kpi: string) => void;
+  selectedKPI: string;
+  setSelectedKPI: (kpi: string) => void;
   activePieLegends: string[];
   setActivePieLegends: (legends: string[]) => void;
   activePieData: Array<{
@@ -86,8 +83,8 @@ export function DistributionCard({
   kpiTransformedData,
   distributionChartType,
   setDistributionChartType,
-  selectedPieKPI,
-  setSelectedPieKPI,
+  selectedKPI,
+  setSelectedKPI,
   activePieLegends,
   setActivePieLegends,
   activePieData,
@@ -98,7 +95,7 @@ export function DistributionCard({
   availableMetrics
 }: DistributionCardProps) {
   console.log("DistributionCard Props:", {
-    selectedPieKPI,
+    selectedKPI,
     kpiTransformedData: kpiTransformedData.length,
     activePieData: activePieData.length,
     filteredTotalValue,
@@ -123,7 +120,7 @@ export function DistributionCard({
   // If we have empty data but the KPI is roomRevenue, create placeholder data
   const effectiveData = React.useMemo(() => {
     if ((activePieData.length === 0 || activePieData.every(d => d.value === 0)) && 
-        selectedPieKPI === 'roomRevenue') {
+        selectedKPI === 'roomRevenue') {
       
       // Create placeholder data with our colors
       return [
@@ -140,7 +137,7 @@ export function DistributionCard({
         fill: categoryColorMap[item.name] || colorPalette[0] // Fallback color
       };
     });
-  }, [activePieData, selectedPieKPI, categoryColorMap, colorPalette]);
+  }, [activePieData, selectedKPI, categoryColorMap, colorPalette]);
 
   // Update the kpiTransformedData to use consistent colors from the map
   const updatedKpiData = React.useMemo(() => {
@@ -151,18 +148,18 @@ export function DistributionCard({
   }, [kpiTransformedData, categoryColorMap, colorPalette]);
 
   // Determine if the currently selected KPI supports pie charts
-  const currentMetricSupportsPie = availableMetrics[selectedPieKPI]?.config.supportsPie ?? true;
+  const currentMetricSupportsPie = availableMetrics[selectedKPI]?.config.supportsPie ?? true;
   
   // Add fullscreen dialog state
   const [isFullscreenOpen, setIsFullscreenOpen] = React.useState(false);
 
   // Add helper function to determine if the currency symbol should be shown
   const shouldShowCurrency = React.useMemo(() => {
-    return selectedPieKPI !== 'roomsSold' && 
-           selectedPieKPI !== 'cancellations' && 
-           selectedPieKPI !== 'lengthOfStay' &&
-           selectedPieKPI !== 'bookingLeadTime';
-  }, [selectedPieKPI]);
+    return selectedKPI !== 'roomsSold' && 
+           selectedKPI !== 'cancellations' && 
+           selectedKPI !== 'lengthOfStay' &&
+           selectedKPI !== 'bookingLeadTime';
+  }, [selectedKPI]);
 
   // Get effective prefix and suffix based on the selected KPI
   const effectivePrefix = shouldShowCurrency ? prefix : '';
@@ -207,7 +204,7 @@ export function DistributionCard({
                         y={(viewBox.cy || 0) + 20}
                         className="fill-muted-foreground text-xs"
                       >
-                        Total {availableMetrics[selectedPieKPI]?.name || 'Value'}
+                        Total {availableMetrics[selectedKPI]?.name || 'Value'}
                       </tspan>
                     </text>
                   )
@@ -219,7 +216,7 @@ export function DistributionCard({
         </PieChart>
       </ChartContainer>
     </div>
-  ), [effectiveData, filteredTotalValue, effectivePrefix, effectiveSuffix, selectedPieKPI, effectiveCategoryConfig, availableMetrics]);
+  ), [effectiveData, filteredTotalValue, effectivePrefix, effectiveSuffix, selectedKPI, effectiveCategoryConfig, availableMetrics]);
 
   // Create the BarChart component to reuse in normal and fullscreen modes
   const BarChartContent = React.useCallback(() => {
@@ -263,7 +260,7 @@ export function DistributionCard({
                     <div className="bg-white p-4 border border-gray-200 shadow-lg rounded-lg">
                       <p className="font-medium mb-2">{label}</p>
                       <p className="text-sm">
-                        {availableMetrics[selectedPieKPI]?.name}: 
+                        {availableMetrics[selectedKPI]?.name}: 
                         {effectivePrefix}{Number(payload[0].value).toLocaleString()}{effectiveSuffix}
                       </p>
                     </div>
@@ -284,11 +281,12 @@ export function DistributionCard({
         </ChartContainer>
       </div>
     );
-  }, [updatedKpiData, currentMetricSupportsPie, activePieLegends, selectedPieKPI, effectivePrefix, effectiveSuffix, effectiveCategoryConfig, availableMetrics]);
+  }, [updatedKpiData, currentMetricSupportsPie, activePieLegends, selectedKPI, effectivePrefix, effectiveSuffix, effectiveCategoryConfig, availableMetrics]);
 
   // Create the Legend component to reuse in normal and fullscreen modes
   const LegendContent = React.useCallback(() => (
-    <div className="w-full grid grid-cols-2 gap-3 mt-6">
+    // Responsive grid: 1 column on small screens, 2 on medium and up. Responsive gap.
+    <div className="w-full grid grid-cols-1 md:grid-cols-2 gap-2 md:gap-3 mt-6">
       {updatedKpiData.map((item) => (
         <div 
           key={item.name}
@@ -302,23 +300,26 @@ export function DistributionCard({
               }
             }
           }}
+          // Adjusted padding and base classes
           className={`${currentMetricSupportsPie && distributionChartType === 'pie' ? 'cursor-pointer' : ''} 
-            flex items-center justify-between px-4 py-3 rounded-lg bg-[#f0f4fa] border border-[#e5eaf3] ${
+            flex items-center justify-between px-3 sm:px-4 py-3 rounded-lg bg-[#f0f4fa] border border-[#e5eaf3] ${
             (activePieLegends.includes(item.name) || !currentMetricSupportsPie || distributionChartType === 'bar') 
               ? '' : 'opacity-50'
           }`}
         >
           <div className="flex items-center gap-2">
             <div 
-              className="w-2 h-2 rounded-full"
+              className="w-2 h-2 rounded-full flex-shrink-0" // Added flex-shrink-0
               style={{ backgroundColor: item.fill }}
             />
-            <span className="text-xs text-gray-500 font-medium">
+            {/* Allow text wrapping */}
+            <span className="text-xs text-gray-500 font-medium break-words"> 
               {item.name}: {effectivePrefix}{item.value.toLocaleString()}{effectiveSuffix}
               {distributionChartType === 'pie' && currentMetricSupportsPie && ` (${item.percentage}%)`}
             </span>
           </div>
-          <span className={`text-xs flex items-center ${item.change > 0 ? "text-emerald-500" : "text-red-500"}`}>
+          {/* Ensure change percentage doesn't wrap */}
+          <span className={`text-xs flex items-center flex-shrink-0 ml-2 ${item.change > 0 ? "text-emerald-500" : "text-red-500"}`}> 
             {item.change > 0 ? <ArrowUpIcon className="h-3 w-3 mr-1" /> : <ArrowDownIcon className="h-3 w-3 mr-1" />}
             {item.change > 0 ? "+" : ""}{item.change.toFixed(1)}%
           </span>
@@ -331,22 +332,27 @@ export function DistributionCard({
     <>
       <Card className="border-gray-300">
         <CardHeader>
-          <div className="flex justify-between items-center">
+          {/* Wrap title and controls for responsive layout */}
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-3">
+            {/* Title */}
             <h3 className="text-lg font-medium">{title}</h3>
-            <div className="flex items-center gap-3">
+
+            {/* Filters Container - Group controls */}
+            <div className="flex items-center gap-2 sm:gap-3 flex-wrap sm:flex-nowrap">
               {/* Chart Type Dropdown */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button 
                     variant="ghost" 
                     size="sm"
-                    className="bg-[#f2f8ff] hover:bg-[#f2f8ff] text-[#342630] rounded-full px-4 font-semibold whitespace-nowrap"
+                    // Removed w-full sm:w-auto for consistent sizing
+                    className="bg-[#f2f8ff] hover:bg-[#f2f8ff] text-[#342630] rounded-full px-4 font-semibold whitespace-nowrap justify-between sm:justify-center" 
                   >
-                    {distributionChartType === 'pie' ? 'Pie Chart' : 'Bar Chart'}
+                    <span>{distributionChartType === 'pie' ? 'Pie Chart' : 'Bar Chart'}</span>
                     <TriangleDown className="ml-3" />
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
+                <DropdownMenuContent align="start" className="w-[--radix-dropdown-menu-trigger-width]">
                   <DropdownMenuItem 
                     onClick={() => setDistributionChartType('pie')}
                     disabled={!currentMetricSupportsPie}
@@ -366,18 +372,19 @@ export function DistributionCard({
                   <Button 
                     variant="ghost" 
                     size="sm"
-                    className="bg-[#f2f8ff] hover:bg-[#f2f8ff] text-[#342630] rounded-full px-4 font-semibold whitespace-nowrap"
+                    // Removed w-full sm:w-auto for consistent sizing
+                    className="bg-[#f2f8ff] hover:bg-[#f2f8ff] text-[#342630] rounded-full px-4 font-semibold whitespace-nowrap justify-between sm:justify-center"
                   >
-                    {availableMetrics[selectedPieKPI]?.name || 'Metric'}
+                    <span>{availableMetrics[selectedKPI]?.name || 'Metric'}</span>
                     <TriangleDown className="ml-3" />
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
+                <DropdownMenuContent align="start" className="w-[--radix-dropdown-menu-trigger-width]">
                   {Object.entries(availableMetrics).map(([key, metric]) => (
                     <DropdownMenuItem 
                       key={key}
                       onClick={() => {
-                        setSelectedPieKPI(key);
+                        setSelectedKPI(key);
                         // If pie chart isn't supported for this metric, switch to bar
                         if (!metric.config.supportsPie && distributionChartType === 'pie') {
                           setDistributionChartType('bar');
@@ -390,11 +397,12 @@ export function DistributionCard({
                 </DropdownMenuContent>
               </DropdownMenu>
 
-              {/* Add Expand Button */}
+              {/* Expand Button */}
               <Button 
                 variant="ghost" 
                 size="sm"
-                className="bg-[#f2f8ff] hover:bg-[#f2f8ff] text-[#342630] rounded-full px-4 font-semibold whitespace-nowrap"
+                // Removed w-full sm:w-auto and sm:ml-auto
+                className="bg-[#f2f8ff] hover:bg-[#f2f8ff] text-[#342630] rounded-full px-4 font-semibold whitespace-nowrap justify-center"
                 onClick={() => setIsFullscreenOpen(true)}
               >
                 <Maximize2 className="h-4 w-4 mr-1" />
@@ -418,29 +426,37 @@ export function DistributionCard({
 
       {/* Fullscreen Dialog */}
       <Dialog open={isFullscreenOpen} onOpenChange={setIsFullscreenOpen}>
+        {/* ... existing fullscreen dialog structure ... */}
+        {/* Ensure header controls inside fullscreen are also responsive if needed */}
         <DialogContent className="max-w-[100vw] w-[100vw] h-[100vh] max-h-[100vh] p-0 m-0 rounded-none [&>button]:hidden">
-          <div className="px-10 pt-6 pb-12 flex flex-col h-full">
+          <div className="px-4 sm:px-10 pt-6 pb-12 flex flex-col h-full">
             <DialogHeader className="mb-6 relative">
-              <div className="flex justify-between items-center">
+               {/* Responsive header inside dialog */}
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
                 <DialogTitle className="text-xl">{title}</DialogTitle>
-                <div className="flex gap-3">
+                 {/* Control buttons */}
+                <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 w-full sm:w-auto">
+                  {/* KPI Dropdown */}
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button 
+                       <Button 
                         variant="ghost" 
                         size="sm"
-                        className="bg-[#f2f8ff] hover:bg-[#f2f8ff] text-[#342630] rounded-full px-4 font-semibold"
+                        className="bg-[#f2f8ff] hover:bg-[#f2f8ff] text-[#342630] rounded-full px-4 font-semibold justify-between sm:justify-center w-full sm:w-auto"
                       >
-                        {availableMetrics[selectedPieKPI]?.name || 'Metric'}
+                        <span>{availableMetrics[selectedKPI]?.name || 'Metric'}</span>
                         <TriangleDown className="ml-3" />
                       </Button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
+                     <DropdownMenuContent align="end" className="w-[--radix-dropdown-menu-trigger-width] sm:w-auto">
                       {Object.entries(availableMetrics).map(([key, metric]) => (
                         <DropdownMenuItem 
                           key={key}
                           onClick={() => {
-                            setSelectedPieKPI(key);
+                            setSelectedKPI(key);
+                            if (!metric.config.supportsPie && distributionChartType === 'pie') {
+                              setDistributionChartType('bar');
+                            }
                           }}
                         >
                           {metric.name}
@@ -449,11 +465,11 @@ export function DistributionCard({
                     </DropdownMenuContent>
                   </DropdownMenu>
                   
-                  {/* Close button styled like the dropdown buttons */}
+                  {/* Close button */}
                   <Button 
                     variant="ghost" 
                     size="sm"
-                    className="bg-[#f2f8ff] hover:bg-[#f2f8ff] text-[#342630] rounded-full px-4 font-semibold"
+                    className="bg-[#f2f8ff] hover:bg-[#f2f8ff] text-[#342630] rounded-full px-4 font-semibold justify-center w-full sm:w-auto"
                     onClick={() => setIsFullscreenOpen(false)}
                   >
                     <X className="h-4 w-4" />
@@ -462,11 +478,13 @@ export function DistributionCard({
               </div>
             </DialogHeader>
             
+            {/* Fullscreen Content Area */}
             <div className="flex-1 overflow-auto">
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-                {/* In fullscreen, always show both charts if supported */}
+              {/* Responsive grid for charts */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8 mb-8">
+                {/* Pie Chart Area */}
                 <div className="flex flex-col">
-                  <h3 className="text-lg font-semibold mb-4">Pie Chart</h3>
+                  <h3 className="text-lg font-semibold mb-4 text-center lg:text-left">Pie Chart</h3>
                   {currentMetricSupportsPie ? (
                     <PieChartContent />
                   ) : (
@@ -475,13 +493,15 @@ export function DistributionCard({
                     </div>
                   )}
                 </div>
+                {/* Bar Chart Area */}
                 <div className="flex flex-col">
-                  <h3 className="text-lg font-semibold mb-4">Bar Chart</h3>
+                  <h3 className="text-lg font-semibold mb-4 text-center lg:text-left">Bar Chart</h3>
                   <BarChartContent />
                 </div>
               </div>
               
-              {/* Show combined legend at the bottom */}
+              {/* Fullscreen Legend */}
+              <h3 className="text-lg font-semibold mb-4 mt-8 text-center lg:text-left">Legend</h3>
               <LegendContent />
             </div>
           </div>

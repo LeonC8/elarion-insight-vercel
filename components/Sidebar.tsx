@@ -1,10 +1,11 @@
 import Link from 'next/link'
 import { motion } from 'framer-motion'
-import { BarChart2Icon, HomeIcon, GlobeIcon, UsersIcon, BedDoubleIcon, MapPinIcon, UserIcon, LogOutIcon, CalendarIcon, TrendingUpIcon, Settings, BarChart3Icon } from 'lucide-react'
+import { BarChart2Icon, HomeIcon, GlobeIcon, UsersIcon, BedDoubleIcon, MapPinIcon, UserIcon, LogOutIcon, CalendarIcon, TrendingUpIcon, Settings, BarChart3Icon, MenuIcon, XIcon } from 'lucide-react'
 import { usePathname } from 'next/navigation'
 
 interface SidebarProps {
   onLogout: () => void;
+  onClose?: () => void;
 }
 
 const sidebarLinks = [
@@ -17,12 +18,19 @@ const sidebarLinks = [
   { name: "Pace", icon: TrendingUpIcon, path: "/pace" },
 ]
 
-export function Sidebar({ onLogout }: SidebarProps) {
+export function Sidebar({ onLogout, onClose }: SidebarProps) {
   const pathname = usePathname()
 
   return (
-    <div className="w-64 bg-slate-900 text-white flex flex-col h-screen">
-      <div className="py-4 px-6 flex-grow">
+    <div className="w-64 bg-slate-900 text-white flex flex-col h-screen relative">
+      <button 
+        onClick={onClose} 
+        className="absolute top-4 right-4 p-2 text-gray-400 hover:text-white lg:hidden"
+      >
+        <XIcon className="h-6 w-6" />
+      </button>
+
+      <div className="py-4 px-6 flex-grow overflow-y-auto">
         <div className="flex items-center mb-8 mt-4">
           <BarChart2Icon className="h-12 w-11 text-blue-400 mr-2 pr-1" />
           <div className="flex flex-col">
@@ -38,6 +46,7 @@ export function Sidebar({ onLogout }: SidebarProps) {
                 initial={{ opacity: 0, x: -20 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: index * 0.1 }}
+                onClick={onClose}
               >
                 <Link 
                   href={link.path}

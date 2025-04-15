@@ -24,7 +24,6 @@ import dynamic from 'next/dynamic'
 import { TopFive } from '../new/TopFive'
 import { KpiWithChart } from '../new/KpiWithChart'
 import { Kpi } from '../new/Kpi'
-import { KpiWithSubtleChart } from '../new/KpiWithSubtleChart'
 import { ChartConfig } from '@/components/ui/chart'
 import type { CategoryTimeSeriesData } from '@/components/new/CategoriesDetailsDialog'
 import { ReservationsByDayChart } from '../new/ReservationsByDayChart'
@@ -36,6 +35,7 @@ import { OccupancyAnalysisChart } from '../new/OccupancyAnalysisChart'
 import { KpiResponse } from '@/app/api/overview/general/route'
 import { KpiWithAlignedChart } from '../new/KpiWithAlignedChart'
 import { usePersistentOverviewFilters } from '@/hooks/usePersistentOverviewFilters'; // Import the custom hook
+import { getCodeFromFullName } from '@/lib/countryUtils'; // <-- Import the utility function
 
 // Dynamic import for WorldMap with loading state
 const WorldMap = dynamic(
@@ -1369,7 +1369,7 @@ export function Overview() {
     // Data fetching is handled by the main useEffect dependency change
   }
 
-  // Modify the fetchWorldMapData function to use the mapping
+  // Modify the fetchWorldMapData function to use the mapping and convert country names
   const fetchWorldMapData = async (metric: string = selectedMapMetric) => {
     try {
       const params = new URLSearchParams({
@@ -1388,14 +1388,23 @@ export function Overview() {
       
       // Use the mapped metric key to access the correct data
       const mappedMetric = metricKeyMapping[metric] || metric;
-      const transformedData = data[mappedMetric].map((item: any) => ({
-        country: item.name.toLowerCase(),
-        value: item.value
-      }));
       
-      setWorldMapData(transformedData);
+      // Check if the data for the mapped metric exists and is an array
+      if (data && Array.isArray(data[mappedMetric])) {
+          const transformedData = data[mappedMetric].map((item: any) => ({
+            // Convert the full name to a 2-letter code using the utility function
+            country: getCodeFromFullName(item.name), 
+            value: item.value
+          }));
+          setWorldMapData(transformedData);
+      } else {
+         console.warn(`Data for metric '${mappedMetric}' not found or not an array in API response.`);
+         setWorldMapData([]); // Set to empty array if data is missing/invalid
+      }
+      
     } catch (error) {
       console.error('Error fetching world map data:', error);
+      setWorldMapData([]); // Reset data on error
     }
   };
 
@@ -1406,16 +1415,22 @@ export function Overview() {
 
   return (
     <div className="flex-1 overflow-auto bg-[#f5f8ff]">
-        {/* Header with Filters */}
-        <div className="fixed top-0 left-[256px] right-0 z-30 flex justify-between items-center mb-6 bg-white py-6 px-12 border-b border-gray-300 shadow-sm">
-          <div>
-            <h2 className="text-xl font-bold text-gray-800 mb-1">Overview</h2>
-            <span className='text-gray-400 font-ligth mt-3 pt-2 text-sm'>{`${selectedTimeFrame} ${selectedViewType}`}</span>
+        {/* Header Section */}
+        {/* Update the header div to support flex-row and space-between layout on large screens */}
+        <div className="sticky top-0 left-0 right-0 z-30 flex flex-col lg:flex-row lg:items-center lg:justify-between bg-white py-4 lg:py-6 lg:px-12 border-b border-gray-300 shadow-sm">
+          
+          {/* Title Block - Visible ONLY on Large Screens */}
+          <div className="hidden lg:block"> {/* This block is hidden by default, shown on lg screens */}
+            <h2 className="text-xl md:text-2xl font-bold text-gray-800 mb-1">Overview</h2>
+            <span className='text-gray-500 font-light mt-1 pt-1 text-sm'>{`${selectedTimeFrame} ${selectedViewType}`}</span>
           </div>
 
-          <div className="flex items-center space-x-8">
+          {/* Filters container - Adjust padding and width for large screens */}
+          {/* Change w-full to lg:w-auto so it doesn't take full width on large screens */}
+          <div className="flex flex-nowrap items-end gap-x-4 lg:gap-x-8 gap-y-3 overflow-x-auto pb-2 lg:pb-0 w-full lg:w-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100 px-4 md:px-6 lg:px-0"> 
             {/* Combined Time Frame and View Type Dropdown */}
-            <div className="flex flex-col">
+            {/* No changes needed here */}
+            <div className="flex flex-col flex-shrink-0"> 
               <span className="text-xs text-gray-500 mb-2">Selected period</span>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -1479,7 +1494,7 @@ export function Overview() {
             </div>
 
             {/* Comparison Dropdown with Label */}
-            <div className="flex flex-col">
+            <div className="flex flex-col flex-shrink-0"> 
               <span className="text-xs text-gray-500 mb-2">Compare with:</span>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -1506,9 +1521,9 @@ export function Overview() {
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
-            
+
             {/* Date Picker with Label */}
-            <div className="flex flex-col">
+            <div className="flex flex-col flex-shrink-0"> 
               <span className="text-xs text-gray-500 mb-2">Business date</span>
               <DatePicker
                 date={date} // Uses date from the hook
@@ -1517,7 +1532,7 @@ export function Overview() {
             </div>
 
             {/* Hotel Selector with Label */}
-            <div className="flex flex-col">
+            <div className="flex flex-col flex-shrink-0"> 
               <span className="text-xs text-gray-500 mb-2">Property</span>
               <HotelSelector 
                 selectedHotels={selectedHotels}
@@ -1525,19 +1540,20 @@ export function Overview() {
               />
             </div>
 
-            {/* Export Button */}
-            {/* <Button 
-              variant="ghost" 
-              className="flex items-center space-x-2 text-blue-600 mt-7"
-            >
-              <DownloadIcon className="h-4 w-4" />
-              <span>Export to Excel</span>
-            </Button> */}
+            {/* Export Button - Removed for brevity, add back if needed */}
+            
           </div>
         </div>
 
+      {/* Main Content Area */}
+      <div className="p-4 md:p-6 lg:p-8 lg:px-12">
+        {/* Overview Title - MOVED LOGICALLY, this block now ONLY renders on mobile/medium */}
+        {/* Add 'block lg:hidden' to hide this on large screens */}
+        <div className="block lg:hidden mb-6 md:mb-8"> {/* Added block lg:hidden */}
+          <h2 className="text-xl md:text-2xl font-bold text-gray-800 mb-1">Overview</h2>
+          <span className='text-gray-500 font-light mt-1 pt-1 text-sm'>{`${selectedTimeFrame} ${selectedViewType}`}</span>
+        </div>
 
-      <div className="p-8 px-12 pt-[140px]">
         {/* Show primary error if it exists */}
         {error && !loading && ( // Only show if primary loading is done and error exists
           <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-6">
@@ -1545,15 +1561,15 @@ export function Overview() {
           </div>
         )}
 
-        {/* KPI Grid - Use primary loading state */}
-        <div className="grid grid-cols-4 gap-6 mb-8">
+        {/* KPI Grid - Responsive columns */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 md:gap-6 mb-6 md:mb-8">
           {loading ? ( // Use primary loading state for KPI skeletons
             <>
               {[...Array(4)].map((_, index) => (
-                <Card key={index} className="bg-white p-6">
-                  <Skeleton className="h-10 w-32 mb-2" />
-                  <Skeleton className="h-5 w-16 mb-4" />
-                  <Skeleton className="h-24 w-full" />
+                <Card key={index} className="bg-white p-4 md:p-6">
+                  <Skeleton className="h-8 md:h-10 w-24 md:w-32 mb-2" />
+                  <Skeleton className="h-4 md:h-5 w-12 md:w-16 mb-3 md:mb-4" />
+                  <Skeleton className="h-20 md:h-24 w-full" />
                 </Card>
               ))}
             </>
@@ -1600,30 +1616,44 @@ export function Overview() {
           )}
         </div>
 
-        {/* Second Row - KPIs without Charts - Use primary loading state */}
-        <div className="grid grid-cols-5 gap-4 mb-8">
+        {/* Second Row - KPIs without Charts - Responsive columns */}
+        {/* Adjusted grid for Room Revenue span */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 mb-6 md:mb-8">
           {loading ? ( // Use primary loading state for KPI skeletons
             <>
-              {[...Array(5)].map((_, index) => (
-                <Card key={index} className="bg-white p-4">
-                  <div className="flex justify-between items-start mb-3">
-                    <Skeleton className="h-5 w-24" />
+              {/* Apply col-span-2 to the first skeleton on mobile */}
+              <Card key={0} className="bg-white p-3 md:p-4 col-span-2 sm:col-span-1"> 
+                 <div className="flex justify-between items-start mb-2 md:mb-3">
+                   <Skeleton className="h-4 md:h-5 w-16 md:w-24" />
+                 </div>
+                 <Skeleton className="h-6 md:h-8 w-16 md:w-24 mb-1 md:mb-2" />
+                 <Skeleton className="h-3 md:h-4 w-10 md:w-16" />
+              </Card>
+              {/* Render the remaining skeletons */}
+              {[...Array(4)].map((_, index) => ( 
+                <Card key={index + 1} className="bg-white p-3 md:p-4">
+                  <div className="flex justify-between items-start mb-2 md:mb-3">
+                    <Skeleton className="h-4 md:h-5 w-16 md:w-24" />
                   </div>
-                  <Skeleton className="h-8 w-24 mb-2" />
-                  <Skeleton className="h-4 w-16" />
+                  <Skeleton className="h-6 md:h-8 w-16 md:w-24 mb-1 md:mb-2" />
+                  <Skeleton className="h-3 md:h-4 w-10 md:w-16" />
                 </Card>
               ))}
             </>
           ) : (
             <>
-              <Kpi
-                title="Room Revenue"
-                currentValue={kpiData?.roomRevenue.value ?? 10200}
-                percentageChange={kpiData?.roomRevenue.percentageChange ?? -6.8}
-                prefix="€"
-                color="green"
-                chartData={kpiData?.roomRevenue.fluctuation ?? roomRevenueChartData}
-              />
+              {/* Apply col-span-2 on mobile (default), revert on sm and up */}
+              <div className="col-span-2 sm:col-span-1">
+                <Kpi
+                  title="Room Revenue"
+                  currentValue={kpiData?.roomRevenue.value ?? 10200}
+                  percentageChange={kpiData?.roomRevenue.percentageChange ?? -6.8}
+                  prefix="€"
+                  color="green"
+                  chartData={kpiData?.roomRevenue.fluctuation ?? roomRevenueChartData}
+                />
+              </div>
+              {/* Remaining KPIs */}
               <Kpi
                 title="F&B Revenue"
                 currentValue={kpiData?.fbRevenue.value ?? 3000}
@@ -1660,8 +1690,8 @@ export function Overview() {
           )}
         </div>
 
-        {/* Top Producers and Demographics */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mt-8">
+        {/* Top Producers and Occupancy Analysis - Stack vertically on medium screens */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8 mt-6 md:mt-8">
           <TopFive 
             title="Producers"
             color="blue"
@@ -1722,25 +1752,27 @@ export function Overview() {
         </div>
 
         {/* World Map */}
-        <div className="mt-8">
+        <div className="mt-6 md:mt-8">
           <Card className="bg-white rounded-lg overflow-hidden">
-            <CardHeader className="flex flex-col items-start">
+            <CardHeader className="flex flex-col items-start px-4 py-4 md:px-6 md:py-5">
               <div className="flex w-full justify-between items-center">
                 <div>
-                  <CardTitle className="text-lg font-semibold text-gray-800 mb-3">Global Distribution</CardTitle>
+                  <CardTitle className="text-base md:text-lg font-semibold text-gray-800 mb-2 md:mb-3">Global Distribution</CardTitle>
                 </div>
               </div>
             </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 gap-8">
+            <CardContent className="px-2 py-4 md:px-6 md:py-6">
+              {/* Responsive grid for map and TopFive */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8">
                 {/* World Map Side */}
                 <div>
-                  <div className="h-[500px] flex justify-center items-center">
+                  {/* Adjusted map size container */}
+                  <div className="h-[350px] sm:h-[450px] lg:h-[500px] flex justify-center items-center mb-4">
                     <WorldMap
                       color="rgb(59, 130, 246)"
                       title=""
                       valueSuffix={selectedMapMetric === 'revenue' ? '€' : selectedMapMetric === 'adr' ? '€' : ''}
-                      size="xl"
+                      size="responsive" // Use responsive size if available, or adjust based on container
                       data={worldMapData}
                       tooltipBgColor="black"
                       tooltipTextColor="white"
@@ -1761,8 +1793,8 @@ export function Overview() {
                   </div>
                 </div>
 
-                {/* Top Five Countries Side - Now with API integration */}
-                <div className="border-l border-gray-100 pl-8">
+                {/* Top Five Countries Side - Adjust padding/border for stacking */}
+                <div className="lg:border-l lg:border-gray-100 lg:pl-6 xl:pl-8 pt-6 lg:pt-0 border-t border-gray-100 lg:border-t-0">
                   <TopFive 
                     title="Countries"
                     color="blue"
@@ -1826,8 +1858,8 @@ export function Overview() {
           </Card>
         </div>
 
-        {/* Market Segments and Room Types */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-8">
+        {/* Market Segments, Booking Channels, Room Types - Responsive Columns */}
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 md:gap-8 mt-6 md:mt-8">
           <TopFive 
             title="Market Segments "
             color="blue"
@@ -1918,8 +1950,8 @@ export function Overview() {
           />
         </div>
 
-        {/* Horizontal Bar Chart and Reservations by Day */}
-        <div className="grid gap-4 grid-cols-2 pt-8">
+        {/* Horizontal Bar Chart and Reservations by Day - Stack on large screens */}
+        <div className="grid gap-6 md:gap-8 grid-cols-1 lg:grid-cols-2 pt-6 md:pt-8">
           {/* Use url and apiParams for Lead Times chart */}
           <HorizontalBarChartMultipleDatasets
             // ... other props ...
@@ -1928,6 +1960,7 @@ export function Overview() {
             defaultDataset="bookingLeadTime" // Use the key defined in the API response
             leftMargin={-10}
             lazyLoad={true} // <-- Already added
+            fixedTitle="Lead time distribution" // <-- Add this fixed title
           />
            {/* Update ReservationsByDayChart to fetch its own data and lazy load */}
           <ReservationsByDayChart
@@ -1937,11 +1970,12 @@ export function Overview() {
           />
         </div>
 
-        {/* New KPIs section */}
-        <div className="grid grid-cols-2 gap-6 mt-8">
+        {/* New KPIs section - Stack on large screens */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8 mt-6 md:mt-8">
            {/* KpiWithChart already fetches its own data */}
           <KpiWithChart
-            title="Booking Status"
+            title="Booking Status" // This title is now less prominent, primarily for internal identification
+            fixedTitle="Cancellations statistics" // <-- Add the fixed title here
             color="blue"
             apiUrl="/api/overview/cancellations"
             apiParams={analysisApiParams} // Use common params
@@ -1965,16 +1999,13 @@ export function Overview() {
           />
            {/* Update HorizontalBarChartMultipleDatasets for Length of Stay */}
           <HorizontalBarChartMultipleDatasets
-            // REMOVE datasets prop
-            // datasets={ ... }
-            url="/api/overview/length-of-stay" // Pass the URL
-            apiParams={analysisApiParams} // Pass the common API parameters
-            defaultDataset="lengthOfStay" // Assume API returns a dataset with this key
-            // REMOVE loading/error props - handled internally
-            // loading={lengthOfStayLoading}
-            // error={lengthOfStayError}
-            leftMargin={10}
-            lazyLoad={true} // <-- Add this
+            // Add the necessary props to fetch data
+            url="/api/overview/length-of-stay" // Specify the API endpoint
+            apiParams={analysisApiParams}      // Pass the common API parameters
+            defaultDataset="lengthOfStay"      // Specify the data key in the API response
+            leftMargin={10}                   // Keep existing margin if needed
+            lazyLoad={true}                    // Enable lazy loading
+            fixedTitle="Length of stay distribution" // Add a fixed title
           />
         </div>
       </div>

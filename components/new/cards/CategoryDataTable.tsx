@@ -11,6 +11,24 @@ import {
   TableRow,
 } from "@/components/ui/table"
 
+// Helper function for formatting percentage change in tables (copied and adapted)
+const formatPercentageChange = (current: number, previous: number): string => {
+  // Ensure values are numbers and finite before proceeding
+  const currentVal = Number(current);
+  const previousVal = Number(previous);
+
+  if (!isFinite(currentVal) || !isFinite(previousVal)) return '-'; // Handle non-finite numbers
+
+  if (previousVal === 0 && currentVal === 0) return '-';
+  if (previousVal === 0) return '+100.0%'; // Current > 0
+  if (currentVal === 0) return '-100.0%'; // Previous > 0
+
+  const change = ((currentVal - previousVal) / previousVal) * 100;
+  // Clamp change to avoid extreme values like Infinity/-Infinity if previous is extremely small
+  const clampedChange = Math.max(-1000, Math.min(1000, change));
+  return `${clampedChange > 0 ? '+' : ''}${clampedChange.toFixed(1)}%`;
+};
+
 // Interface for metric configuration
 interface MetricConfig {
   name: string;
@@ -160,7 +178,6 @@ export function CategoryDataTable({
                       const metricConfig = availableMetrics[metricKey];
                       const currentValue = row[metricKey] || 0;
                       const previousValue = row[`${metricKey}Previous`] || 0;
-                      const changeValue = row[`${metricKey}Change`] || 0;
                       
                       // Use metric-specific prefix if defined, otherwise use empty string
                       // This ensures metrics like 'roomsSold' won't show a € sign
@@ -185,11 +202,15 @@ export function CategoryDataTable({
                           </TableCell>
                           
                           <TableCell className={`text-right min-w-[150px] ${!isLastMetric ? 'border-r border-[#d0d7e3]' : ''} ${
-                            changeValue > 0 ? "text-emerald-500" : previousValue === 0 && currentValue > 0 ? "text-gray-500" : "text-red-500"
+                            // Updated color logic based on MainTimeSeriesDialog
+                            (currentValue > previousValue || (previousValue === 0 && currentValue > 0))
+                              ? "text-emerald-500"
+                              : (currentValue < previousValue || (currentValue === 0 && previousValue > 0))
+                              ? "text-red-500"
+                              : "text-gray-700" // Use gray for no change (including 0 vs 0)
                           }`}>
-                            {previousValue === 0 && currentValue > 0 
-                              ? "-" 
-                              : `${changeValue > 0 ? "+" : ""}${changeValue.toFixed(1)}%`}
+                            {/* Use the new helper function for formatting */}
+                            {formatPercentageChange(currentValue, previousValue)}
                           </TableCell>
                         </React.Fragment>
                       );

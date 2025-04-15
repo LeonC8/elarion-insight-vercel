@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { ClickHouseClient, createClient } from '@clickhouse/client';
 import { calculateDateRanges, calculateComparisonDateRanges } from '@/lib/dateUtils';
+import { getFullNameFromCode, getCodeFromFullName } from '@/lib/countryUtils';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -51,8 +52,14 @@ function roundValue(value: number | null | undefined): number {
   return value >= 100 ? Math.round(value) : Number(value.toFixed(2));
 }
 
-// Helper function to generate a code from a name
+// Updated Helper function to generate a code from a name
 function generateCode(name: string, field: string): string {
+  // Use the utility function for guest countries to get the 2-letter code
+  if (field === 'guest_country') {
+    // Use the full name (which is expected as input here) to get the code
+    return getCodeFromFullName(name);
+  }
+  // Keep original logic for other fields (like producers)
   return name.toString().toLowerCase().replace(/\s+/g, '_');
 }
 
@@ -322,8 +329,12 @@ export async function GET(request: Request) {
       });
     }
 
-    // Helper function to get display name (maps producer ID to name if needed)
+    // Updated helper function to get display name (maps producer ID or country code)
     const getDisplayName = (fieldValue: any): string => {
+      if (field === 'guest_country') {
+        // Use the utility function to convert code to full name
+        return getFullNameFromCode(String(fieldValue));
+      }
       if (isProducerRoute && producerMap.size > 0) {
         const producerId = parseInt(fieldValue);
         return producerMap.get(producerId) || `Producer ${fieldValue}`;
@@ -423,12 +434,14 @@ export async function GET(request: Request) {
       const prevValue = parseFloat(prevItem.total_revenue || '0');
       const change = value - prevValue;
       
+      // Get the display name (handles country code conversion)
       const displayName = getDisplayName(item.field_name);
       
       return {
-        name: displayName,
+        name: displayName, // Use the full name
         value: roundValue(value),
         change: roundValue(change),
+        // Generate code based on the full display name
         code: generateCode(displayName, field)
       };
     });
@@ -442,12 +455,14 @@ export async function GET(request: Request) {
       const prevValue = parseFloat(prevItem.rooms_sold || '0');
       const change = value - prevValue;
       
+      // Get the display name (handles country code conversion)
       const displayName = getDisplayName(item.field_name);
       
       return {
-        name: displayName,
+        name: displayName, // Use the full name
         value: roundValue(value),
         change: roundValue(change),
+        // Generate code based on the full display name
         code: generateCode(displayName, field)
       };
     });
@@ -467,23 +482,30 @@ export async function GET(request: Request) {
       const prevAdr = prevRoomsSold > 0 ? prevRoomRevenue / prevRoomsSold : 0;
       const change = currentAdr - prevAdr;
       
+      // Get the display name (handles country code conversion)
       const displayName = getDisplayName(item.field_name);
       
       return {
-        name: displayName,
+        name: displayName, // Use the full name
         value: roundValue(currentAdr),
         change: roundValue(change),
+        // Generate code based on the full display name
         code: generateCode(displayName, field)
       };
     });
 
-    // Extract the top category names *only* for the fluctuation query
-    const topCategoryNames = topCategoriesData.map(item => item.field_name);
+    // Extract the top category *original field values* for the fluctuation query filter
+    const topCategoryOriginalValues = topCategoriesData.map(item => item.field_name);
+    // Create a map from original value to display name for later use
+    const originalValueToDisplayNameMap = new Map<string, string>();
+    topCategoriesData.forEach(item => {
+        originalValueToDisplayNameMap.set(item.field_name, getDisplayName(item.field_name));
+    });
 
     // Define the time granularity for the query - MODIFIED to always use daily granularity
     const timeGroupingClause = "toString(toDate(occupancy_date)) AS date_period";
 
-    // Modified query to get daily data points
+    // Modified query to get daily data points using original field values in IN clause
     const fluctuationQuery = `
       SELECT 
         ${timeGroupingClause},
@@ -497,12 +519,12 @@ export async function GET(request: Request) {
         AND date(scd_valid_from) <= DATE('${businessDateParam}') 
         AND DATE('${businessDateParam}') < date(scd_valid_to)
         ${fieldFilters}
-        AND ${field} IN (${topCategoryNames.map(name => `'${name}'`).join(',')})
+        AND ${field} IN (${topCategoryOriginalValues.map(name => typeof name === 'string' ? `'${name.replace(/'/g, "''")}'` : name).join(',')})
       GROUP BY date_period, field_name
       ORDER BY date_period, field_name
     `;
 
-    // Query for the previous period also using daily granularity
+    // Query for the previous period also using daily granularity and original field values
     const prevFluctuationQuery = `
       SELECT 
         ${timeGroupingClause},
@@ -516,7 +538,7 @@ export async function GET(request: Request) {
         AND date(scd_valid_from) <= DATE('${prevBusinessDateParam}') 
         AND DATE('${prevBusinessDateParam}') < date(scd_valid_to)
         ${fieldFilters}
-        AND ${field} IN (${topCategoryNames.map(name => `'${name}'`).join(',')})
+        AND ${field} IN (${topCategoryOriginalValues.map(name => typeof name === 'string' ? `'${name.replace(/'/g, "''")}'` : name).join(',')})
       GROUP BY date_period, field_name
       ORDER BY date_period, field_name
     `;
@@ -544,12 +566,12 @@ export async function GET(request: Request) {
     const currentDataMap = new Map();
     const prevDataMap = new Map();
     
-    // Organize current period data
+    // Organize current period data - use original field value from DB as intermediate key part
     fluctuationData.forEach(item => {
-      const category = item.field_name;
+      const originalFieldValue = item.field_name; // Use the value directly from DB
       const datePeriod = item.date_period;
-      const key = `${category}|${datePeriod}`;
-      
+      const key = `${originalFieldValue}|${datePeriod}`; // Key uses original value
+
       currentDataMap.set(key, {
         revenue: parseFloat(item.total_revenue || '0'),
         roomsSold: parseFloat(item.rooms_sold || '0'),
@@ -557,9 +579,9 @@ export async function GET(request: Request) {
       });
     });
     
-    // Organize previous period data
+    // Organize previous period data - use original field value from DB as intermediate key part
     prevFluctuationData.forEach(item => {
-      const category = item.field_name;
+      const originalFieldValue = item.field_name; // Use the value directly from DB
       const datePeriod = item.date_period;
       
       // Map previous period date to current period for comparison
@@ -581,7 +603,7 @@ export async function GET(request: Request) {
           // If periods are same length, map directly
           const prevIdx = datesToIndex(prevStartDate, prevEndDate, datePeriod);
           if (prevIdx !== -1) {
-            const mappedIdx = prevIdx / prevDayDiff * dayDiff;
+            const mappedIdx = prevIdx; // Direct mapping index
             const mappedMsec = new Date(startDate).getTime() + 
                              (mappedIdx * 24 * 60 * 60 * 1000);
             mappedDate = new Date(mappedMsec).toISOString().split('T')[0];
@@ -603,75 +625,72 @@ export async function GET(request: Request) {
         mappedDate = `${prevYear + yearDiff}-01-01`;
       }
       
-      const key = `${category}|${mappedDate}`;
-      
-      prevDataMap.set(key, {
-        revenue: parseFloat(item.total_revenue || '0'),
-        roomsSold: parseFloat(item.rooms_sold || '0'),
-        roomRevenue: parseFloat(item.room_revenue || '0')
-      });
+      if (mappedDate) { // Only set if mappedDate is valid
+          const key = `${originalFieldValue}|${mappedDate}`; // Key uses original value + mapped date
+          prevDataMap.set(key, {
+            revenue: parseFloat(item.total_revenue || '0'),
+            roomsSold: parseFloat(item.rooms_sold || '0'),
+            roomRevenue: parseFloat(item.room_revenue || '0')
+          });
+      }
     });
 
-    // Generate complete fluctuation data for each category and KPI - using only topCategoryNames
+    // Generate complete fluctuation data for each category and KPI - using only topCategoryOriginalValues
     const revenueFluctuationData: Record<string, FluctuationDataPoint[]> = {};
     const roomsSoldFluctuationData: Record<string, FluctuationDataPoint[]> = {};
     const adrFluctuationData: Record<string, FluctuationDataPoint[]> = {};
     
-    // For each *top* category, create a time series with all dates
-    topCategoryNames.forEach(category => {
-      const displayName = getDisplayName(category);
+    // For each *top* category (using original value), create a time series with all dates
+    topCategoryOriginalValues.forEach(originalValue => {
+      // Get the display name corresponding to this original value
+      const displayName = originalValueToDisplayNameMap.get(String(originalValue)) || getDisplayName(originalValue); // Use map or convert directly
+
       const revenueSeries: FluctuationDataPoint[] = [];
       const roomsSoldSeries: FluctuationDataPoint[] = [];
       const adrSeries: FluctuationDataPoint[] = [];
-      
+
       allDates.forEach(date => {
-        const key = `${category}|${date}`;
+        // Use the original field value to look up data in maps
+        const key = `${originalValue}|${date}`;
         const currentData = currentDataMap.get(key) || { revenue: 0, roomsSold: 0, roomRevenue: 0 };
-        
-        // Find mapped previous date for comparison
-        let prevData = { revenue: 0, roomsSold: 0, roomRevenue: 0 };
-        
-        // For more accurate comparison, look up the equivalent date in the previous period
-        if (prevDataMap.has(key)) {
-          prevData = prevDataMap.get(key);
-        }
-        
+        const prevData = prevDataMap.get(key) || { revenue: 0, roomsSold: 0, roomRevenue: 0 };
+
         // Calculate values and change percentages
         const revenueChange = prevData.revenue !== 0 ? 
-          ((currentData.revenue - prevData.revenue) / prevData.revenue) * 100 : 0;
+          ((currentData.revenue - prevData.revenue) / prevData.revenue) * 100 : (currentData.revenue > 0 ? Infinity : 0);
         
         const roomsSoldChange = prevData.roomsSold !== 0 ? 
-          ((currentData.roomsSold - prevData.roomsSold) / prevData.roomsSold) * 100 : 0;
+          ((currentData.roomsSold - prevData.roomsSold) / prevData.roomsSold) * 100 : (currentData.roomsSold > 0 ? Infinity : 0);
         
         // Calculate ADR
         const currentAdr = currentData.roomsSold > 0 ? currentData.roomRevenue / currentData.roomsSold : 0;
         const prevAdr = prevData.roomsSold > 0 ? prevData.roomRevenue / prevData.roomsSold : 0;
-        const adrChange = prevAdr !== 0 ? ((currentAdr - prevAdr) / prevAdr) * 100 : 0;
+        const adrChange = prevAdr !== 0 ? ((currentAdr - prevAdr) / prevAdr) * 100 : (currentAdr > 0 ? Infinity : 0);
         
         // Add data points to each series
         revenueSeries.push({
           date,
           value: roundValue(currentData.revenue),
           previousValue: roundValue(prevData.revenue),
-          change: roundValue(revenueChange)
+          change: isFinite(revenueChange) ? roundValue(revenueChange) : (revenueChange > 0 ? 9999 : -9999) // Handle Infinity
         });
         
         roomsSoldSeries.push({
           date,
           value: roundValue(currentData.roomsSold),
           previousValue: roundValue(prevData.roomsSold),
-          change: roundValue(roomsSoldChange)
+          change: isFinite(roomsSoldChange) ? roundValue(roomsSoldChange) : (roomsSoldChange > 0 ? 9999 : -9999) // Handle Infinity
         });
         
         adrSeries.push({
           date,
           value: roundValue(currentAdr),
           previousValue: roundValue(prevAdr),
-          change: roundValue(adrChange)
+          change: isFinite(adrChange) ? roundValue(adrChange) : (adrChange > 0 ? 9999 : -9999) // Handle Infinity
         });
       });
       
-      // Add series for this category to the output data using display name
+      // Add series for this category to the output data using the *full display name* as the key
       revenueFluctuationData[displayName] = revenueSeries;
       roomsSoldFluctuationData[displayName] = roomsSoldSeries;
       adrFluctuationData[displayName] = adrSeries;
@@ -715,7 +734,8 @@ export async function GET(request: Request) {
     };
 
     // Construct the response with the new structure
-    // kpis now contain *all* categories, fluctuationData contains *top* categories
+    // kpis now contain *all* categories with full names
+    // fluctuationData contains *top* categories keyed by full name
     const response: FluctuationResponse = {
       metrics: metricConfigs,
       kpis: {

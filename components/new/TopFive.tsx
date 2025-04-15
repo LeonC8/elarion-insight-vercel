@@ -1,6 +1,6 @@
 import { ArrowUpIcon, ArrowDownIcon, PercentIcon, HashIcon } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -288,14 +288,43 @@ export function TopFive({
   }
   // If not using API endpoint, effectiveMetrics remains the initially passed prop.
 
+  // Calculate the global maximum value across all metrics using useMemo
+  const globalMaxValue = useMemo(() => {
+    let max = 0;
+    effectiveMetrics.forEach(metric => {
+      metric.data?.forEach(item => {
+        if (item.value > max) {
+          max = item.value;
+        }
+      });
+    });
+    // Ensure max value is at least 1 to avoid division by zero issues if all values are 0
+    return max > 0 ? max : 1; 
+  }, [effectiveMetrics]); // Recalculate only when effectiveMetrics changes
+
   // Get current metric data
   const currentMetric = effectiveMetrics.find(m => m.key === selectedMetric) || effectiveMetrics[0];
   let currentData = currentMetric?.data || []; // Ensure currentData is always an array
 
+  // Filter out duplicates based on name, keeping the first occurrence
+  const seenNames = new Set<string>();
+  currentData = currentData.filter(item => {
+    // Only filter if item has a name
+    if (item.name) {
+      if (!seenNames.has(item.name)) {
+        seenNames.add(item.name);
+        return true; // Keep the first occurrence
+      } else {
+        return false; // Discard subsequent occurrences
+      }
+    }
+    return true; // Keep items without a name
+  });
+
   // Recalculate derived values whenever currentData changes
-  const maxValue = currentData.length > 0 
-    ? Math.max(...currentData.map(item => item.value)) 
-    : 0;
+  // const maxValue = currentData.length > 0  // This local maxValue is no longer needed
+  //   ? Math.max(...currentData.map(item => item.value)) 
+  //   : 0;
 
   const allData = [...currentData].sort((a, b) => { // Use the potentially updated currentData
     switch (filterType) {
@@ -314,31 +343,85 @@ export function TopFive({
 
   const filteredData = allData.slice(0, 5); // Use the potentially updated allData
 
-  // Add function to calculate percentage change
-  const calculatePercentageChange = (current: number, change: number): number => {
-    // If prevValue is available, use it for better accuracy
-    // const previous = item.prevValue !== undefined ? item.prevValue : current - change;
-    const previous = current - change; // Use derived previous value for now
-    if (previous === 0 || previous === null || previous === undefined) {
-      // Handle division by zero or undefined previous value
-      // Return 0 or some indicator like Infinity or NaN based on desired behavior
-      return current > 0 ? Infinity : 0; // Example: If current > 0 and prev was 0, infinite % increase
+  // NEW: Reverse the display order for bottom/falling lists
+  const displayData = (filterType === 'bottom' || filterType === 'falling') 
+    ? [...filteredData].reverse() 
+    : filteredData;
+
+  // Add function to calculate percentage change - MODIFIED
+  // Returns percentage change as a number, or null if undefined (e.g., 0 vs 0)
+  const calculatePercentageChange = (current: number, change: number): number | null => {
+    // Derive previous value. Ensure inputs are numbers.
+    const currentNum = Number(current);
+    const changeNum = Number(change);
+    if (isNaN(currentNum) || isNaN(changeNum)) return null;
+
+    const previous = currentNum - changeNum;
+
+    if (!isFinite(currentNum) || !isFinite(previous)) {
+       return null; // Handle non-finite inputs
     }
-    // Ensure calculation is safe
-    const percentage = (change / previous) * 100;
-    return isNaN(percentage) ? 0 : Number(percentage.toFixed(1)); // Handle NaN result
+    
+    // Case: 0 vs 0
+    if (previous === 0 && currentNum === 0) {
+      return null; // Represents the '-' case, change is undefined
+    }
+    
+    // Case: X vs 0 (Previous was 0)
+    if (previous === 0) { 
+       // If current is > 0, it's a 100% increase from 0 (or infinite, represented as 100)
+       // If current is < 0, it's a -100% decrease from 0 (or infinite, represented as -100)
+       // Let's return a large finite number like 100% or -100% or null depending on preference.
+       // Returning null might be less confusing than implying 100%. Let's stick to null for division by zero.
+       // Or follow MainTimeSeriesDialog: +100% / -100%
+       return currentNum > 0 ? 100.0 : -100.0; 
+    }
+    
+    // Case: 0 vs X (Current is 0, Previous was non-zero)
+    // This is always a -100% change
+    if (currentNum === 0) { 
+        return -100.0;
+    }
+
+    // Standard case: Both previous and current are non-zero and finite
+    const percentage = (changeNum / previous) * 100;
+
+    // Handle potential NaN/Infinity from extremely small 'previous' values if necessary
+    if (!isFinite(percentage)) {
+        // Fallback for safety, though previous checks should prevent this.
+        return previous > 0 ? (change > 0 ? 100.0 : -100.0) : (change > 0 ? -100.0 : 100.0); 
+    }
+    
+    // Return the calculated percentage, rounded to one decimal place
+    return Number(percentage.toFixed(1));
   }
 
   // Format change value based on the metric and display mode
   const formatChange = (item: MetricData): string => {
+    const value = Number(item.value);
+    const change = Number(item.change);
+    if (isNaN(value) || isNaN(change)) return '-';
+
     if (showPercentage) {
-      // Calculate percentage change
-      const percentChange = calculatePercentageChange(item.value, item.change);
-      return `${Math.abs(percentChange)}%`;
+      const percentChange = calculatePercentageChange(value, change);
+      if (percentChange === null) {
+        return '-'; // Handle undefined change (0 vs 0)
+      }
+      // Format the number with sign and percentage
+      return `${percentChange > 0 ? '+' : ''}${Math.abs(percentChange).toFixed(1)}%`; 
     }
-    // For absolute changes, return the raw change number
-    return `${Math.abs(item.change)}`;
+    // For absolute changes, return the formatted absolute change number
+    return `${formatNumberWithCommas(Math.abs(change))}`;
   }
+  
+  // Helper function to format percentage display string
+  const formatPercentageDisplay = (percentChange: number | null): string => {
+      if (percentChange === null) {
+          return '-';
+      }
+      // Use toFixed(1) for one decimal place
+      return `${percentChange > 0 ? '+' : ''}${percentChange.toFixed(1)}%`;
+  };
 
   // Modify the getColorClass function to only handle bg color
   const getColorClass = (type: 'bg') => {
@@ -366,15 +449,16 @@ export function TopFive({
   return (
     <div ref={ref}>
       <Card className={`h-full ${withBorder ? 'bg-white border-gray-300 ' : 'bg-transparent shadow-none border-0'}`}>
-        <CardHeader className="flex flex-row items-start justify-between pb-2">
+        <CardHeader className="flex flex-col md:flex-row items-start justify-between pb-2">
           {/* Title and subtitle column */}
-          <div className="flex flex-col">
+          <div className="flex flex-col w-full md:w-auto"> {/* Ensure title takes full width on mobile */}
             <CardTitle className="text-lg font-semibold text-gray-800">{title}</CardTitle>
             {subtitle && <CardDescription className="text-sm text-gray-500 mt-1">{subtitle}</CardDescription>}
           </div>
           
-          {/* Controls bundled at top right */}
-          <div className="flex items-center space-x-2 mt-0">
+          {/* Controls bundled - Adjust classes for responsive layout and spacing */}
+          {/* Increased mobile margin-top from mt-3 to mt-4 */}
+          <div className="flex items-center flex-wrap gap-2 w-full md:w-auto mt-7 pt-2 md:pt-0 md:mt-0 justify-start md:justify-end">
             {/* Only render the category dropdown if categories are provided */}
             {categories && categories.length > 0 && (
               <DropdownMenu>
@@ -382,7 +466,7 @@ export function TopFive({
                   <Button 
                     variant="ghost" 
                     size="sm"
-                    className="bg-[#f2f8ff] hover:bg-[#f2f8ff] text-[#342630] rounded-full px-4 font-semibold"
+                    className="bg-[#f2f8ff] hover:bg-[#f2f8ff] text-[#342630] rounded-full px-4 font-semibold flex-shrink-0" // Added flex-shrink-0
                   >
                     {currentCategoryLabel} <TriangleDown className="ml-2" />
                   </Button>
@@ -404,7 +488,7 @@ export function TopFive({
               variant="ghost"
               size="sm"
               onClick={() => setShowPercentage(!showPercentage)}
-              className="flex items-center justify-center w-8 h-8 rounded-full bg-[#f2f8ff] hover:bg-[#f2f8ff] text-[#342630] p-0"
+              className="flex items-center justify-center w-8 h-8 rounded-full bg-[#f2f8ff] hover:bg-[#f2f8ff] text-[#342630] p-0 flex-shrink-0" // Added flex-shrink-0
             >
               {showPercentage ? (
                 <PercentIcon className="h-4 w-4" />
@@ -418,7 +502,7 @@ export function TopFive({
                 <Button 
                   variant="ghost" 
                   size="sm"
-                  className="bg-[#f2f8ff] hover:bg-[#f2f8ff] text-[#342630] rounded-full px-4 font-semibold"
+                  className="bg-[#f2f8ff] hover:bg-[#f2f8ff] text-[#342630] rounded-full px-4 font-semibold flex-shrink-0" // Added flex-shrink-0
                 >
                   {filterDisplayNames[filterType]} <TriangleDown className="ml-2" />
                 </Button>
@@ -444,7 +528,7 @@ export function TopFive({
                 <Button 
                   variant="ghost" 
                   size="sm"
-                  className="bg-[#f2f8ff] hover:bg-[#f2f8ff] text-[#342630] rounded-full px-4"
+                  className="bg-[#f2f8ff] hover:bg-[#f2f8ff] text-[#342630] rounded-full px-4 flex-shrink-0" // Added flex-shrink-0
                 >
                   {currentMetric?.label || 'Select Metric'} <TriangleDown className="ml-2" />
                 </Button>
@@ -506,8 +590,8 @@ export function TopFive({
           {!showSkeleton && !apiError && (apiEndpoint ? fetchedParams === JSON.stringify(apiParams) : true) && (
             <>
               {/* Show actual data */}
-              {/* Check if filteredData has items before mapping */}
-              {filteredData.length > 0 ? filteredData.map((item, index) => (
+              {/* Check if displayData has items before mapping */}
+              {displayData.length > 0 ? displayData.map((item, index) => (
                 <div
                   key={item.code || item.name || index} // Use index as fallback key
                   className="relative mb-4 last:mb-0"
@@ -520,21 +604,19 @@ export function TopFive({
                       </span>
                       <span 
                         className={`flex items-center text-sm ${
-                          // Use a small threshold for change to determine color if needed
-                          item.change > 0 ? 'text-green-500' : item.change < 0 ? 'text-red-500' : 'text-gray-500' // Handle zero change
-                        } w-20 justify-end`}
+                          // Color based on the actual change value, not the percentage
+                          item.change > 0 ? 'text-green-500' : item.change < 0 ? 'text-red-500' : 'text-gray-500' 
+                        } w-20 justify-end`} // Increased width slightly if needed
                       >
                         {item.change !== 0 && ( // Only show icon if change is non-zero
                            item.change > 0 ? (
-                             <ArrowUpIcon className="h-4 w-4 mr-1 flex-shrink-0" /> // Add flex-shrink-0
+                             <ArrowUpIcon className="h-4 w-4 mr-1 flex-shrink-0" /> 
                            ) : (
-                             <ArrowDownIcon className="h-4 w-4 mr-1 flex-shrink-0" /> // Add flex-shrink-0
+                             <ArrowDownIcon className="h-4 w-4 mr-1 flex-shrink-0" />
                            )
                         )}
-                        {/* Format change value */}
-                        {showPercentage ? 
-                          `${Math.abs(calculatePercentageChange(item.value, item.change))}%` : 
-                          `${formatNumberWithCommas(Math.abs(item.change))}`}
+                        {/* Display formatted change (absolute or percentage) */}
+                        {formatChange(item)}
                       </span>
                     </div>
                   </div>
@@ -543,35 +625,38 @@ export function TopFive({
                     <div 
                       className={`h-full ${getColorClass('bg')} transition-all duration-300`}
                       style={{ 
-                        // Handle maxValue being 0
-                        width: maxValue > 0 ? `${(item.value / maxValue) * 100}%` : '0%'
+                        // Use globalMaxValue for consistent scaling
+                        width: globalMaxValue > 0 ? `${(item.value / globalMaxValue) * 100}%` : '0%'
                       }} 
                     />
                   </div>
                 </div>
               )) : (
-                 // Show "No data" message if filteredData is empty after potential fetch
+                 // Show "No data" message if displayData is empty after potential fetch
                  <div className="text-center text-gray-500 py-10">
                    No data available for the selected criteria.
                  </div>
               )}
 
-              {/* Fill with empty rows if needed (Only if filteredData has < 5 items but > 0) */}
+              {/* Fill with empty rows if needed (Only if displayData has < 5 items but > 0) */}
               {/* This might be less necessary if the "No data available" message covers the empty case */}
-              {filteredData.length > 0 && filteredData.length < 5 && Array.from({ length: 5 - filteredData.length }).map((_, index) => (
+              {displayData.length > 0 && displayData.length < 5 && Array.from({ length: 5 - displayData.length }).map((_, index) => (
                 <div
                   key={`empty-${index}`}
-                  className="relative mb-4 last:mb-0 opacity-0 pointer-events-none" // Hide visually but maintain space
+                  className="relative mb-4 last:mb-0" // Removed opacity-0 pointer-events-none
                 >
                    {/* Simplified empty row structure to maintain spacing */}
                   <div className="flex items-center justify-between py-4">
-                     <span className="text-gray-400 text-sm italic">&nbsp;</span>
+                     {/* Display subtle placeholder text */}
+                     <span className="text-gray-400 text-sm italic">No data</span> 
                      <div className="flex items-center">
+                       {/* Keep placeholders for value/change columns to maintain layout */}
                        <span className="text-sm font-medium w-16 text-right mr-8">&nbsp;</span>
                        <span className="flex items-center text-sm w-20 justify-end">&nbsp;</span>
                      </div>
                    </div>
-                   <div className="absolute bottom-0 left-0 right-0 h-1 bg-gray-100"></div>
+                   {/* Remove the progress bar div for empty rows */}
+                   {/* <div className="absolute bottom-0 left-0 right-0 h-1 bg-gray-100"></div> */}
                  </div>
                ))}
             </>
@@ -616,11 +701,9 @@ export function TopFive({
           apiParams={filteredApiParams} 
           // Pass the apiEndpoint if it exists
           apiEndpoint={apiEndpoint}
-          // Optionally pass the fetched timeSeries data if available and ready
-          categoryTimeSeriesData={apiEndpoint && fetchedParams === JSON.stringify(apiParams) ? effectiveTimeSeriesData : categoryTimeSeriesData}
           // Optionally pass the fetched distribution data if available and ready
-          distributionData={apiEndpoint && fetchedParams === JSON.stringify(apiParams) ? effectiveDistributionData : distributionData}
-          chartConfig={chartConfig}
+          // distributionData={apiEndpoint && fetchedParams === JSON.stringify(apiParams) ? effectiveDistributionData : distributionData} 
+          // chartConfig={chartConfig} // REMOVED: chartConfig is not a prop of CategoriesDetailsDialog
         />
       )}
 
@@ -657,9 +740,10 @@ export function TopFive({
                           <TableCell className="border-r border-[#d0d7e3]">
                             {currentMetric?.prefix || ''}{formatNumberWithCommas(item.value)}{currentMetric?.suffix || ''}
                           </TableCell>
-                          <TableCell className={item.change > 0 ? "text-emerald-500" : "text-red-500"}>
-                            {item.change > 0 ? '+' : ''}{formatNumberWithCommas(item.change)} 
-                            ({calculatePercentageChange(item.value, item.change).toFixed(1)}%)
+                          <TableCell className={item.change > 0 ? "text-emerald-500" : item.change < 0 ? "text-red-500" : "text-gray-700"}>
+                            {/* Show absolute change and percentage change */}
+                            {item.change >= 0 ? '+' : ''}{formatNumberWithCommas(item.change)} 
+                            &nbsp;({formatPercentageDisplay(calculatePercentageChange(item.value, item.change))})
                           </TableCell>
                         </TableRow>
                       )) : ( // Handle case where allData is empty

@@ -109,6 +109,19 @@ function Skeleton({ className }: { className?: string }) {
   )
 }
 
+// Helper function for formatting percentage change in tables
+const formatPercentageChange = (current: number, previous: number): string => {
+  if (!isFinite(current) || !isFinite(previous)) return '-'; // Handle non-finite numbers
+  if (previous === 0 && current === 0) return '-';
+  if (previous === 0) return '+100.0%'; // Current > 0
+  if (current === 0) return '-100.0%'; // Previous > 0
+
+  const change = ((current - previous) / previous) * 100;
+  // Clamp change to avoid extreme values like Infinity/-Infinity if previous is extremely small
+  const clampedChange = Math.max(-1000, Math.min(1000, change));
+  return `${clampedChange > 0 ? '+' : ''}${clampedChange.toFixed(1)}%`;
+};
+
 export function ReservationsByDayChart({
   data: dataProp,
   url,
@@ -289,7 +302,7 @@ export function ReservationsByDayChart({
 
   return (
     <>
-      <Card ref={ref} className="border-gray-300 min-h-[440px]">
+      <Card ref={ref} className="border-gray-300">
         <CardHeader>
           <div className="flex w-full justify-between items-center">
             <CardTitle className="text-lg font-semibold text-gray-800">
@@ -376,7 +389,7 @@ export function ReservationsByDayChart({
                  </div>
               ) : (
                  // Render the chart only if there is data
-                 <ChartContainer config={chartConfig}>
+                 <ChartContainer config={chartConfig} className="min-h-[341px] w-full">
                    <BarChart
                      data={chartData}
                      height={300}
@@ -448,7 +461,7 @@ export function ReservationsByDayChart({
 
               {/* View Details Button - Show only if data is ready and not empty */}
               {dataReady && data && data.length > 0 && (
-                <div className="mt-3 pt-4 border-t border-gray-200">
+                <div className="mt-8 pt-4 border-t border-gray-200">
                   <div className="flex justify-end">
                     <Button
                       variant="ghost"
@@ -464,7 +477,7 @@ export function ReservationsByDayChart({
               )}
               {/* Placeholder for button area when data is empty or not ready */}
               {(!dataReady || !data || data.length === 0) && (
-                 <div className="mt-3 pt-4 border-t border-transparent">
+                 <div className="mt-8 pt-4 border-t border-transparent">
                    <div className="flex justify-end">
                      <div className="h-9 w-24"></div> {/* Maintain height */}
                    </div>
@@ -513,8 +526,16 @@ export function ReservationsByDayChart({
                       <TableCell className="w-[25%] text-left border-r border-[#d0d7e3]">
                         {row.previous.toLocaleString()}
                       </TableCell>
-                      <TableCell className={`w-[25%] text-left ${row.current > row.previous ? "text-emerald-500" : "text-red-500"}`}>
-                        {((row.current - row.previous) / row.previous * 100).toFixed(1)}%
+                      <TableCell className={`w-[25%] text-left ${
+                        // Updated color logic to match formatting rules
+                        (row.current > row.previous || (row.previous === 0 && row.current > 0))
+                          ? "text-emerald-500"
+                          : (row.current < row.previous || (row.current === 0 && row.previous > 0))
+                          ? "text-red-500"
+                          : "text-gray-700" // Style for '-' case
+                      }`}>
+                        {/* Use the helper function */}
+                        {formatPercentageChange(row.current, row.previous)}
                       </TableCell>
                     </TableRow>
                   ))}

@@ -66,10 +66,6 @@ export function KpiWithAlignedChart({
       label: "Current Period",
       color: chartColor,
     },
-    previous: {
-      label: "Previous Period",
-      color: "hsl(var(--muted-foreground))",
-    },
   } as ChartConfig
 
   // Calculate min and max values for domain
@@ -86,6 +82,62 @@ export function KpiWithAlignedChart({
     }
     // For charts with prefix or suffix, auto domain works fine
     return ['auto', 'auto'];
+  };
+
+  // Custom Tooltip Content Renderer
+  const renderTooltipContent = (props: any) => {
+    const { payload, label, active } = props; // `label` might be the x-axis value (date), `payload` has the data points
+
+    if (active && payload && payload.length) {
+      // Find the data entry for the 'current' series
+      const dataEntry = payload.find((p: any) => p.dataKey === 'current');
+      if (!dataEntry) return null;
+
+      const dataPoint = dataEntry.payload; // The full data object for this point: { date, current, previous }
+      const currentVal = dataEntry.value;  // The specific value for 'current' at this point
+
+      let formattedValue;
+      // Apply formatting based on the KPI title
+      if (title === 'Revenue' || title === 'Rooms Sold' || title === 'ADR') {
+        formattedValue = Math.round(currentVal).toLocaleString();
+      } else if (title === 'Occupancy') {
+        // Format to one decimal place and add suffix if it exists
+        formattedValue = currentVal.toFixed(1) + (suffix || '');
+      } else {
+        // Default formatting (e.g., locale string)
+        formattedValue = currentVal.toLocaleString();
+      }
+
+      // Add prefix for non-occupancy values
+      const displayValue = (title !== 'Occupancy') ? `${prefix || ''}${formattedValue}` : formattedValue;
+
+      return (
+        <div className="rounded-lg border bg-background p-2 text-sm shadow-sm min-w-[150px]">
+          <div className="grid gap-1">
+            {/* Title: Use label from chart config */}
+            <div className="font-medium text-foreground">
+              {mainChartConfig.current.label}
+            </div>
+            {/* Value Line - Now includes the date */}
+            <div className="flex items-center gap-2 mt-1">
+              <span
+                className="h-2.5 w-2.5 shrink-0 rounded-[2px]"
+                style={{ backgroundColor: mainChartConfig.current.color }} // Use color from config
+              />
+              <div className="flex flex-1 justify-between">
+                {/* Change "Value:" to the date */}
+                <span className="text-muted-foreground">{dataPoint.date}:</span>
+                <span className="font-medium text-foreground">
+                  {displayValue}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    return null;
   };
 
   return (
@@ -150,7 +202,7 @@ export function KpiWithAlignedChart({
                     </linearGradient>
                   </defs>
                   <ChartTooltip 
-                    content={<ChartTooltipContent />}
+                    content={renderTooltipContent}
                     position={{ y: -40 }}
                     cursor={false}
                     offset={5}

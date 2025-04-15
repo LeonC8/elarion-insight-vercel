@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { ClickHouseClient, createClient } from '@clickhouse/client';
 import { calculateDateRanges, calculateComparisonDateRanges } from '@/lib/dateUtils';
+import { getFullNameFromCode, getCodeFromFullName } from '@/lib/countryUtils';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -131,48 +132,7 @@ export interface AnalysisResponse {
       };
     };
   }>;
-  // Optional country codes mapping
-  countryCodes?: {
-    [countryName: string]: string;
-  };
 }
-
-// Country code mapping - only used when field is guest_country
-const countryCodes: { [countryName: string]: string } = {
-  "United States": "us",
-  "United Kingdom": "gb",
-  "Germany": "de",
-  "France": "fr",
-  "Spain": "es",
-  "Italy": "it",
-  "Netherlands": "nl",
-  "Switzerland": "ch",
-  "Canada": "ca",
-  "Australia": "au",
-  "Japan": "jp",
-  "China": "cn",
-  "India": "in",
-  "Brazil": "br",
-  "Mexico": "mx",
-  "Russia": "ru",
-  "South Korea": "kr",
-  "United Arab Emirates": "ae",
-  "Saudi Arabia": "sa",
-  "Sweden": "se",
-  "Norway": "no",
-  "Denmark": "dk",
-  "Belgium": "be",
-  "Austria": "at",
-  "Portugal": "pt",
-  "Greece": "gr",
-  "Ireland": "ie",
-  "Poland": "pl",
-  "Finland": "fi",
-  "Singapore": "sg",
-  "Thailand": "th",
-  "Malaysia": "my",
-  "Indonesia": "id",
-};
 
 // Helper function to round numbers
 function roundValue(value: number): number {
@@ -181,11 +141,13 @@ function roundValue(value: number): number {
   return value >= 100 ? Math.round(value) : Number(value.toFixed(2));
 }
 
-// Helper function to generate a code from a name
+// Updated Helper function to generate a code from a name
 function generateCode(name: string, field: string): string {
-  if (field === 'guest_country' && countryCodes[name]) {
-    return countryCodes[name];
+  // Use the utility function for guest countries to get the 2-letter code
+  if (field === 'guest_country') {
+    return getCodeFromFullName(name);
   }
+  // Keep original logic for other fields (like producers)
   return name.toString().toLowerCase().replace(/\s+/g, '_');
 }
 
@@ -410,8 +372,12 @@ export async function GET(request: Request) {
       previousDataMap.set(item.field_name, item);
     });
 
-    // Helper function to get display name (maps producer ID to name if needed)
+    // Updated helper function to get display name (maps producer ID to name or country code to full name)
     const getDisplayName = (fieldValue: any): string => {
+      if (field === 'guest_country') {
+        // Use the utility function to convert code to full name
+        return getFullNameFromCode(String(fieldValue));
+      }
       if (isProducerRoute && producerMap.size > 0) {
         const producerId = parseInt(fieldValue);
         return producerMap.get(producerId) || `Producer ${fieldValue}`;
@@ -431,12 +397,14 @@ export async function GET(request: Request) {
       const prevValue = parseFloat(prevItem.total_revenue || '0');
       const change = value - prevValue;
       
+      // Get the display name (now handles country code conversion)
       const displayName = getDisplayName(item.field_name);
       
       return {
-        name: displayName,
+        name: displayName, // Will be full country name if applicable
         value: roundValue(value),
         change: roundValue(change),
+        // Generate code (will be 2-letter code for countries thanks to updated generateCode)
         code: generateCode(displayName, field)
       };
     });
@@ -453,12 +421,14 @@ export async function GET(request: Request) {
       const prevValue = parseFloat(prevItem.rooms_sold || '0');
       const change = value - prevValue;
       
+      // Get the display name (now handles country code conversion)
       const displayName = getDisplayName(item.field_name);
       
       return {
-        name: displayName,
+        name: displayName, // Will be full country name if applicable
         value: roundValue(value),
         change: roundValue(change),
+        // Generate code (will be 2-letter code for countries thanks to updated generateCode)
         code: generateCode(displayName, field)
       };
     });
@@ -479,12 +449,14 @@ export async function GET(request: Request) {
       const prevAdr = prevRoomsSold > 0 ? prevRoomRevenue / prevRoomsSold : 0;
       const change = currentAdr - prevAdr;
       
+      // Get the display name (now handles country code conversion)
       const displayName = getDisplayName(item.field_name);
       
       return {
-        name: displayName,
+        name: displayName, // Will be full country name if applicable
         value: roundValue(currentAdr),
         change: roundValue(change),
+        // Generate code (will be 2-letter code for countries thanks to updated generateCode)
         code: generateCode(displayName, field)
       };
     });
@@ -497,11 +469,35 @@ export async function GET(request: Request) {
 
     timeSeriesData.forEach(item => {
       const date = item.date_period.toString();
-      const fieldValue = getDisplayName(item.field_name);
-      const fieldCode = generateCode(fieldValue, field);
+      // Get display name first (handles country code conversion)
+      const displayName = getDisplayName(item.field_name);
+      // Generate code from the display name (uses getCodeFromFullName for countries)
+      const fieldCode = generateCode(displayName, field);
       
-      const isCurrentPeriod = new Date(item.occupancy_date) >= new Date(startDate) && 
-                             new Date(item.occupancy_date) <= new Date(endDate);
+      // Determine if the record belongs to the current or previous period
+      // Note: Need the original occupancy_date from the item if possible,
+      // otherwise, we might need to infer based on the date_period string format.
+      // Assuming `item` still has `occupancy_date` or we can compare `date_period`
+      let isCurrentPeriod = false;
+      const itemDateStr = item.occupancy_date || date; // Fallback to date_period if occupancy_date isn't selected
+      try {
+        // Attempt to parse the date string. Adjust parsing based on actual format if needed.
+        const itemDate = new Date(itemDateStr);
+        const currentStartDate = new Date(startDate);
+        const currentEndDate = new Date(endDate);
+        // Ensure date comparison is correct
+        isCurrentPeriod = itemDate >= currentStartDate && itemDate <= currentEndDate;
+      } catch(e) {
+        console.warn(`Could not parse date for time series item: ${itemDateStr}`);
+        // Fallback logic if parsing fails, might need adjustment
+        // Example: Check if date_period formatted as YYYYMM matches current period months
+        if (periodType !== 'Day') {
+           const currentStartYYYYMM = parseInt(startDate.substring(0, 4) + startDate.substring(5, 7));
+           const currentEndYYYYMM = parseInt(endDate.substring(0, 4) + endDate.substring(5, 7));
+           const itemYYYYMM = parseInt(date); // Assuming date_period is YYYYMM
+           isCurrentPeriod = itemYYYYMM >= currentStartYYYYMM && itemYYYYMM <= currentEndYYYYMM;
+        }
+      }
 
       dateSet.add(date);
       fieldValueSet.add(fieldCode);
@@ -544,10 +540,16 @@ export async function GET(request: Request) {
     // Prepare map data if the field is guest_country
     let mapData;
     if (field === 'guest_country') {
-      mapData = currentData.slice(0, limit).map(country => ({
-        country: countryCodes[country.field_name] || 'unknown',
-        value: roundValue(parseFloat(country.total_revenue || '0'))
-      }));
+      mapData = currentData.slice(0, limit).map(countryItem => {
+        // Get the full name first
+        const fullName = getDisplayName(countryItem.field_name);
+        // Get the code from the full name
+        const countryCode = getCodeFromFullName(fullName);
+        return {
+          country: countryCode, // Use the 2-letter code for the map
+          value: roundValue(parseFloat(countryItem.total_revenue || '0'))
+        };
+      });
     }
 
     // Construct response
@@ -558,10 +560,9 @@ export async function GET(request: Request) {
       timeSeriesData: processedTimeSeriesData
     };
 
-    // Add map data and country codes if the field is guest_country
+    // Add map data if the field is guest_country
     if (field === 'guest_country') {
       response.mapData = mapData;
-      response.countryCodes = countryCodes;
     }
 
     // --- STORE IN CACHE ---

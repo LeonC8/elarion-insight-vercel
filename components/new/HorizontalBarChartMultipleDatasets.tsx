@@ -47,6 +47,7 @@ export interface HorizontalBarChartMultipleDatasetsProps {
   url?: string
   apiParams?: Record<string, string | number | boolean | undefined>
   lazyLoad?: boolean
+  fixedTitle?: string
 }
 
 // Extract number from a string (e.g., "3 night" -> 3, "7+ nights" -> 7.5)
@@ -90,6 +91,7 @@ export function HorizontalBarChartMultipleDatasets({
   url,
   apiParams,
   lazyLoad = false,
+  fixedTitle,
 }: HorizontalBarChartMultipleDatasetsProps) {
   // State for internally fetched data, loading, and errors
   const [internalDatasets, setInternalDatasets] = useState<DataSet[] | null>(null)
@@ -98,9 +100,10 @@ export function HorizontalBarChartMultipleDatasets({
   const [fetchedParams, setFetchedParams] = useState<string | null>(null);
 
   // Determine initial default dataset key
-  const determineDefaultDatasetKey = (datasets: DataSet[] | null): string | undefined => {
-    if (defaultDatasetProp) return defaultDatasetProp;
-    if (datasets && datasets.length > 0) return datasets[0].key;
+  const determineDefaultDatasetKey = (datasets: DataSet[] | null | undefined): string | undefined => {
+    if (!datasets) return undefined; // Handle null or undefined
+    if (defaultDatasetProp && datasets.some(d => d.key === defaultDatasetProp)) return defaultDatasetProp;
+    if (datasets.length > 0) return datasets[0].key;
     return undefined;
   };
 
@@ -184,12 +187,12 @@ export function HorizontalBarChartMultipleDatasets({
      if (!selectedDataset && datasets && datasets.length > 0) {
        setSelectedDataset(determineDefaultDatasetKey(datasets));
      }
-   }, [datasets, defaultDatasetProp]);
+   }, [datasets, defaultDatasetProp, selectedDataset]);
 
 
   // Find the current dataset based on the selected key
-   const currentDataset = datasets?.find(d => d.key === selectedDataset) ?? (datasets?.length > 0 ? datasets[0] : null);
-  const currentCategory = categories?.find(c => c.key === selectedCategory) || categories?.[0]
+   const currentDataset = datasets?.find(d => d.key === selectedDataset);
+   const currentCategory = categories?.find(c => c.key === selectedCategory) || categories?.[0]
 
   // Handle error state
   if (error && !isLoading) {
@@ -289,7 +292,7 @@ export function HorizontalBarChartMultipleDatasets({
       {!showSkeleton && dataReady && currentDataset && datasets.length > 0 && (
         <HorizontalBarChart 
           data={chartData ?? []} 
-          title={currentDataset?.title || ""} 
+          title={fixedTitle || currentDataset?.title || ""} 
           leftMargin={leftMargin}
         />
       )}

@@ -208,11 +208,11 @@ export function OccupancyAnalysisChart({
     <>
       <Card className="border-gray-300 h-full flex flex-col">
         <CardHeader>
-          <div className="flex w-full justify-between items-center">
-            <CardTitle className="text-lg font-semibold text-gray-800">
+          <div className="flex w-full justify-between items-center gap-4">
+            <CardTitle className="text-lg font-semibold text-gray-800 whitespace-nowrap overflow-hidden text-ellipsis">
               Occupancy Analysis
             </CardTitle>
-            <div className="flex space-x-2">
+            <div className="flex space-x-2 flex-shrink-0">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button 
@@ -236,7 +236,10 @@ export function OccupancyAnalysisChart({
           </div>
         </CardHeader>
         <CardContent className="flex-grow flex flex-col">
-          <ChartContainer config={chartConfig}>
+          <ChartContainer 
+            config={chartConfig} 
+            className="min-h-[300px] max-h-[300px] w-full"
+          >
             <BarChart
               data={chartData}
               height={300}
@@ -281,7 +284,7 @@ export function OccupancyAnalysisChart({
           </ChartContainer>
 
           {/* Clickable Legend */}
-          <div className="flex justify-center gap-3 mt-6">
+          <div className="flex justify-center gap-3 pb-5">
             {Object.entries(chartConfig).map(([key, config]) => (
               <div
                 key={key}

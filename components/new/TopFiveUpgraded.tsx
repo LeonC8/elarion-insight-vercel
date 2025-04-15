@@ -297,23 +297,81 @@ export function TopFiveUpgraded({
     }
   }).slice(0, 5)
 
-  // Add function to calculate percentage change
-  const calculatePercentageChange = (current: number, change: number): number => {
-    const previous = current - change;
-    if (previous === 0) return 0;
-    return Number(((change / previous) * 100).toFixed(1));
+  // NEW: Reverse the display order for bottom/falling lists
+  const displayData = (filterType === 'bottom' || filterType === 'falling') 
+    ? [...filteredData].reverse() 
+    : filteredData;
+
+  // Add function to calculate percentage change - MODIFIED
+  // Returns percentage change as a number, or null if undefined (e.g., 0 vs 0)
+  const calculatePercentageChange = (current: number, change: number): number | null => {
+    // Derive previous value. Ensure inputs are numbers.
+    const currentNum = Number(current);
+    const changeNum = Number(change);
+    if (isNaN(currentNum) || isNaN(changeNum)) return null;
+
+    const previous = currentNum - changeNum;
+
+    if (!isFinite(currentNum) || !isFinite(previous)) {
+       return null; // Handle non-finite inputs
+    }
+
+    // Case: 0 vs 0
+    if (previous === 0 && currentNum === 0) {
+      return null; // Represents the '-' case, change is undefined
+    }
+
+    // Case: X vs 0 (Previous was 0)
+    if (previous === 0) { 
+       // Follow MainTimeSeriesDialog: +100% / -100%
+       return currentNum > 0 ? 100.0 : -100.0; 
+    }
+    
+    // Case: 0 vs X (Current is 0, Previous was non-zero)
+    // This is always a -100% change
+    if (currentNum === 0) { 
+        return -100.0;
+    }
+
+    // Standard case: Both previous and current are non-zero and finite
+    const percentage = (changeNum / previous) * 100;
+
+    // Handle potential NaN/Infinity from extremely small 'previous' values if necessary
+    if (!isFinite(percentage)) {
+        // Fallback for safety
+        return previous > 0 ? (change > 0 ? 100.0 : -100.0) : (change > 0 ? -100.0 : 100.0); 
+    }
+    
+    // Return the calculated percentage, rounded to one decimal place
+    return Number(percentage.toFixed(1));
   }
 
   // Format change value based on the metric and display mode
   const formatChange = (item: MetricData): string => {
+    const value = Number(item.value);
+    const change = Number(item.change);
+    if (isNaN(value) || isNaN(change)) return '-';
+
     if (showPercentage) {
-      // Calculate percentage change
-      const percentChange = calculatePercentageChange(item.value, item.change);
-      return `${Math.abs(percentChange)}%`;
+      const percentChange = calculatePercentageChange(value, change);
+      if (percentChange === null) {
+        return '-'; // Handle undefined change (0 vs 0)
+      }
+      // Format the number with sign and percentage
+      return `${percentChange > 0 ? '+' : ''}${Math.abs(percentChange).toFixed(1)}%`; 
     }
-    // For absolute changes, return the raw change number
-    return `${Math.abs(item.change)}`;
+    // For absolute changes, return the formatted absolute change number
+    return `${formatNumberWithCommas(Math.abs(change))}`;
   }
+
+  // Helper function to format percentage display string
+  const formatPercentageDisplay = (percentChange: number | null): string => {
+      if (percentChange === null) {
+          return '-';
+      }
+      // Use toFixed(1) for one decimal place
+      return `${percentChange > 0 ? '+' : ''}${percentChange.toFixed(1)}%`;
+  };
 
   // Modify the getColorClass function to only handle bg color
   const getColorClass = (type: 'bg') => {
@@ -537,7 +595,7 @@ export function TopFiveUpgraded({
           {!apiLoading && !apiError && (
             <>
               {/* Display the actual data rows */}
-              {filteredData.map((item, index) => (
+              {displayData.map((item, index) => (
                 <div
                   key={item.code || item.name}
                   className="relative mb-4 last:mb-0"
@@ -550,17 +608,19 @@ export function TopFiveUpgraded({
                       </span>
                       <span 
                         className={`flex items-center text-sm ${
-                          item.change > 0 ? 'text-green-500' : 'text-red-500'
-                        } w-20 justify-end`}
+                          // Color based on the actual change value
+                          item.change > 0 ? 'text-green-500' : item.change < 0 ? 'text-red-500' : 'text-gray-500'
+                        } w-20 justify-end`} // Increased width slightly if needed
                       >
-                        {item.change > 0 ? (
-                          <ArrowUpIcon className="h-4 w-4 mr-1" />
-                        ) : (
-                          <ArrowDownIcon className="h-4 w-4 mr-1" />
-                        )}
-                        {showPercentage ? 
-                          `${Math.abs(calculatePercentageChange(item.value, item.change))}%` : 
-                          `${formatNumberWithCommas(Math.abs(item.change))}`}
+                        {item.change !== 0 ? ( // Show icon only if change is non-zero
+                          item.change > 0 ? (
+                            <ArrowUpIcon className="h-4 w-4 mr-1" />
+                          ) : (
+                            <ArrowDownIcon className="h-4 w-4 mr-1" />
+                          )
+                        ) : null /* No icon for zero change */ } 
+                        {/* Display formatted change (absolute or percentage) */}
+                        {formatChange(item)}
                       </span>
                     </div>
                   </div>
@@ -577,7 +637,7 @@ export function TopFiveUpgraded({
               ))}
               
               {/* Add empty rows to ensure 5 total rows */}
-              {Array.from({ length: Math.max(0, 5 - filteredData.length) }).map((_, index) => (
+              {Array.from({ length: Math.max(0, 5 - displayData.length) }).map((_, index) => (
                 <div
                   key={`empty-${index}`}
                   className="relative mb-4 last:mb-0"
@@ -603,7 +663,7 @@ export function TopFiveUpgraded({
           )}
           
           {/* View Details button section */}
-          {!apiLoading && !apiError && filteredData.length > 0 && (
+          {!apiLoading && !apiError && displayData.length > 0 && (
             <div className="mt-4 pt-4 border-t border-gray-200">
               <div className="flex justify-end">
                 <Button
@@ -685,9 +745,10 @@ export function TopFiveUpgraded({
                           <TableCell className="border-r border-[#d0d7e3]">
                             {currentMetric?.prefix || ''}{formatNumberWithCommas(item.value)}{currentMetric?.suffix || ''}
                           </TableCell>
-                          <TableCell className={item.change > 0 ? "text-emerald-500" : "text-red-500"}>
-                            {item.change > 0 ? '+' : ''}{formatNumberWithCommas(item.change)} 
-                            ({calculatePercentageChange(item.value, item.change).toFixed(1)}%)
+                          <TableCell className={item.change > 0 ? "text-emerald-500" : item.change < 0 ? "text-red-500" : "text-gray-700"}>
+                            {/* Show absolute change and percentage change */}
+                            {item.change >= 0 ? '+' : ''}{formatNumberWithCommas(item.change)} 
+                            &nbsp;({formatPercentageDisplay(calculatePercentageChange(item.value, item.change))})
                           </TableCell>
                         </TableRow>
                       ))}

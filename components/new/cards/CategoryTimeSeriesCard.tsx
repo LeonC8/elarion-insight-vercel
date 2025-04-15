@@ -35,7 +35,7 @@ function TriangleDown({ className }: { className?: string }) {
 
 // Types
 type ChartDisplayMode = 'normal' | 'stacked';
-type KPIType = 'revenue' | 'roomsSold' | 'adr';
+// type KPIType = 'revenue' | 'roomsSold' | 'adr'; // Remove if not needed
 
 // Add MetricConfig interface
 interface MetricConfig {
@@ -55,8 +55,10 @@ interface CategoryTimeSeriesCardProps {
   title?: string;
   categoryChartMode: ChartDisplayMode;
   setCategoryChartMode: (mode: ChartDisplayMode) => void;
-  selectedCategoryKPI: string; // Changed from KPIType to string for dynamic metrics
-  setSelectedCategoryKPI: (kpi: string) => void;
+  // selectedCategoryKPI: string; // Remove old prop
+  // setSelectedCategoryKPI: (kpi: string) => void; // Remove old prop
+  selectedKPI: string; // Add shared prop
+  setSelectedKPI: (kpi: string) => void; // Add shared prop
   effectiveCategoryData: Array<{
     date: string;
     categories: Record<string, {
@@ -71,7 +73,7 @@ interface CategoryTimeSeriesCardProps {
   activeCategories: string[];
   setActiveCategories: (categories: string[]) => void;
   getCategoriesLeftMargin: (data: any[]) => number;
-  timeSeriesDatasets: any[]; // Using any[] for simplicity, should be more specific in real code
+  timeSeriesDatasets: any[]; 
   prefix?: string;
   availableMetrics: {[key: string]: MetricConfig};
 }
@@ -80,8 +82,10 @@ export function CategoryTimeSeriesCard({
   title = "Over Time",
   categoryChartMode,
   setCategoryChartMode,
-  selectedCategoryKPI,
-  setSelectedCategoryKPI,
+  // selectedCategoryKPI, // Remove old prop
+  // setSelectedCategoryKPI, // Remove old prop
+  selectedKPI, // Use shared prop
+  setSelectedKPI, // Use shared prop
   effectiveCategoryData,
   effectiveCategoryConfig,
   activeCategories,
@@ -108,8 +112,8 @@ export function CategoryTimeSeriesCard({
     }, {});
   }, [effectiveCategoryConfig]);
   
-  // Determine if stacked mode is supported for the current KPI
-  const supportsStacked = availableMetrics[selectedCategoryKPI]?.config.supportsStacked ?? true;
+  // Determine if stacked mode is supported for the current KPI - Use selectedKPI
+  const supportsStacked = availableMetrics[selectedKPI]?.config.supportsStacked ?? true; // Use selectedKPI
   
   // Add state for fullscreen dialog
   const [isFullscreenOpen, setIsFullscreenOpen] = React.useState(false);
@@ -280,8 +284,8 @@ export function CategoryTimeSeriesCard({
           </AreaChart>
         </ChartContainer>
 
-        {/* Categories Over Time Legend - Moved below chart */}
-        <div className="flex justify-center gap-3 mt-14 flex-wrap">
+        {/* Categories Over Time Legend - Responsive Flex Wrap */}
+        <div className="flex justify-center gap-2 sm:gap-3 mt-8 flex-wrap">
           {Object.keys(colorizedCategoryConfig).map((key) => (
             <div
               key={key}
@@ -310,57 +314,65 @@ export function CategoryTimeSeriesCard({
         </div>
       </>
     );
-  }, [effectiveCategoryData, colorizedCategoryConfig, categoryChartMode, activeCategories, timeSeriesDatasets, prefix, getLeftMargin, setActiveCategories]);
+  }, [effectiveCategoryData, colorizedCategoryConfig, categoryChartMode, activeCategories, timeSeriesDatasets, prefix, getLeftMargin, setActiveCategories, selectedKPI]); // Add selectedKPI dependency if prefix/suffix depends on it indirectly
   
   return (
     <>
       <Card className="border-gray-300">
         <CardHeader>
-          <div className="flex justify-between items-center">
+          {/* Wrap title and controls for responsive layout */}
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-3">
+            {/* Title */}
             <h3 className="text-lg font-medium">{title}</h3>
-            <div className="flex items-center gap-3">
+
+            {/* Filters Container - Group controls */}
+            <div className="flex items-center gap-2 sm:gap-3 flex-wrap sm:flex-nowrap">
+              {/* Chart View Dropdown */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button 
                     variant="ghost" 
                     size="sm"
-                    className="bg-[#f2f8ff] hover:bg-[#f2f8ff] text-[#342630] rounded-full px-4 font-semibold"
+                    // Removed w-full sm:w-auto for consistent sizing
+                    className="bg-[#f2f8ff] hover:bg-[#f2f8ff] text-[#342630] rounded-full px-4 font-semibold whitespace-nowrap justify-between sm:justify-center"
                   >
-                    {categoryChartMode === 'normal' ? 'Normal' : 'Stacked'}
+                    <span>{categoryChartMode === 'normal' ? 'Line chart view' : 'Stacked line view'}</span>
                     <TriangleDown className="ml-3" />
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
+                <DropdownMenuContent align="start" className="w-[--radix-dropdown-menu-trigger-width]">
                   <DropdownMenuItem onClick={() => setCategoryChartMode('normal')}>
-                    Normal
+                    Line chart view
                   </DropdownMenuItem>
                   <DropdownMenuItem 
                     onClick={() => setCategoryChartMode('stacked')}
                     disabled={!supportsStacked}
                     className={!supportsStacked ? 'opacity-50 cursor-not-allowed' : ''}
                   >
-                    Stacked
+                    Stacked line view
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
               
+              {/* KPI Dropdown - Use selectedKPI */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button 
                     variant="ghost" 
                     size="sm"
-                    className="bg-[#f2f8ff] hover:bg-[#f2f8ff] text-[#342630] rounded-full px-4 font-semibold"
+                    // Removed w-full sm:w-auto for consistent sizing
+                    className="bg-[#f2f8ff] hover:bg-[#f2f8ff] text-[#342630] rounded-full px-4 font-semibold whitespace-nowrap justify-between sm:justify-center"
                   >
-                    {availableMetrics[selectedCategoryKPI]?.name || 'Metric'}
+                    <span>{availableMetrics[selectedKPI]?.name || 'Metric'}</span> {/* Use selectedKPI */}
                     <TriangleDown className="ml-3" />
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
+                <DropdownMenuContent align="start" className="w-[--radix-dropdown-menu-trigger-width]">
                   {Object.entries(availableMetrics).map(([key, metric]) => (
                     <DropdownMenuItem 
                       key={key}
                       onClick={() => {
-                        setSelectedCategoryKPI(key as string);
+                        setSelectedKPI(key as string); // Use setSelectedKPI
                         // If stacked mode isn't supported, switch to normal
                         if (!metric.config.supportsStacked && categoryChartMode === 'stacked') {
                           setCategoryChartMode('normal');
@@ -373,11 +385,12 @@ export function CategoryTimeSeriesCard({
                 </DropdownMenuContent>
               </DropdownMenu>
               
-              {/* Add Fullscreen Button */}
+              {/* Fullscreen Button */}
               <Button 
                 variant="ghost" 
                 size="sm"
-                className="bg-[#f2f8ff] hover:bg-[#f2f8ff] text-[#342630] rounded-full px-4 font-semibold"
+                // Removed w-full sm:w-auto and sm:ml-auto
+                className="bg-[#f2f8ff] hover:bg-[#f2f8ff] text-[#342630] rounded-full px-4 font-semibold whitespace-nowrap justify-center"
                 onClick={() => setIsFullscreenOpen(true)}
               >
                 <Maximize2 className="h-4 w-4 mr-1" />
@@ -393,54 +406,60 @@ export function CategoryTimeSeriesCard({
       
       {/* Fullscreen Dialog */}
       <Dialog open={isFullscreenOpen} onOpenChange={setIsFullscreenOpen}>
+         {/* Ensure DialogContent padding is responsive */}
         <DialogContent className="max-w-[100vw] w-[100vw] h-[100vh] max-h-[100vh] p-0 m-0 rounded-none [&>button]:hidden">
-          <div className="px-10 pt-6 pb-12 flex flex-col h-full">
+          {/* Add responsive padding to the inner container */}
+          <div className="px-4 sm:px-10 pt-6 pb-12 flex flex-col h-full"> 
             <DialogHeader className="mb-6 relative">
-              <div className="flex justify-between items-center">
+              {/* Responsive header inside dialog */}
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
                 <DialogTitle className="text-xl">{title}</DialogTitle>
-                <div className="flex gap-3">
+                 {/* Control buttons */}
+                <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 w-full sm:w-auto">
+                  {/* Chart View Dropdown */}
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button 
                         variant="ghost" 
                         size="sm"
-                        className="bg-[#f2f8ff] hover:bg-[#f2f8ff] text-[#342630] rounded-full px-4 font-semibold"
+                        className="bg-[#f2f8ff] hover:bg-[#f2f8ff] text-[#342630] rounded-full px-4 font-semibold justify-between sm:justify-center w-full sm:w-auto"
                       >
-                        {categoryChartMode === 'normal' ? 'Normal' : 'Stacked'}
+                        <span>{categoryChartMode === 'normal' ? 'Line chart view' : 'Stacked line view'}</span>
                         <TriangleDown className="ml-3" />
                       </Button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
+                    <DropdownMenuContent align="end" className="w-[--radix-dropdown-menu-trigger-width] sm:w-auto">
                       <DropdownMenuItem onClick={() => setCategoryChartMode('normal')}>
-                        Normal
+                        Line chart view
                       </DropdownMenuItem>
                       <DropdownMenuItem 
                         onClick={() => setCategoryChartMode('stacked')}
                         disabled={!supportsStacked}
                         className={!supportsStacked ? 'opacity-50 cursor-not-allowed' : ''}
                       >
-                        Stacked
+                        Stacked line view
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
                   
+                  {/* KPI Dropdown - Use selectedKPI */}
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button 
                         variant="ghost" 
                         size="sm"
-                        className="bg-[#f2f8ff] hover:bg-[#f2f8ff] text-[#342630] rounded-full px-4 font-semibold"
+                        className="bg-[#f2f8ff] hover:bg-[#f2f8ff] text-[#342630] rounded-full px-4 font-semibold justify-between sm:justify-center w-full sm:w-auto"
                       >
-                        {availableMetrics[selectedCategoryKPI]?.name || 'Metric'}
+                        <span>{availableMetrics[selectedKPI]?.name || 'Metric'}</span> {/* Use selectedKPI */}
                         <TriangleDown className="ml-3" />
                       </Button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
+                    <DropdownMenuContent align="end" className="w-[--radix-dropdown-menu-trigger-width] sm:w-auto">
                       {Object.entries(availableMetrics).map(([key, metric]) => (
                         <DropdownMenuItem 
                           key={key}
                           onClick={() => {
-                            setSelectedCategoryKPI(key as string);
+                            setSelectedKPI(key as string); // Use setSelectedKPI
                             if (!metric.config.supportsStacked && categoryChartMode === 'stacked') {
                               setCategoryChartMode('normal');
                             }
@@ -452,11 +471,11 @@ export function CategoryTimeSeriesCard({
                     </DropdownMenuContent>
                   </DropdownMenu>
                   
-                  {/* Close button styled like the dropdown buttons */}
+                  {/* Close button */}
                   <Button 
                     variant="ghost" 
                     size="sm"
-                    className="bg-[#f2f8ff] hover:bg-[#f2f8ff] text-[#342630] rounded-full px-4 font-semibold"
+                    className="bg-[#f2f8ff] hover:bg-[#f2f8ff] text-[#342630] rounded-full px-4 font-semibold justify-center w-full sm:w-auto"
                     onClick={() => setIsFullscreenOpen(false)}
                   >
                     <X className="h-4 w-4" />
@@ -465,9 +484,11 @@ export function CategoryTimeSeriesCard({
               </div>
             </DialogHeader>
             
-            <div className="flex-1 overflow-hidden">
-              <div className="h-[calc(100%-20px)]">
-                <ChartContent bottom={120} />
+            {/* Ensure chart content takes remaining height */}
+            <div className="flex-1 overflow-hidden"> 
+              <div className="h-full"> {/* Changed from fixed calc height */}
+                {/* Adjust bottom margin dynamically based on expected legend height */}
+                <ChartContent bottom={100} /> 
               </div>
             </div>
           </div>

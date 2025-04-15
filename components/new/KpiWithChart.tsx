@@ -6,7 +6,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
   ChartConfig,
   ChartContainer,
-  ChartLegend,
   ChartTooltip,
   ChartTooltipContent,
 } from "@/components/ui/chart"
@@ -65,6 +64,9 @@ interface KpiWithChartProps {
     prefix?: string;
   }>;
   
+  // Add the new fixedTitle prop
+  fixedTitle?: string; 
+
   // Legacy props for backward compatibility
   prefix?: string;
   metrics?: Array<{
@@ -96,13 +98,13 @@ interface KpiWithChartProps {
 
 const getChartConfig = (color: 'green' | 'blue' | 'red'): ChartConfig => ({
   current: {
-    label: "Current Period",
+    label: "Selected Period",
     color: color === 'green' ? "hsl(142.1 76.2% 36.3%)" : 
            color === 'blue' ? "hsl(221.2 83.2% 53.3%)" :
            "hsl(0, 84%, 60%)",
   },
   previous: {
-    label: "Previous Period",
+    label: "Comparison Period",
     color: "hsl(var(--muted-foreground))",
   },
 }) 
@@ -143,6 +145,19 @@ function TriangleDown({ className }: { className?: string }) {
   )
 }
 
+// Helper function for formatting percentage change in tables
+const formatPercentageChange = (current: number, previous: number): string => {
+  if (!isFinite(current) || !isFinite(previous)) return '-'; // Handle non-finite numbers
+  if (previous === 0 && current === 0) return '-';
+  if (previous === 0) return '+100.0%'; // Current > 0
+  if (current === 0) return '-100.0%'; // Previous > 0
+
+  const change = ((current - previous) / previous) * 100;
+  // Clamp change to avoid extreme values like Infinity/-Infinity if previous is extremely small
+  const clampedChange = Math.max(-1000, Math.min(1000, change));
+  return `${clampedChange > 0 ? '+' : ''}${clampedChange.toFixed(1)}%`;
+};
+
 export function KpiWithChart({ 
   title, 
   initialValue,
@@ -156,7 +171,9 @@ export function KpiWithChart({
   // New API-related props
   apiUrl,
   apiParams,
-  fieldMapping
+  fieldMapping,
+  // Destructure the new prop
+  fixedTitle 
 }: KpiWithChartProps) {
   const [fullScreenTable, setFullScreenTable] = React.useState(false)
   const [loading, setLoading] = React.useState(false)
@@ -308,11 +325,12 @@ export function KpiWithChart({
 
   return (
     <>
-      <Card className="border-gray-300">
+      <Card className="border-gray-300 min-h-[420px]">
         <CardHeader>
           <div className="flex justify-between items-center">
+            {/* Use fixedTitle if provided, otherwise use the dynamic label */}
             <CardTitle className="text-base mb-2 font-medium text-sm text-muted-foreground">
-              {currentMetricData.label}
+              {fixedTitle || currentMetricData.label}
             </CardTitle>
             {allMetrics.length > 1 && (
               <DropdownMenu>
@@ -353,7 +371,7 @@ export function KpiWithChart({
             )}
           </div>
         </CardHeader>
-        <CardContent className="relative pb-4 mt-3 min-h-[360px]">
+        <CardContent className="relative pb-4 mt-3">
           {/* Spinner Overlay */}
           {loading && (
             <div className="absolute inset-0 flex items-center justify-center bg-white/80 z-20 rounded-b-lg">
@@ -361,7 +379,7 @@ export function KpiWithChart({
             </div>
           )}
 
-          <ChartContainer config={chartConfig}>
+          <ChartContainer config={chartConfig} className="min-h-[300px] w-full">
             <AreaChart
               data={chartDataForRender}
               height={300}
@@ -423,35 +441,32 @@ export function KpiWithChart({
                   dot={false}
                 />
               )}
-              <ChartLegend 
-                className="mt-6" 
-                content={() => (
-                  <div className="flex justify-center gap-3 pt-10 pb-0 mb-0">
-                    {Object.keys(chartConfig).map((key) => (
-                      <div
-                        key={key}
-                        onClick={() => {
-                          if (activeMainSeries.includes(key)) {
-                            setActiveMainSeries(activeMainSeries.filter(item => item !== key))
-                          } else {
-                            setActiveMainSeries([...activeMainSeries, key])
-                          }
-                        }}
-                        className={`cursor-pointer bg-[#f0f4fa] px-3 py-1.5 rounded-full border border-[#e5eaf3] flex items-center gap-2 ${
-                          activeMainSeries.includes(key) ? '' : 'opacity-50'
-                        }`}
-                      >
-                        <div style={{ backgroundColor: chartConfig[key].color }} className="w-2 h-2 rounded-full" />
-                        <span className="text-xs text-gray-500 font-medium">{chartConfig[key].label}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              />
             </AreaChart>
           </ChartContainer>
           
-          <div className="mt-3 pt-4 border-t border-gray-200">
+          {/* Legend moved outside ChartContainer */}
+          <div className="flex justify-center gap-3 mt-6"> 
+            {Object.keys(chartConfig).map((key) => (
+              <div
+                key={key}
+                onClick={() => {
+                  if (activeMainSeries.includes(key)) {
+                    setActiveMainSeries(activeMainSeries.filter(item => item !== key))
+                  } else {
+                    setActiveMainSeries([...activeMainSeries, key])
+                  }
+                }}
+                className={`cursor-pointer bg-[#f0f4fa] px-3 py-1.5 rounded-full border border-[#e5eaf3] flex items-center gap-2 ${
+                  activeMainSeries.includes(key) ? '' : 'opacity-50'
+                }`}
+              >
+                <div style={{ backgroundColor: chartConfig[key].color }} className="w-2 h-2 rounded-full" />
+                <span className="text-xs text-gray-500 font-medium">{chartConfig[key].label}</span>
+              </div>
+            ))}
+          </div>
+          
+          <div className="mt-8 pt-4 border-t border-gray-200">
             <div className="flex justify-end">
               <Button
                 variant="ghost"
@@ -480,10 +495,10 @@ export function KpiWithChart({
                       Date
                     </TableHead>
                     <TableHead className="bg-[#f0f4fa]/60 text-left border-r border-[#d0d7e3]">
-                      Current Period
+                      Selected Period
                     </TableHead>
                     <TableHead className="bg-[#f0f4fa]/60 text-left border-r border-[#d0d7e3]">
-                      Previous Period
+                      Comparison Period
                     </TableHead>
                     <TableHead className="bg-[#f0f4fa]/60 last:rounded-tr-lg text-left">
                       Change
@@ -502,8 +517,14 @@ export function KpiWithChart({
                       <TableCell className="w-[25%] text-left border-r border-[#d0d7e3]">
                         {currentMetricData.prefix || prefix}{row.previous.toLocaleString()}
                       </TableCell>
-                      <TableCell className={`w-[25%] text-left ${row.current > row.previous ? "text-emerald-500" : "text-red-500"}`}>
-                        {row.previous !== 0 ? ((row.current - row.previous) / row.previous * 100).toFixed(1) : "N/A"}%
+                      <TableCell className={`w-[25%] text-left ${
+                        (row.current > row.previous || (row.previous === 0 && row.current > 0))
+                          ? "text-emerald-500"
+                          : (row.current < row.previous || (row.current === 0 && row.previous > 0))
+                          ? "text-red-500"
+                          : "text-gray-700" // Style for '-' case
+                      }`}>
+                        {formatPercentageChange(row.current, row.previous)}
                       </TableCell>
                     </TableRow>
                   ))}

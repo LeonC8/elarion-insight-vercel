@@ -34,14 +34,27 @@ interface HorizontalBarChartProps {
 // Chart configuration for current/previous period
 const chartConfig = {
   current: {
-    label: "Current Period",
+    label: "Selected Period",
     color: "hsl(221.2 83.2% 53.3%)",  // Blue
   },
   previous: {
-    label: "Previous Period",
+    label: "Comparison Period",
     color: "#93c5fd",  // Lighter Blue
   },
 } satisfies ChartConfig
+
+// Helper function for formatting percentage change in tables
+const formatPercentageChange = (current: number, previous: number): string => {
+  if (!isFinite(current) || !isFinite(previous)) return '-'; // Handle non-finite numbers
+  if (previous === 0 && current === 0) return '-';
+  if (previous === 0) return '+100.0%'; // Current > 0
+  if (current === 0) return '-100.0%'; // Previous > 0
+
+  const change = ((current - previous) / previous) * 100;
+  // Clamp change to avoid extreme values like Infinity/-Infinity if previous is extremely small
+  const clampedChange = Math.max(-1000, Math.min(1000, change));
+  return `${clampedChange > 0 ? '+' : ''}${clampedChange.toFixed(1)}%`;
+};
 
 export function HorizontalBarChart({ data, title, leftMargin = -10 }: HorizontalBarChartProps) {
   const [activeSeries, setActiveSeries] = React.useState<string[]>([
@@ -59,7 +72,7 @@ export function HorizontalBarChart({ data, title, leftMargin = -10 }: Horizontal
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <ChartContainer config={chartConfig}>
+          <ChartContainer config={chartConfig} className="min-h-[345px] w-full">
             <BarChart
               data={data}
               layout="vertical"
@@ -160,10 +173,10 @@ export function HorizontalBarChart({ data, title, leftMargin = -10 }: Horizontal
                       Range
                     </TableHead>
                     <TableHead className="bg-[#f0f4fa]/60 text-left border-r border-[#d0d7e3]">
-                      Current Period
+                      Selected Period
                     </TableHead>
                     <TableHead className="bg-[#f0f4fa]/60 text-left border-r border-[#d0d7e3]">
-                      Previous Period
+                      Comparison Period
                     </TableHead>
                     <TableHead className="bg-[#f0f4fa]/60 last:rounded-tr-lg text-left">
                       Change
@@ -182,8 +195,14 @@ export function HorizontalBarChart({ data, title, leftMargin = -10 }: Horizontal
                       <TableCell className="w-[25%] text-left border-r border-[#d0d7e3]">
                         {row.previous.toLocaleString()}
                       </TableCell>
-                      <TableCell className={`w-[25%] text-left ${row.current > row.previous ? "text-emerald-500" : "text-red-500"}`}>
-                        {((row.current - row.previous) / row.previous * 100).toFixed(1)}%
+                      <TableCell className={`w-[25%] text-left ${
+                        (row.current > row.previous || (row.previous === 0 && row.current > 0))
+                          ? "text-emerald-500"
+                          : (row.current < row.previous || (row.current === 0 && row.previous > 0))
+                          ? "text-red-500"
+                          : "text-gray-700" // Style for '-' case
+                      }`}>
+                        {formatPercentageChange(row.current, row.previous)}
                       </TableCell>
                     </TableRow>
                   ))}

@@ -148,24 +148,7 @@ interface FluctuationResponse {
   timeScale: 'day' | 'month' | 'year';
 }
 
-// Add new type for pie chart KPI selection
-type PieChartKPIType = 'revenue' | 'roomsSold' | 'adr';
-
-// Add new interface for the table data
-interface TableData {
-  category: string;
-  revenue: number;
-  roomsSold: number;
-  adr: number;
-  revenuePrevious: number;
-  roomsSoldPrevious: number;
-  adrPrevious: number;
-  revenueChange: number;
-  roomsSoldChange: number;
-  adrChange: number;
-}
-
-// Add this type for chart display type
+// Add new type for chart display type
 type ChartType = 'pie' | 'bar';
 
 // Add this helper function near the top of the file
@@ -331,9 +314,8 @@ export function CategoriesDetails({
     }
   });
   
-  // Replace fixed KPI types with dynamic metric keys
-  const [selectedPieKPI, setSelectedPieKPI] = React.useState<MetricKey>('revenue');
-  const [selectedCategoryKPI, setSelectedCategoryKPI] = React.useState<MetricKey>('revenue');
+  // Replace fixed KPI types with dynamic metric keys - USE ONE STATE
+  const [selectedKPI, setSelectedKPI] = React.useState<MetricKey>('revenue');
 
   // Calculate rooms sold data (assuming €150 per room)
   const ROOM_RATE = 150;
@@ -369,38 +351,34 @@ export function CategoriesDetails({
     if (fluctuationData?.metrics) {
       setAvailableMetrics(fluctuationData.metrics);
       
-      // Reset selected KPIs if they're no longer valid
-      if (!fluctuationData.metrics[selectedPieKPI]) {
-        setSelectedPieKPI(Object.keys(fluctuationData.metrics)[0]);
-      }
-      
-      if (!fluctuationData.metrics[selectedCategoryKPI]) {
-        setSelectedCategoryKPI(Object.keys(fluctuationData.metrics)[0]);
+      // Reset selected KPI if it's no longer valid
+      if (!fluctuationData.metrics[selectedKPI]) {
+        setSelectedKPI(Object.keys(fluctuationData.metrics)[0]);
       }
     }
-  }, [fluctuationData]);
+  }, [fluctuationData, selectedKPI]);
 
-  // Add validation helper for chart types
+  // Add validation helper for chart types based on the single selectedKPI
   const isPieChartSupported = React.useMemo(() => 
-    availableMetrics[selectedPieKPI]?.config.supportsPie ?? true,
-  [availableMetrics, selectedPieKPI]);
+    availableMetrics[selectedKPI]?.config.supportsPie ?? true,
+  [availableMetrics, selectedKPI]);
   
   const isStackedChartSupported = React.useMemo(() => 
-    availableMetrics[selectedCategoryKPI]?.config.supportsStacked ?? true,
-  [availableMetrics, selectedCategoryKPI]);
+    availableMetrics[selectedKPI]?.config.supportsStacked ?? true,
+  [availableMetrics, selectedKPI]);
 
   // Effect to enforce chart type constraints
   React.useEffect(() => {
-    // Force bar chart if pie chart is not supported
+    // Force bar chart if pie chart is not supported for the current KPI
     if (!isPieChartSupported && distributionChartType === 'pie') {
       setDistributionChartType('bar');
     }
     
-    // Force normal mode if stacked is not supported
+    // Force normal mode if stacked is not supported for the current KPI
     if (!isStackedChartSupported && categoryChartMode === 'stacked') {
       setCategoryChartMode('normal');
     }
-  }, [selectedPieKPI, selectedCategoryKPI, availableMetrics]);
+  }, [selectedKPI, availableMetrics, isPieChartSupported, isStackedChartSupported]);
 
   // At the beginning of your component, add this logging
   React.useEffect(() => {
@@ -413,21 +391,21 @@ export function CategoriesDetails({
     }
   }, [fluctuationData]);
 
-  // Update apiDistributionData to use the kpis data from fluctuationData
+  // Update apiDistributionData to use selectedKPI
   const apiDistributionData = React.useMemo(() => {
-    if (!fluctuationData || !availableMetrics[selectedPieKPI]) {
+    if (!fluctuationData || !availableMetrics[selectedKPI]) {
       console.log("Missing fluctuation data or metric:", { 
         hasFluctuationData: !!fluctuationData, 
-        selectedPieKPI,
+        selectedKPI,
         metricsKeys: Object.keys(availableMetrics)
       });
       return [];
     }
     
-    console.log("Selected KPI:", selectedPieKPI);
+    console.log("Selected KPI:", selectedKPI);
     
     // Get the data from fluctuationData.kpis
-    const kpiData = fluctuationData.kpis[selectedPieKPI];
+    const kpiData = fluctuationData.kpis[selectedKPI];
     
     console.log("KPI data for charts:", kpiData);
     
@@ -438,16 +416,16 @@ export function CategoriesDetails({
       fill: COLOR_PALETTE[0],
       change: item.change || 0
     })) || [];
-  }, [fluctuationData, selectedPieKPI, availableMetrics]);
+  }, [fluctuationData, selectedKPI, availableMetrics]);
   
-  // Update the processedDistributionData memo to calculate percentage changes
+  // Update the processedDistributionData memo to use selectedKPI
   const processedDistributionData = React.useMemo(() => {
     if (!apiDistributionData || apiDistributionData.length === 0) {
-        console.log("No distribution data available for:", selectedPieKPI);
+        console.log("No distribution data available for:", selectedKPI);
         return [];
     }
     
-    console.log(`Processing ${apiDistributionData.length} items for ${selectedPieKPI}`);
+    console.log(`Processing ${apiDistributionData.length} items for ${selectedKPI}`);
     
     // Sort by value (descending)
     const sortedData = [...apiDistributionData].sort((a, b) => b.value - a.value);
@@ -480,23 +458,23 @@ export function CategoriesDetails({
         fill: item.name === "Other" ? "#999999" : COLOR_PALETTE[index % COLOR_PALETTE.length]
     }));
     
-}, [apiDistributionData, selectedPieKPI]);
+}, [apiDistributionData, selectedKPI]);
 
-  // Update the kpiTransformedData to handle roomRevenue specifically
+  // Update the kpiTransformedData to use selectedKPI
   const kpiTransformedData = React.useMemo(() => {
     if (!processedDistributionData || processedDistributionData.length === 0) {
       console.log("No processed data for charts");
       return [];
     }
     
-    console.log(`Transforming ${processedDistributionData.length} items for charts, KPI: ${selectedPieKPI}`);
+    console.log(`Transforming ${processedDistributionData.length} items for charts, KPI: ${selectedKPI}`);
     
     // Get current metric configuration
-    const metricConfig = availableMetrics[selectedPieKPI];
+    const metricConfig = availableMetrics[selectedKPI];
     if (!metricConfig) return [];
     
     // For roomRevenue, ensure we have valid data
-    if (selectedPieKPI === 'roomRevenue') {
+    if (selectedKPI === 'roomRevenue') {
       console.log("Room Revenue processed data:", processedDistributionData);
       
       // If all values are 0, something is wrong, create synthetic data
@@ -533,7 +511,7 @@ export function CategoriesDetails({
     );
     
     if (otherItems.length > 0) {
-      if (selectedPieKPI === 'adr') {
+      if (selectedKPI === 'adr') {
         // For ADR, calculate the average ADR and average change for "Others"
         // LINTER FIX: Calculate average value and change for ADR 'Others'
         const otherValue = otherItems.reduce((sum, item) => sum + item.value, 0) / otherItems.length;
@@ -573,14 +551,14 @@ export function CategoriesDetails({
       ...item,
       percentage: Number(((item.value / totalValue) * 100).toFixed(1))
     }));
-  }, [processedDistributionData, selectedPieKPI, availableMetrics]);
+  }, [processedDistributionData, selectedKPI, availableMetrics]);
 
-  // Update effect to switch to bar chart when ADR is selected
+  // Update effect to switch to bar chart when ADR is selected - use selectedKPI
   React.useEffect(() => {
-    if (selectedPieKPI === 'adr' && distributionChartType === 'pie') {
+    if (selectedKPI === 'adr' && distributionChartType === 'pie') {
       setDistributionChartType('bar');
     }
-  }, [selectedPieKPI]);
+  }, [selectedKPI, distributionChartType]);
 
   // Update the table data based on API data
   const processedTableData = React.useMemo(() => {
@@ -660,16 +638,16 @@ export function CategoriesDetails({
     [kpiTransformedData, activePieLegends]
   );
   
-  // Update the filteredTotalValue calculation to work for all KPIs
+  // Update the filteredTotalValue calculation to work for all KPIs using selectedKPI
   const filteredTotalValue = React.useMemo(() => {
     // Calculate the sum for all KPI types, not just revenue
     return activePieData.reduce((total, item) => total + item.value, 0);
-  }, [activePieData, selectedPieKPI]);
+  }, [activePieData, selectedKPI]);
 
-  // Update transformedCategoryData to handle empty datasets
+  // Update transformedCategoryData to use selectedKPI
   const transformedCategoryData = React.useMemo(() => {
     // If ADR is selected, use the pre-generated ADR dataset directly
-    if (selectedCategoryKPI === 'adr') {
+    if (selectedKPI === 'adr') {
       const adrDataset = timeSeriesDatasets.find(dataset => dataset.id === 'adr');
       return adrDataset?.data || [];
     }
@@ -686,17 +664,17 @@ export function CategoriesDetails({
         return {
           ...acc,
           [key]: {
-            current: selectedCategoryKPI === 'revenue' ? 
+            current: selectedKPI === 'revenue' ? 
               value.current : 
               roomsSold,
-            previous: selectedCategoryKPI === 'revenue' ? 
+            previous: selectedKPI === 'revenue' ? 
               value.previous : 
               prevRoomsSold
           }
         };
       }, {})
     }));
-  }, [timeSeriesDatasets, selectedCategoryKPI]);
+  }, [timeSeriesDatasets, selectedKPI]);
 
   // Modify the useEffect that fetches fluctuation data - this will be the only API call
   React.useEffect(() => {
@@ -756,12 +734,12 @@ export function CategoriesDetails({
     fetchFluctuationData();
   }, [open, apiEndpoint, JSON.stringify(apiParams), isDialog]);
 
-  // Transform fluctuation data into the format expected by charts
+  // Transform fluctuation data into the format expected by charts using selectedKPI
   const apiCategoryData = React.useMemo(() => {
     if (!fluctuationData) return null;
     
     // Get the data for the currently selected KPI
-    const kpiData = fluctuationData.fluctuationData[selectedCategoryKPI];
+    const kpiData = fluctuationData.fluctuationData[selectedKPI];
     
     if (!kpiData) return null;
     
@@ -804,7 +782,7 @@ export function CategoriesDetails({
         categories
       };
     });
-  }, [fluctuationData, selectedCategoryKPI]);
+  }, [fluctuationData, selectedKPI]);
 
   // Dynamic color generation for categories
   const getCategoryColor = React.useCallback((category: string, index: number) => {
@@ -812,11 +790,11 @@ export function CategoriesDetails({
     return COLOR_PALETTE[index % COLOR_PALETTE.length];
   }, []);
 
-  // Update chart config to use dynamic categories
+  // Update chart config to use dynamic categories based on selectedKPI
   const categoryConfig = React.useMemo(() => {
     if (!fluctuationData) return STANDARD_CATEGORIES;
     
-    const kpiData = fluctuationData.fluctuationData[selectedCategoryKPI];
+    const kpiData = fluctuationData.fluctuationData[selectedKPI];
     if (!kpiData) return STANDARD_CATEGORIES;
     
     // Create a dynamic config using the actual category names
@@ -830,7 +808,7 @@ export function CategoriesDetails({
     });
     
     return config;
-  }, [fluctuationData, selectedCategoryKPI, getCategoryColor]);
+  }, [fluctuationData, selectedKPI, getCategoryColor]);
 
   // Use the dynamic category config
   const effectiveCategoryConfig = categoryConfig || STANDARD_CATEGORIES;
@@ -848,31 +826,32 @@ export function CategoriesDetails({
   }, [effectiveCategoryConfig]);
 
 
-  // Add this effect to switch to normal view when ADR is selected
+  // Add this effect to switch to normal view when ADR is selected - use selectedKPI
   React.useEffect(() => {
-    if (selectedCategoryKPI === 'adr' && categoryChartMode === 'stacked') {
+    if (selectedKPI === 'adr' && categoryChartMode === 'stacked') {
       setCategoryChartMode('normal');
     }
-  }, [selectedCategoryKPI]);
+  }, [selectedKPI, categoryChartMode]);
 
-  // Add this effect to ensure we have proper data for ADR in the pie chart area
+  // Add this effect to ensure we have proper data for ADR in the pie chart area - use selectedKPI
   React.useEffect(() => {
-    if (selectedPieKPI === 'adr') {
+    if (selectedKPI === 'adr') {
       // Make sure all categories are active when showing ADR bar chart
-      if (activePieLegends.length !== pieDatasets[0].data.length) {
-        setActivePieLegends(pieDatasets[0].data.map(item => item.name));
+      // Check if pieDatasets[0] exists before accessing its data
+      if (pieDatasets[0] && activePieLegends.length !== pieDatasets[0].data.length) {
+          setActivePieLegends(pieDatasets[0].data.map(item => item.name));
       }
     }
-  }, [selectedPieKPI, pieDatasets, activePieLegends]);
+  }, [selectedKPI, pieDatasets, activePieLegends]);
 
   // Extract the main content into a separate component or variable
   const content = (
-    <div className={`flex-1 overflow-y-auto ${isDialog ? "pr-6 bg-[#f2f8ff] px-4 pb-4 pt-4" : ""}`}>
+    <div className={`flex-1 overflow-y-auto ${isDialog ? "bg-[#f2f8ff] px-2 sm:px-4 pb-4 pt-4" : ""}`}>
       {isLoading ? (
-        // Loading state for the entire content
+        // Loading state for the entire content - Made responsive
         <div className="flex flex-col gap-6">
-          {/* Charts Row Loading State */}
-          <div className="grid grid-cols-2 gap-6">
+          {/* Charts Row Loading State - Responsive Grid */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Distribution Card Loading */}
             <div className={`${isDialog ? "border border-gray-300" : ""} rounded-lg bg-white p-4`}>
               <div className="h-8 bg-gray-200 rounded-md w-1/3 mb-6 animate-pulse"></div>
@@ -908,35 +887,35 @@ export function CategoriesDetails({
           </div>
         </div>
       ) : (
-        // Actual content when data is loaded
+        // Actual content when data is loaded - Made responsive
         <div className="flex flex-col gap-6">
-          {/* Charts Row */}
-          <div className="grid grid-cols-2 gap-6">
-            {/* Distribution Card Component */}
+          {/* Charts Row - Responsive Grid */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Distribution Card Component - Pass selectedKPI and setSelectedKPI */}
             <DistributionCard
               title="Distribution"
               kpiTransformedData={kpiTransformedData}
               distributionChartType={distributionChartType}
               setDistributionChartType={setDistributionChartType}
-              selectedPieKPI={selectedPieKPI}
-              setSelectedPieKPI={setSelectedPieKPI}
+              selectedKPI={selectedKPI}
+              setSelectedKPI={setSelectedKPI}
               activePieLegends={activePieLegends}
               setActivePieLegends={setActivePieLegends}
               activePieData={activePieData}
               filteredTotalValue={filteredTotalValue}
               effectiveCategoryConfig={effectiveCategoryConfig}
-              prefix={availableMetrics[selectedPieKPI]?.config.prefix || prefix}
-              suffix={availableMetrics[selectedPieKPI]?.config.suffix || suffix}
+              prefix={availableMetrics[selectedKPI]?.config.prefix || prefix}
+              suffix={availableMetrics[selectedKPI]?.config.suffix || suffix}
               availableMetrics={availableMetrics}
             />
 
-            {/* Category Time Series Card Component */}
+            {/* Category Time Series Card Component - Pass selectedKPI and setSelectedKPI */}
             <CategoryTimeSeriesCard
               title="Over Time"
               categoryChartMode={categoryChartMode}
               setCategoryChartMode={setCategoryChartMode}
-              selectedCategoryKPI={selectedCategoryKPI}
-              setSelectedCategoryKPI={setSelectedCategoryKPI}
+              selectedKPI={selectedKPI}
+              setSelectedKPI={setSelectedKPI}
               effectiveCategoryData={effectiveCategoryData}
               effectiveCategoryConfig={effectiveCategoryConfig}
               activeCategories={activeCategories as string[]}
@@ -944,8 +923,8 @@ export function CategoriesDetails({
                 setActiveCategories(categories as any)}
               getCategoriesLeftMargin={getCategoriesLeftMargin}
               timeSeriesDatasets={timeSeriesDatasets}
-              prefix={availableMetrics[selectedCategoryKPI]?.config.prefix || prefix}
-              suffix={availableMetrics[selectedCategoryKPI]?.config.suffix || suffix}
+              prefix={availableMetrics[selectedKPI]?.config.prefix || prefix}
+              suffix={availableMetrics[selectedKPI]?.config.suffix || suffix}
               availableMetrics={availableMetrics}
             />
           </div>
@@ -994,9 +973,10 @@ export function CategoriesDetails({
     return (
       <Dialog open={open} onOpenChange={onOpenChange}>
         {loadingAndErrorElements}
-        <DialogContent className="max-w-[90vw] max-h-[90vh] flex flex-col p-0">
-          <DialogHeader className="flex-none py-6 pb-2" showBorder={true}>
-            <DialogTitle className="text-lg font-medium px-4">{title} Breakdown</DialogTitle>
+        {/* Ensure DialogContent allows content scrolling on smaller heights */}
+        <DialogContent className="max-w-[95vw] sm:max-w-[90vw] max-h-[90vh] flex flex-col p-0">
+          <DialogHeader className="flex-none py-4 sm:py-6 pb-2" showBorder={true}>
+            <DialogTitle className="text-lg font-medium px-2 sm:px-4">{title} Breakdown</DialogTitle>
           </DialogHeader>
           {content}
         </DialogContent>

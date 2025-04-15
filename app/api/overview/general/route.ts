@@ -123,17 +123,17 @@ type FluctuationData = {
   previous: number;
 }[];
 
-// Update the KpiResponse interface to include fluctuation data
+// Update the KpiResponse interface to allow null for percentageChange
 export interface KpiResponse {
-  totalRevenue: { value: number; percentageChange: number; fluctuation: FluctuationData };
-  roomsSold: { value: number; percentageChange: number; fluctuation: FluctuationData };
-  adr: { value: number; percentageChange: number; fluctuation: FluctuationData };
-  occupancyRate: { value: number; percentageChange: number; fluctuation: FluctuationData };
-  roomRevenue: { value: number; percentageChange: number; fluctuation: FluctuationData };
-  fbRevenue: { value: number; percentageChange: number; fluctuation: FluctuationData };
-  otherRevenue: { value: number; percentageChange: number; fluctuation: FluctuationData };
-  revpar: { value: number; percentageChange: number; fluctuation: FluctuationData };
-  trevpar: { value: number; percentageChange: number; fluctuation: FluctuationData };
+  totalRevenue: { value: number; percentageChange: number | null; fluctuation: FluctuationData };
+  roomsSold: { value: number; percentageChange: number | null; fluctuation: FluctuationData };
+  adr: { value: number; percentageChange: number | null; fluctuation: FluctuationData };
+  occupancyRate: { value: number; percentageChange: number | null; fluctuation: FluctuationData };
+  roomRevenue: { value: number; percentageChange: number | null; fluctuation: FluctuationData };
+  fbRevenue: { value: number; percentageChange: number | null; fluctuation: FluctuationData };
+  otherRevenue: { value: number; percentageChange: number | null; fluctuation: FluctuationData };
+  revpar: { value: number; percentageChange: number | null; fluctuation: FluctuationData };
+  trevpar: { value: number; percentageChange: number | null; fluctuation: FluctuationData };
   hotelCapacity: number;
 }
 
@@ -496,10 +496,36 @@ export async function GET(request: Request) {
     const trevpar = roomsAvailable > 0 ? totalRevenue / roomsAvailable : 0;
     const prevTrevpar = prevRoomsAvailable > 0 ? prevTotalRevenue / prevRoomsAvailable : 0;
 
-    // Calculate percentage changes
-    const calculatePercentageChange = (current: number, previous: number) => {
-      if (previous === 0) return 0;
-      return ((current - previous) / previous) * 100;
+    // Calculate percentage changes - UPDATED LOGIC
+    const calculatePercentageChange = (current: number, previous: number): number | null => {
+      // Handle non-finite inputs safely
+      if (!isFinite(current) || !isFinite(previous)) {
+        // Decide on handling: returning null might be safest if data quality is uncertain
+        // Or treat non-finite as 0 for calculation? Let's treat as 0 for now.
+        current = isFinite(current) ? current : 0;
+        previous = isFinite(previous) ? previous : 0;
+      }
+
+      if (previous === 0) {
+        if (current === 0) {
+          return null; // Case: 0 vs 0 - Indicate undefined change with null
+        } else {
+          return 100; // Case: >0 vs 0 - Represents +100% change
+        }
+      }
+      // From here, previous is non-zero
+      if (current === 0) {
+        return -100; // Case: 0 vs >0 - Represents -100% change
+      }
+
+      // Standard calculation for non-zero previous value
+      const change = ((current - previous) / previous) * 100;
+
+      // Clamp change to avoid extreme values (e.g., +/- 1000%)
+      const clampedChange = Math.max(-1000, Math.min(1000, change));
+
+      // Avoid returning -0 by explicitly checking for 0
+      return clampedChange === 0 ? 0 : clampedChange;
     };
 
     // Process daily data to create fluctuation arrays for each KPI
@@ -514,19 +540,23 @@ export async function GET(request: Request) {
       previousDailyData.forEach(day => {
         // Extract month and day from the previous year's date (ignore year)
         const prevDate = new Date(day.occupancy_date);
-        const monthDay = `${(prevDate.getMonth() + 1).toString().padStart(2, '0')}/${prevDate.getDate().toString().padStart(2, '0')}`;
-        previousDataMap.set(monthDay, day);
+        // Keep the key for lookup as MM/DD to match how previous data is keyed
+        const monthDayKey = `${(prevDate.getMonth() + 1).toString().padStart(2, '0')}/${prevDate.getDate().toString().padStart(2, '0')}`;
+        previousDataMap.set(monthDayKey, day);
       });
 
       // Create the fluctuation data array
       return currentDailyData.map(currentDay => {
         const date = new Date(currentDay.occupancy_date);
-        
-        // Format the date as MM/DD instead of just month name
-        const formattedDate = `${(date.getMonth() + 1).toString().padStart(2, '0')}/${date.getDate().toString().padStart(2, '0')}`;
-        
-        // Use the month/day as key to look up previous data (ignoring year)
-        const previousDay = previousDataMap.get(formattedDate) || {
+
+        // Format the date as DD/MM for display
+        const formattedDate = `${date.getDate().toString().padStart(2, '0')}/${(date.getMonth() + 1).toString().padStart(2, '0')}`;
+
+        // Create the key for lookup as MM/DD to match the map
+        const lookupKey = `${(date.getMonth() + 1).toString().padStart(2, '0')}/${date.getDate().toString().padStart(2, '0')}`;
+
+        // Use the MM/DD key to look up previous data (ignoring year)
+        const previousDay = previousDataMap.get(lookupKey) || {
           occupancy_date: currentDay.occupancy_date,
           rooms_sold: 0,
           room_revenue: 0,
@@ -537,7 +567,7 @@ export async function GET(request: Request) {
         };
 
         return {
-          date: formattedDate,
+          date: formattedDate, // Use DD/MM format here
           current: getCurrentValue(currentDay),
           previous: getPreviousValue(previousDay),
         };

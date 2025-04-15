@@ -42,9 +42,22 @@ const chartConfig = {
 export function Component() {
   return (
     <Card>
-      <CardContent>
-        <ChartContainer config={chartConfig}>
-          <BarChart accessibilityLayer data={chartData}>
+      <CardContent className="pt-6">
+        <ChartContainer 
+          config={chartConfig} 
+          className="min-h-[250px] w-full"
+        >
+          <BarChart 
+            accessibilityLayer 
+            data={chartData} 
+            height={250}
+            margin={{
+              top: 5,
+              right: 5,
+              left: -20,
+              bottom: 5,
+            }}
+          >
             <CartesianGrid vertical={false} />
             <XAxis
               dataKey="month"
