@@ -2,9 +2,27 @@
 
 import { Button } from "@/components/ui/button"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { HorizontalBarChart } from "./HorizontalBarChart"
 import { useState, useEffect } from "react"
 import { useInView } from "@/hooks/useInView"
+import * as React from "react"
+import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts"
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+import {
+  ChartConfig,
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+} from "@/components/ui/chart"
+import { ArrowRight } from 'lucide-react'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 
 function TriangleDown({ className }: { className?: string }) {
   return (
@@ -79,6 +97,31 @@ function Skeleton({ className }: { className?: string }) {
   )
 }
 
+// Chart configuration for current/previous period
+const chartConfig = {
+  current: {
+    label: "Selected Period",
+    color: "hsl(221.2 83.2% 53.3%)",  // Blue
+  },
+  previous: {
+    label: "Comparison Period",
+    color: "#93c5fd",  // Lighter Blue
+  },
+} satisfies ChartConfig
+
+// Helper function for formatting percentage change in tables
+const formatPercentageChange = (current: number, previous: number): string => {
+  if (!isFinite(current) || !isFinite(previous)) return '-'; // Handle non-finite numbers
+  if (previous === 0 && current === 0) return '-';
+  if (previous === 0) return '+100.0%'; // Current > 0
+  if (current === 0) return '-100.0%'; // Previous > 0
+
+  const change = ((current - previous) / previous) * 100;
+  // Clamp change to avoid extreme values like Infinity/-Infinity if previous is extremely small
+  const clampedChange = Math.max(-1000, Math.min(1000, change));
+  return `${clampedChange > 0 ? '+' : ''}${clampedChange.toFixed(1)}%`;
+};
+
 export function HorizontalBarChartMultipleDatasets({
   datasets: datasetsProp,
   defaultDataset: defaultDatasetProp,
@@ -111,6 +154,13 @@ export function HorizontalBarChartMultipleDatasets({
     !url ? determineDefaultDatasetKey(datasetsProp) : undefined
   );
   const [selectedCategory, setSelectedCategory] = useState(defaultCategory)
+
+  // Add state copied from HorizontalBarChart.tsx
+  const [activeSeries, setActiveSeries] = React.useState<string[]>([
+    'current',
+    'previous'
+  ])
+  const [fullScreenTable, setFullScreenTable] = React.useState(false)
 
   // Use the Intersection Observer hook
   const { ref, isInView } = useInView<HTMLDivElement>({ 
@@ -192,6 +242,7 @@ export function HorizontalBarChartMultipleDatasets({
 
   // Find the current dataset based on the selected key
    const currentDataset = datasets?.find(d => d.key === selectedDataset);
+   const chartTitle = fixedTitle || currentDataset?.title || "";
    const currentCategory = categories?.find(c => c.key === selectedCategory) || categories?.[0]
 
   // Handle error state
@@ -214,93 +265,192 @@ export function HorizontalBarChartMultipleDatasets({
   if (dataReady && currentDataset?.data) {
      chartData = [...currentDataset.data];
      if (sort && chartData.length > 0) {
-       chartData.sort((a, b) => extractNumber(a.range) - extractNumber(b.range));
+       chartData.sort((a: { range: string }, b: { range: string }) => extractNumber(a.range) - extractNumber(b.range));
      }
   }
 
   const showSkeleton = isLoading || (url && lazyLoad && !fetchedParams && !internalError);
 
-  return (
-    <div ref={ref} className="relative min-h-[400px]">
-      {showSkeleton && (
-        <div className="absolute inset-0 flex items-center justify-center bg-white/80 z-20">
-          <div className="w-full h-[400px] p-8 space-y-4">
-              <Skeleton className="h-6 w-3/4" />
-              <Skeleton className="h-6 w-1/2" />
-              <Skeleton className="h-6 w-5/6" />
-              <Skeleton className="h-6 w-2/3" />
-              <Skeleton className="h-6 w-3/4" />
-              <Skeleton className="h-6 w-1/2" />
-           </div>
-        </div>
-      )}
+  // --- Start: Title/Subtitle logic copied from HorizontalBarChart.tsx ---
+  let mainTitle = chartTitle; // Use chartTitle determined above
+  let subtitle: string | null = null;
+  const titleParts = chartTitle.split(" by ");
+  if (titleParts.length > 1) {
+    mainTitle = titleParts[0];
+    subtitle = `By ${titleParts.slice(1).join(" by ")}`; // Handle cases with multiple "by"
+  }
+  // --- End: Title/Subtitle logic copied from HorizontalBarChart.tsx ---
 
-      <div className={`absolute right-8 top-6 z-10 flex space-x-2 ${isLoading ? 'opacity-50 pointer-events-none' : ''}`}>
-        {categories && categories.length > 0 && (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button 
-                variant="ghost" 
-                size="sm"
-                className="bg-[#f2f8ff] hover:bg-[#f2f8ff] text-[#342630] rounded-full px-4"
-                disabled={isLoading || !categories || categories.length === 0}
-              >
-                {currentCategory?.label || "All"} <TriangleDown className="ml-2" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent>
-              {categories.map(category => (
-                <DropdownMenuItem 
-                  key={category.key}
-                  onClick={() => setSelectedCategory(category.key)}
-                  disabled={isLoading}
-                >
-                  {category.label}
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
-        )}
-        
-        {datasets && datasets.length > 1 && (
-           <DropdownMenu>
-             <DropdownMenuTrigger asChild>
-               <Button 
-                 variant="ghost" 
-                 size="sm"
-                 className="bg-[#f2f8ff] hover:bg-[#f2f8ff] text-[#342630] rounded-full px-4"
-                 disabled={isLoading || !datasets || datasets.length <= 1}
-               >
-                 {currentDataset?.title || 'Select Dataset'} <TriangleDown className="ml-2" />
-               </Button>
-             </DropdownMenuTrigger>
-             <DropdownMenuContent>
-               {datasets.map(dataset => (
-                 <DropdownMenuItem 
-                   key={dataset.key}
-                   onClick={() => setSelectedDataset(dataset.key)}
-                   disabled={isLoading}
-                 >
-                   {dataset.title}
-                 </DropdownMenuItem>
-               ))}
-             </DropdownMenuContent>
-           </DropdownMenu>
-        )}
-      </div>
+  return (
+    <Card ref={ref} className="border-gray-300 min-h-[450px]"> 
+     
+
+      <CardHeader className={`flex flex-col md:flex-row items-start justify-between pb-4 ${showSkeleton ? 'invisible' : ''}`}>
+        <div className="w-full md:w-auto mb-4 md:mb-0">
+           <CardTitle className="text-lg font-semibold text-gray-800">
+             {mainTitle}
+           </CardTitle>
+           {subtitle && (
+             <CardDescription className="text-sm text-gray-500 pt-1">
+               {subtitle}
+             </CardDescription>
+           )}
+        </div>
+
+        <div className={`flex items-center flex-wrap gap-2 w-full md:w-auto justify-start md:justify-end ${isLoading ? 'opacity-50 pointer-events-none' : ''}`}>
+           {categories && categories.length > 0 && (
+             <DropdownMenu>
+               <DropdownMenuTrigger asChild>
+                 <Button variant="ghost" size="sm" className="bg-[#f2f8ff] hover:bg-[#f2f8ff] text-[#342630] rounded-full px-4 flex-shrink-0" disabled={isLoading || !categories || categories.length === 0}>
+                   {currentCategory?.label || "All"} <TriangleDown className="ml-2" />
+                 </Button>
+               </DropdownMenuTrigger>
+               <DropdownMenuContent>
+                 {categories.map(category => ( <DropdownMenuItem key={category.key} onClick={() => setSelectedCategory(category.key)} disabled={isLoading}>{category.label}</DropdownMenuItem> ))}
+               </DropdownMenuContent>
+             </DropdownMenu>
+           )}
+           {datasets && datasets.length > 1 && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="sm" className="bg-[#f2f8ff] hover:bg-[#f2f8ff] text-[#342630] rounded-full px-4 flex-shrink-0" disabled={isLoading || !datasets || datasets.length <= 1}>
+                    {currentDataset?.title || 'Select Dataset'} <TriangleDown className="ml-2" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent>
+                  {datasets.map(dataset => ( <DropdownMenuItem key={dataset.key} onClick={() => setSelectedDataset(dataset.key)} disabled={isLoading}>{dataset.title}</DropdownMenuItem> ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+           )}
+        </div>
+      </CardHeader>
       
-      {!showSkeleton && dataReady && currentDataset && datasets.length > 0 && (
-        <HorizontalBarChart 
-          data={chartData ?? []} 
-          title={fixedTitle || currentDataset?.title || ""} 
-          leftMargin={leftMargin}
-        />
-      )}
-      {!showSkeleton && !error && (!url || fetchedParams === JSON.stringify(apiParams)) && datasets.length === 0 && (
-         <div className="absolute inset-0 flex items-center justify-center text-gray-500">
-            No data available.
-         </div>
-      )}
-    </div>
+      <CardContent className={`${showSkeleton ? 'invisible' : ''}`}>
+        {!showSkeleton && dataReady && currentDataset && datasets.length > 0 && (
+          <ChartContainer config={chartConfig} className="min-h-[345px] w-full">
+            <BarChart
+              data={chartData}
+              layout="vertical"
+              height={300}
+              margin={{
+                top: 10,
+                right: 10,
+                bottom: 20,
+                left: leftMargin,
+              }}
+            >
+              <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+              <XAxis
+                type="number"
+                tickLine={false}
+                axisLine={false}
+                tickFormatter={(value) => `${Math.round(value).toLocaleString()}`}
+                tickMargin={8}
+              />
+              <YAxis
+                dataKey="range"
+                type="category"
+                tickLine={false}
+                axisLine={false}
+                tickMargin={8}
+              />
+              <ChartTooltip content={<ChartTooltipContent />} />
+              {activeSeries.includes('current') && (
+                <Bar
+                  dataKey="current"
+                  fill={chartConfig.current.color}
+                  radius={[0, 4, 4, 0]}
+                />
+              )}
+              {activeSeries.includes('previous') && (
+                <Bar
+                  dataKey="previous"
+                  fill={chartConfig.previous.color}
+                  radius={[0, 4, 4, 0]}
+                />
+              )}
+            </BarChart>
+          </ChartContainer>
+        )}
+
+        {!showSkeleton && !error && (!url || fetchedParams === JSON.stringify(apiParams)) && datasets.length === 0 && (
+           <div className="flex items-center justify-center text-gray-500 min-h-[345px]">
+              No data available.
+           </div>
+        )}
+
+        {!showSkeleton && dataReady && currentDataset && datasets.length > 0 && (
+          <>
+            <div className="flex justify-center gap-3 mt-6">
+              {Object.entries(chartConfig).map(([key, config]) => (
+                <div
+                  key={key}
+                  onClick={() => {
+                    if (activeSeries.includes(key)) {
+                      setActiveSeries(activeSeries.filter(item => item !== key))
+                    } else {
+                      setActiveSeries([...activeSeries, key])
+                    }
+                  }}
+                  className={`cursor-pointer bg-[#f0f4fa] px-3 py-1.5 rounded-full border border-[#e5eaf3] flex items-center gap-2 ${
+                    activeSeries.includes(key) ? '' : 'opacity-50'
+                  }`}
+                >
+                  <div style={{ backgroundColor: config.color }} className="w-2 h-2 rounded-full" />
+                  <span className="text-xs text-gray-500 font-medium">{config.label}</span>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-8 pt-4 border-t border-gray-200">
+              <div className="flex justify-end">
+                <Button
+                  variant="ghost"
+                  className="text-blue-600 hover:text-blue-800 font-medium text-sm flex items-center gap-2"
+                  onClick={() => setFullScreenTable(true)}
+                >
+                  View Details
+                  <ArrowRight className="w-4 h-4" />
+                </Button>
+              </div>
+            </div>
+          </>
+        )}
+      </CardContent>
+
+      <Dialog open={fullScreenTable} onOpenChange={setFullScreenTable}>
+        <DialogContent className="max-w-7xl min-h-fit max-h-[90vh]">
+          <DialogHeader className="pb-6">
+            <DialogTitle>{chartTitle}</DialogTitle> 
+          </DialogHeader>
+          <div className="border rounded-lg bg-[#f0f4fa]/40 border-[#d0d7e3]">
+            <div className="overflow-y-auto max-h-[calc(90vh-120px)]">
+              <Table>
+                <TableHeader>
+                   <TableRow className="border-b border-[#d0d7e3] hover:bg-transparent">
+                     <TableHead className="bg-[#f0f4fa]/60 first:rounded-tl-lg text-left border-r border-[#d0d7e3]">Range</TableHead>
+                     <TableHead className="bg-[#f0f4fa]/60 text-left border-r border-[#d0d7e3]">Selected Period</TableHead>
+                     <TableHead className="bg-[#f0f4fa]/60 text-left border-r border-[#d0d7e3]">Comparison Period</TableHead>
+                     <TableHead className="bg-[#f0f4fa]/60 last:rounded-tr-lg text-left">Change</TableHead>
+                   </TableRow>
+                 </TableHeader>
+                <TableBody>
+                  {chartData.map((row, idx) => ( 
+                    <TableRow key={idx} className="border-b border-[#d0d7e3] last:border-0">
+                      <TableCell className="w-[25%] bg-[#f0f4fa]/40 border-r border-[#d0d7e3] text-left">{row.range}</TableCell>
+                      <TableCell className="w-[25%] text-left border-r border-[#d0d7e3]">{row.current.toLocaleString()}</TableCell>
+                      <TableCell className="w-[25%] text-left border-r border-[#d0d7e3]">{row.previous.toLocaleString()}</TableCell>
+                      <TableCell className={`w-[25%] text-left ${ (row.current > row.previous || (row.previous === 0 && row.current > 0)) ? "text-emerald-500" : (row.current < row.previous || (row.current === 0 && row.previous > 0)) ? "text-red-500" : "text-gray-700"}`}>
+                        {formatPercentageChange(row.current, row.previous)}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </Card> 
   )
 } 

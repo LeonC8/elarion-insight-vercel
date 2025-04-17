@@ -2,14 +2,14 @@
 
 import { Button } from "@/components/ui/button"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { HorizontalBarChart } from "./HorizontalBarChart"
 import { useState, useEffect } from "react"
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { ChartConfig, ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
 import { ArrowRight } from 'lucide-react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import * as React from "react"
 
 function TriangleDown({ className }: { className?: string }) {
   return (
@@ -269,6 +269,23 @@ export function HorizontalBarChartMultipleDatasetsUpgraded({
     previous: item.previous
   }));
 
+  // Add separate state for horizontal chart's legend and table dialog
+  const [horizontalActiveSeries, setHorizontalActiveSeries] = React.useState<string[]>([
+    'current',
+    'previous'
+  ])
+  const [horizontalFullScreenTable, setHorizontalFullScreenTable] = React.useState(false)
+
+  // --- Start: Title/Subtitle logic copied from HorizontalBarChart.tsx (for horizontal case) ---
+  let horizontalMainTitle = displayTitle; // Use displayTitle determined above
+  let horizontalSubtitle: string | null = null;
+  const titleParts = displayTitle.split(" by ");
+  if (titleParts.length > 1) {
+    horizontalMainTitle = titleParts[0];
+    horizontalSubtitle = `By ${titleParts.slice(1).join(" by ")}`; // Handle cases with multiple "by"
+  }
+  // --- End: Title/Subtitle logic copied from HorizontalBarChart.tsx ---
+
   if (loading) {
     return (
       <div className="relative">
@@ -308,130 +325,248 @@ export function HorizontalBarChartMultipleDatasetsUpgraded({
     )
   }
 
-  // Render horizontal bar chart (original behavior)
+  // Render horizontal bar chart (original behavior - NOW INLINED)
   if (orientation === 'horizontal') {
     return (
-      <div className="relative">
-        <div className="absolute right-8 top-6 z-10 flex space-x-2">
-          {availableDatasets.length > 0 && (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button 
-                  variant="ghost" 
-                  size="sm"
-                  className="bg-[#f2f8ff] hover:bg-[#f2f8ff] text-[#342630] rounded-full px-4"
-                >
-                  {selectedDatasetLabel} <TriangleDown className="ml-2" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent>
-                {availableDatasets.map(dataset => (
-                  <DropdownMenuItem 
-                    key={dataset.key}
-                    onClick={() => setSelectedDataset(dataset.key)}
+      <>
+        <Card className="border-gray-300 min-h-[450px]">
+          <CardHeader className="flex flex-col md:flex-row items-start justify-between pb-4">
+             <div className="w-full md:w-auto mb-4 md:mb-0">
+                <CardTitle className="text-lg font-semibold text-gray-800">
+                  {horizontalMainTitle}
+                </CardTitle>
+                {horizontalSubtitle && (
+                  <CardDescription className="text-sm text-gray-500 pt-1">
+                    {horizontalSubtitle}
+                  </CardDescription>
+                )}
+             </div>
+             <div className="flex items-center flex-wrap gap-2 w-full md:w-auto justify-start md:justify-end">
+                 {availableDatasets.length > 0 && (
+                   <DropdownMenu>
+                     <DropdownMenuTrigger asChild><Button variant="ghost" size="sm" className="bg-[#f2f8ff] hover:bg-[#f2f8ff] text-[#342630] rounded-full px-4 flex-shrink-0">{selectedDatasetLabel} <TriangleDown className="ml-2" /></Button></DropdownMenuTrigger>
+                     <DropdownMenuContent>{availableDatasets.map(dataset => (<DropdownMenuItem key={dataset.key} onClick={() => setSelectedDataset(dataset.key)}>{dataset.label}</DropdownMenuItem>))}</DropdownMenuContent>
+                   </DropdownMenu>
+                 )}
+                 {dynamicCategories.length > 0 && (
+                   <DropdownMenu>
+                     <DropdownMenuTrigger asChild><Button variant="ghost" size="sm" className="bg-[#f2f8ff] hover:bg-[#f2f8ff] text-[#342630] rounded-full px-4 flex-shrink-0">{selectedCategoryLabel} <TriangleDown className="ml-2" /></Button></DropdownMenuTrigger>
+                     <DropdownMenuContent className="max-h-[300px] overflow-y-auto">{dynamicCategories.map(category => (<DropdownMenuItem key={category.key} onClick={() => setSelectedCategory(category.key)}>{category.label}</DropdownMenuItem>))}</DropdownMenuContent>
+                   </DropdownMenu>
+                 )}
+             </div>
+          </CardHeader>
+          <CardContent>
+             {currentCategoryData.length > 0 ? (
+                <ChartContainer config={verticalChartConfig} className="min-h-[345px] w-full">
+                  <BarChart
+                    data={verticalChartData}
+                    layout="vertical"
+                    height={300}
+                    margin={{ top: 10, right: 10, bottom: 20, left: leftMargin }}
                   >
-                    {dataset.label}
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
-          
-          {dynamicCategories.length > 0 && (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button 
-                  variant="ghost" 
-                  size="sm"
-                  className="bg-[#f2f8ff] hover:bg-[#f2f8ff] text-[#342630] rounded-full px-4"
-                >
-                  {selectedCategoryLabel} <TriangleDown className="ml-2" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent className="max-h-[300px] overflow-y-auto">
-                {dynamicCategories.map(category => (
-                  <DropdownMenuItem 
-                    key={category.key}
-                    onClick={() => setSelectedCategory(category.key)}
-                  >
-                    {category.label}
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
-        </div>
-        <HorizontalBarChart 
-          data={currentCategoryData}
-          title={displayTitle}
-          leftMargin={leftMargin}
-        />
-      </div>
+                    <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                    <XAxis
+                      type="number"
+                      tickLine={false}
+                      axisLine={false}
+                      tickFormatter={(value) => `${Math.round(value).toLocaleString()}`}
+                      tickMargin={8}
+                    />
+                    <YAxis
+                      dataKey="dayOfWeek"
+                      type="category"
+                      tickLine={false}
+                      axisLine={false}
+                      tickMargin={8}
+                    />
+                    <ChartTooltip content={<ChartTooltipContent />} />
+                    {activeSeries.includes('current') && (
+                      <Bar
+                        dataKey="current"
+                        fill={verticalChartConfig.current.color}
+                        radius={[0, 4, 4, 0]}
+                      />
+                    )}
+                    {activeSeries.includes('previous') && (
+                      <Bar
+                        dataKey="previous"
+                        fill={verticalChartConfig.previous.color}
+                        radius={[0, 4, 4, 0]}
+                      />
+                    )}
+                  </BarChart>
+                </ChartContainer>
+             ) : (
+               <div className="flex items-center justify-center text-gray-500 min-h-[345px]">
+                  No data available for the selected criteria.
+               </div>
+             )}
+              {currentCategoryData.length > 0 && (
+                <>
+                  <div className="flex justify-center gap-3 mt-6">
+                    {Object.entries(verticalChartConfig).map(([key, config]) => (
+                      <div
+                        key={key}
+                        onClick={() => {
+                          if (activeSeries.includes(key)) {
+                            setActiveSeries(activeSeries.filter(item => item !== key))
+                          } else {
+                            setActiveSeries([...activeSeries, key])
+                          }
+                        }}
+                        className={`cursor-pointer bg-[#f0f4fa] px-3 py-1.5 rounded-full border border-[#e5eaf3] flex items-center gap-2 ${
+                          activeSeries.includes(key) ? '' : 'opacity-50'
+                        }`}
+                      >
+                        <div style={{ backgroundColor: config.color }} className="w-2 h-2 rounded-full" />
+                        <span className="text-xs text-gray-500 font-medium">{config.label}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="mt-8 pt-4 border-t border-gray-200">
+                    <div className="flex justify-end">
+                      <Button
+                        variant="ghost"
+                        className="text-blue-600 hover:text-blue-800 font-medium text-sm flex items-center gap-2"
+                        onClick={() => setFullScreenTable(true)}
+                      >
+                        View Details
+                        <ArrowRight className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </div>
+                </>
+              )}
+          </CardContent>
+        </Card>
+
+        <Dialog open={fullScreenTable} onOpenChange={setFullScreenTable}>
+          <DialogContent className="max-w-7xl min-h-fit max-h-[90vh]">
+            <DialogHeader className="pb-6">
+              <DialogTitle>{displayTitle}</DialogTitle>
+            </DialogHeader>
+            <div className="border rounded-lg bg-[#f0f4fa]/40 border-[#d0d7e3]">
+              <div className="overflow-y-auto max-h-[calc(90vh-120px)]">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="border-b border-[#d0d7e3] hover:bg-transparent">
+                      <TableHead className="bg-[#f0f4fa]/60 first:rounded-tl-lg text-left border-r border-[#d0d7e3]">Range</TableHead>
+                      <TableHead className="bg-[#f0f4fa]/60 text-left border-r border-[#d0d7e3]">Selected Period</TableHead>
+                      <TableHead className="bg-[#f0f4fa]/60 text-left border-r border-[#d0d7e3]">Comparison Period</TableHead>
+                      <TableHead className="bg-[#f0f4fa]/60 last:rounded-tr-lg text-left">Change</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {verticalChartData.map((row, idx) => (
+                      <TableRow key={idx} className="border-b border-[#d0d7e3] last:border-0">
+                        <TableCell className="w-[25%] bg-[#f0f4fa]/40 border-r border-[#d0d7e3] text-left">
+                          {row.dayOfWeek}
+                        </TableCell>
+                        <TableCell className="w-[25%] text-left border-r border-[#d0d7e3]">
+                          {row.current.toLocaleString()}
+                        </TableCell>
+                        <TableCell className="w-[25%] text-left border-r border-[#d0d7e3]">
+                          {row.previous.toLocaleString()}
+                        </TableCell>
+                        <TableCell className={`w-[25%] text-left ${
+                          (row.current > row.previous || (row.previous === 0 && row.current > 0))
+                            ? "text-emerald-500"
+                            : (row.current < row.previous || (row.current === 0 && row.previous > 0))
+                            ? "text-red-500"
+                            : "text-gray-700" // Style for '-' case
+                        }`}>
+                          {formatPercentageChange(row.current, row.previous)}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+      </>
     )
   }
   
   // Render vertical bar chart (similar to ReservationsByDayChart)
+  // --- Start: Title/Subtitle logic for vertical case ---
+  let verticalMainTitle = displayTitle; 
+  let verticalSubtitle: string | null = null;
+  const verticalTitleParts = displayTitle.split(" by ");
+  if (verticalTitleParts.length > 1) {
+    verticalMainTitle = verticalTitleParts[0];
+    verticalSubtitle = `By ${verticalTitleParts.slice(1).join(" by ")}`; // Handle cases with multiple "by"
+  }
+  // --- End: Title/Subtitle logic for vertical case ---
+
   return (
     <>
       <Card className="border-gray-300">
-        <CardHeader>
-          <div className="flex w-full justify-between items-center">
+        <CardHeader className="flex flex-col md:flex-row items-start justify-between">
+          <div className="w-full md:w-auto">
             <CardTitle className="text-lg font-semibold text-gray-800">
-              {displayTitle}
+              {verticalMainTitle}
             </CardTitle>
-            <div className="flex space-x-2">
-              {availableDatasets.length > 0 && (
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button 
-                      variant="ghost" 
-                      size="sm"
-                      className="bg-[#f2f8ff] hover:bg-[#f2f8ff] text-[#342630] rounded-full px-4"
+            {verticalSubtitle && (
+              <CardDescription className="text-sm text-gray-500 pt-1">
+                {verticalSubtitle}
+              </CardDescription>
+            )}
+          </div>
+          <div className="flex items-center flex-wrap gap-2 w-full md:w-auto mt-4 md:mt-0 justify-start md:justify-end">
+            {availableDatasets.length > 0 && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button 
+                    variant="ghost" 
+                    size="sm"
+                    className="bg-[#f2f8ff] hover:bg-[#f2f8ff] text-[#342630] rounded-full px-4 flex-shrink-0"
+                  >
+                    {selectedDatasetLabel} <TriangleDown className="ml-2" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent>
+                  {availableDatasets.map(dataset => (
+                    <DropdownMenuItem 
+                      key={dataset.key}
+                      onClick={() => setSelectedDataset(dataset.key)}
                     >
-                      {selectedDatasetLabel} <TriangleDown className="ml-2" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent>
-                    {availableDatasets.map(dataset => (
-                      <DropdownMenuItem 
-                        key={dataset.key}
-                        onClick={() => setSelectedDataset(dataset.key)}
-                      >
-                        {dataset.label}
-                      </DropdownMenuItem>
-                    ))}
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              )}
-              
-              {dynamicCategories.length > 0 && (
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button 
-                      variant="ghost" 
-                      size="sm"
-                      className="bg-[#f2f8ff] hover:bg-[#f2f8ff] text-[#342630] rounded-full px-4"
+                      {dataset.label}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+            
+            {dynamicCategories.length > 0 && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button 
+                    variant="ghost" 
+                    size="sm"
+                    className="bg-[#f2f8ff] hover:bg-[#f2f8ff] text-[#342630] rounded-full px-4 flex-shrink-0"
+                  >
+                    {selectedCategoryLabel} <TriangleDown className="ml-2" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className="max-h-[300px] overflow-y-auto">
+                  {dynamicCategories.map(category => (
+                    <DropdownMenuItem 
+                      key={category.key}
+                      onClick={() => setSelectedCategory(category.key)}
                     >
-                      {selectedCategoryLabel} <TriangleDown className="ml-2" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent className="max-h-[300px] overflow-y-auto">
-                    {dynamicCategories.map(category => (
-                      <DropdownMenuItem 
-                        key={category.key}
-                        onClick={() => setSelectedCategory(category.key)}
-                      >
-                        {category.label}
-                      </DropdownMenuItem>
-                    ))}
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              )}
-            </div>
+                      {category.label}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
           </div>
         </CardHeader>
         <CardContent>
-          <ChartContainer config={verticalChartConfig}>
+          <ChartContainer config={verticalChartConfig} className="h-[395px] w-full border-none">
             <BarChart
               data={verticalChartData}
               height={300}

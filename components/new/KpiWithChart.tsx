@@ -239,9 +239,11 @@ export function KpiWithChart({
         
         const data = await response.json();
         setApiData(data);
-      } catch (err) {
+      } catch (err: unknown) {
         // Don't show errors for aborted requests
-        if (err.name !== 'AbortError') {
+        if (typeof err === 'object' && err !== null && 'name' in err && err.name === 'AbortError') {
+           // It's an AbortError, do nothing or log minimally
+        } else {
           console.error('Error fetching KPI data:', err);
           setError(err instanceof Error ? err.message : 'An unknown error occurred');
         }
@@ -325,7 +327,7 @@ export function KpiWithChart({
 
   return (
     <>
-      <Card className="border-gray-300 min-h-[420px]">
+      <Card className="border-gray-300 min-h-[340px]">
         <CardHeader>
           <div className="flex justify-between items-center">
             {/* Use fixedTitle if provided, otherwise use the dynamic label */}
@@ -371,7 +373,7 @@ export function KpiWithChart({
             )}
           </div>
         </CardHeader>
-        <CardContent className="relative pb-4 mt-3">
+        <CardContent className="relative pb-4 mt-3 ">
           {/* Spinner Overlay */}
           {loading && (
             <div className="absolute inset-0 flex items-center justify-center bg-white/80 z-20 rounded-b-lg">
@@ -379,7 +381,7 @@ export function KpiWithChart({
             </div>
           )}
 
-          <ChartContainer config={chartConfig} className="min-h-[300px] w-full">
+          <ChartContainer config={chartConfig} className="h-[305px] w-full">
             <AreaChart
               data={chartDataForRender}
               height={300}

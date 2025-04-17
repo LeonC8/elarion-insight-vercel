@@ -710,103 +710,121 @@ export function PickupDashboard() {
   };
 
   return (
-    <div className="flex-1 overflow-auto">
-      <div className="p-8">
-        <div className="flex flex-col mb-6">
-          <div className="flex justify-between items-center">  
-            <div className="flex items-center">
-              <h2 className="text-3xl font-bold text-gray-800">Pickup</h2>
-            </div>
-            <div className="flex space-x-4 items-center">
-              <div className="flex flex-col">
-                <span className="text-xs text-gray-500 mb-2">Business Date</span>
-                <DropdownMenu open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
-                  <DropdownMenuTrigger asChild>
-                    <Button 
-                      variant="ghost" 
-                      className="bg-[#f2f8ff] hover:bg-[#f2f8ff] text-[#342630] rounded-full px-4"
-                    >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {format(businessDate, 'dd MMM yyyy')}
-                      <ChevronDownIcon className="ml-2 h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent className="p-0" align="end">
-                    <Calendar
-                      mode="single"
-                      selected={businessDate}
-                      onSelect={(date) => {
-                        if (date) {
-                          setBusinessDate(date);
-                          setIsCalendarOpen(false);
-                        }
-                      }}
-                      initialFocus
-                    />
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
-
-              <div className="flex flex-col">
-                <span className="text-xs text-gray-500 mb-2">View type</span>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button 
-                      variant="ghost" 
-                      className="bg-[#f2f8ff] hover:bg-[#f2f8ff] text-[#342630] rounded-full px-4"
-                    >
-                      {selectedView === 'month' ? 'Month View' : 'Year View'} <ChevronDownIcon className="ml-2 h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent>
-                    <DropdownMenuItem onSelect={() => setSelectedView('month')}>
-                      Month View
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onSelect={() => setSelectedView('year')}>
-                      Year View
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
-
-              <div className="flex flex-col">
-                <span className="text-xs text-gray-500 mb-2">Metric</span>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button 
-                      variant="ghost" 
-                      className="bg-[#f2f8ff] hover:bg-[#f2f8ff] text-[#342630] rounded-full px-4"
-                    >
-                      {selectedMetric === 'soldRooms' ? 'Sold Rooms' : 
-                       selectedMetric === 'revenue' ? 'Revenue' : 'ADR'} <ChevronDownIcon className="ml-2 h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent>
-                    <DropdownMenuItem onSelect={() => setSelectedMetric('soldRooms')}>
-                      Sold Rooms
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onSelect={() => setSelectedMetric('revenue')}>
-                      Revenue
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onSelect={() => setSelectedMetric('adr')}>
-                      ADR
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
-
-              <div className="flex flex-col">
-                <span className="text-xs text-gray-500 mb-2">Property</span>
-                <HotelSelector 
-                  selectedHotels={selectedHotels}
-                  setSelectedHotels={setSelectedHotels}
-                />
-              </div>
-            </div>
-          </div>
+    <div className="flex-1 overflow-auto bg-[#f5f8ff]">
+      {/* Header Section */}
+      <div className="xl:fixed top-0 left-0 xl:left-[256px] right-0 z-30 flex flex-col xl:flex-row xl:items-center xl:justify-between bg-white py-4 xl:py-6 xl:px-12 border-b border-gray-300 shadow-sm">
+        {/* Title - Hide on smaller screens, show on xl+ */}
+        <div className="hidden xl:block px-4 xl:px-0 mb-4 xl:mb-0">
+          <h2 className="text-xl xl:text-2xl font-bold text-gray-800">Pickup</h2>
         </div>
 
-        <div className="mt-6">
+        {/* Filters Container - Make horizontally scrollable */}
+        <div className="flex flex-nowrap items-end gap-x-4 xl:gap-x-6 overflow-x-auto pb-2 xl:pb-0 w-full xl:w-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100 px-4 md:px-6 xl:px-0">
+          {/* Business Date Filter */}
+          <div className="flex flex-col flex-shrink-0">
+            <span className="text-xs text-gray-500 mb-2">Business Date</span>
+            <DropdownMenu open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
+              <DropdownMenuTrigger asChild>
+                <Button 
+                  variant="ghost" 
+                  className="bg-[#f2f8ff] hover:bg-[#f2f8ff] text-[#342630] rounded-full px-4"
+                >
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {format(businessDate, 'dd MMM yyyy')}
+                  <ChevronDownIcon className="ml-2 h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent className="p-0" align="end">
+                <Calendar
+                  mode="single"
+                  selected={businessDate}
+                  onSelect={(date) => {
+                    if (date) {
+                      setBusinessDate(date);
+                      setIsCalendarOpen(false);
+                    }
+                  }}
+                  initialFocus
+                />
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+
+          {/* View Type Filter */}
+          <div className="flex flex-col flex-shrink-0">
+            <span className="text-xs text-gray-500 mb-2">View type</span>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button 
+                  variant="ghost" 
+                  className="bg-[#f2f8ff] hover:bg-[#f2f8ff] text-[#342630] rounded-full px-4"
+                >
+                  {selectedView === 'month' ? 'Month View' : 'Year View'} <ChevronDownIcon className="ml-2 h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent>
+                <DropdownMenuItem onSelect={() => setSelectedView('month')}>
+                  Month View
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => setSelectedView('year')}>
+                  Year View
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+
+          {/* Metric Filter */}
+          <div className="flex flex-col flex-shrink-0">
+            <span className="text-xs text-gray-500 mb-2">Metric</span>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button 
+                  variant="ghost" 
+                  className="bg-[#f2f8ff] hover:bg-[#f2f8ff] text-[#342630] rounded-full px-4"
+                >
+                  {selectedMetric === 'soldRooms' ? 'Sold Rooms' : 
+                   selectedMetric === 'revenue' ? 'Revenue' : 'ADR'} <ChevronDownIcon className="ml-2 h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent>
+                <DropdownMenuItem onSelect={() => setSelectedMetric('soldRooms')}>
+                  Sold Rooms
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => setSelectedMetric('revenue')}>
+                  Revenue
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => setSelectedMetric('adr')}>
+                  ADR
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+
+          {/* Hotel Selector Filter */}
+          <div className="flex flex-col flex-shrink-0">
+            <span className="text-xs text-gray-500 mb-2">Property</span>
+            <HotelSelector 
+              selectedHotels={selectedHotels}
+              setSelectedHotels={setSelectedHotels}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Main Content Area */}
+      {/* Use responsive padding classes, including specific xl:pt */}
+      <div 
+        className="pt-4 md:pt-6 lg:pt-8 xl:pt-[140px] p-4 md:p-6 lg:p-8 xl:px-12" 
+      >
+        {/* Title - Show ONLY on screens smaller than xl */}
+        <div className="block xl:hidden mb-6 md:mb-8">
+          <h2 className="text-xl md:text-2xl font-bold text-gray-800">Pickup</h2>
+        </div>
+
+        {/* Table Container */}
+        {/* Max-height remains, removed mt-6 */}
+        {/* Added responsive margin top only for non-xl screens to space below title */}
+        <div className="overflow-x-auto border border-gray-200 rounded-lg relative max-h-[calc(100vh-180px)] mt-0 xl:mt-0"> 
           {selectedView === 'month' ? (
             <MonthlyPickupTable
               selectedMetric={selectedMetric}
@@ -823,98 +841,101 @@ export function PickupDashboard() {
         </div>
       </div>
 
+      {/* Stats Modal Dialog - with responsive improvements */}
       <Dialog open={showStatsModal} onOpenChange={setShowStatsModal}>
-        <DialogContent className="max-w-3xl">
-          <DialogHeader>
-            <DialogTitle className="text-2xl font-bold">
+        <DialogContent className="max-w-3xl p-4 sm:p-6 h-auto max-h-[95vh] overflow-auto">
+          <DialogHeader className="mb-4 pr-6 text-left">
+            <DialogTitle className="text-xl sm:text-2xl font-bold pr-4">
               Performance Summary for {selectedCell?.occupancyDateOrMonth}
             </DialogTitle>
-            <DialogDescription className="text-base text-gray-500 text-sm pt-2">
+            <DialogDescription className="text-sm text-gray-500 pt-1">
               Business date: {selectedCell?.bookingDate}
             </DialogDescription>
           </DialogHeader>
           
           {isLoadingStats ? (
-            <div className="grid grid-cols-4 gap-4 mt-6">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 md:gap-4">
               {Array.from({ length: 8 }).map((_, index) => (
-                <div key={index} className="rounded-lg border border-gray-100 p-5 flex flex-col items-center">
-                  <div className="w-24 h-4 bg-gray-200 animate-pulse rounded mb-4"></div>
-                  <div className="w-16 h-8 bg-gray-200 animate-pulse rounded mt-4 mb-8"></div>
+                <div key={index} className="rounded-lg border border-gray-100 p-3 sm:p-5 flex flex-col items-center">
+                  <div className="w-24 h-4 bg-gray-200 animate-pulse rounded mb-2 sm:mb-4"></div>
+                  <div className="w-16 h-6 sm:h-8 bg-gray-200 animate-pulse rounded mt-3 mb-4 sm:mb-8"></div>
                   <div className="w-24 h-4 bg-gray-200 animate-pulse rounded"></div>
                   <div className="w-12 h-4 bg-gray-200 animate-pulse rounded mt-1"></div>
                 </div>
               ))}
             </div>
           ) : (
-            <div className="grid grid-cols-4 gap-4 mt-6">
-              <div className="rounded-lg border border-gray-100 p-5 flex flex-col items-center text-center">
-                <div className="text-sm text-gray-500 font-medium">Rooms Sold</div>
-                <div className="text-3xl font-bold mt-4 mb-8">{statsData.roomsSold}</div>
-                <div className="text-sm text-gray-500">Variance LY</div>
-                <div className={`text-md font-medium ${statsData.roomsSoldVariance >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 md:gap-4">
+              {/* First row */}
+              <div className="rounded-lg border border-gray-100 p-3 sm:p-5 flex flex-col items-center text-center">
+                <div className="text-xs sm:text-sm text-gray-500 font-medium">Rooms Sold</div>
+                <div className="text-xl sm:text-3xl font-bold mt-2 sm:mt-4 mb-4 sm:mb-8">{statsData.roomsSold}</div>
+                <div className="text-xs sm:text-sm text-gray-500">Variance LY</div>
+                <div className={`text-sm sm:text-md font-medium ${statsData.roomsSoldVariance >= 0 ? 'text-green-500' : 'text-red-500'}`}>
                   {statsData.roomsSoldVariance >= 0 ? '+' : ''}{statsData.roomsSoldVariance}%
                 </div>
               </div>
               
-              <div className="rounded-lg border border-gray-100 p-5 flex flex-col items-center text-center">
-                <div className="text-sm text-gray-500 font-medium">Revenue</div>
-                <div className="text-3xl font-bold mt-4 mb-8">€{statsData.revenue}</div>
-                <div className="text-sm text-gray-500">Variance LY</div>
-                <div className={`text-md font-medium ${statsData.revenueVariance >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+              <div className="rounded-lg border border-gray-100 p-3 sm:p-5 flex flex-col items-center text-center">
+                <div className="text-xs sm:text-sm text-gray-500 font-medium">Revenue</div>
+                <div className="text-xl sm:text-3xl font-bold mt-2 sm:mt-4 mb-4 sm:mb-8">€{statsData.revenue}</div>
+                <div className="text-xs sm:text-sm text-gray-500">Variance LY</div>
+                <div className={`text-sm sm:text-md font-medium ${statsData.revenueVariance >= 0 ? 'text-green-500' : 'text-red-500'}`}>
                   {statsData.revenueVariance >= 0 ? '+' : ''}{statsData.revenueVariance}%
                 </div>
               </div>
               
-              <div className="rounded-lg border border-gray-100 p-5 flex flex-col items-center text-center">
-                <div className="text-sm text-gray-500 font-medium">ADR</div>
-                <div className="text-3xl font-bold mt-4 mb-8">€{statsData.adr}</div>
-                <div className="text-sm text-gray-500">Variance LY</div>
-                <div className={`text-md font-medium ${statsData.adrVariance >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+              <div className="rounded-lg border border-gray-100 p-3 sm:p-5 flex flex-col items-center text-center">
+                <div className="text-xs sm:text-sm text-gray-500 font-medium">ADR</div>
+                <div className="text-xl sm:text-3xl font-bold mt-2 sm:mt-4 mb-4 sm:mb-8">€{statsData.adr}</div>
+                <div className="text-xs sm:text-sm text-gray-500">Variance LY</div>
+                <div className={`text-sm sm:text-md font-medium ${statsData.adrVariance >= 0 ? 'text-green-500' : 'text-red-500'}`}>
                   {statsData.adrVariance >= 0 ? '+' : ''}{statsData.adrVariance}%
                 </div>
               </div>
               
-              <div className="rounded-lg border border-gray-100 p-5 flex flex-col items-center text-center">
-                <div className="text-sm text-gray-500 font-medium">Occupancy</div>
-                <div className="text-3xl font-bold mt-4 mb-8">{statsData.occupancy}%</div>
-                <div className="text-sm text-gray-500">Variance LY</div>
-                <div className={`text-md font-medium ${statsData.occupancyVariance >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+              <div className="rounded-lg border border-gray-100 p-3 sm:p-5 flex flex-col items-center text-center">
+                <div className="text-xs sm:text-sm text-gray-500 font-medium">Occupancy</div>
+                <div className="text-xl sm:text-3xl font-bold mt-2 sm:mt-4 mb-4 sm:mb-8">{statsData.occupancy}%</div>
+                <div className="text-xs sm:text-sm text-gray-500">Variance LY</div>
+                <div className={`text-sm sm:text-md font-medium ${statsData.occupancyVariance >= 0 ? 'text-green-500' : 'text-red-500'}`}>
                   {statsData.occupancyVariance >= 0 ? '+' : ''}{statsData.occupancyVariance}%
                 </div>
               </div>
               
-              <div className="rounded-lg border border-gray-100 p-5 flex flex-col items-center text-center">
-                <div className="text-sm text-gray-500 font-medium">Rooms Cancelled</div>
-                <div className="text-3xl font-bold mt-4 mb-8">{statsData.roomsCancelled}</div>
-                <div className="text-sm text-gray-500">Variance LY</div>
-                <div className={`text-md font-medium ${statsData.roomsCancelledVariance >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+              {/* Second row */}
+              <div className="rounded-lg border border-gray-100 p-3 sm:p-5 flex flex-col items-center text-center">
+                <div className="text-xs sm:text-sm text-gray-500 font-medium">Rooms Cancelled</div>
+                <div className="text-xl sm:text-3xl font-bold mt-2 sm:mt-4 mb-4 sm:mb-8">{statsData.roomsCancelled}</div>
+                <div className="text-xs sm:text-sm text-gray-500">Variance LY</div>
+                <div className={`text-sm sm:text-md font-medium ${statsData.roomsCancelledVariance >= 0 ? 'text-green-500' : 'text-red-500'}`}>
                   {statsData.roomsCancelledVariance >= 0 ? '+' : ''}{statsData.roomsCancelledVariance}%
                 </div>
               </div>
               
-              <div className="rounded-lg border border-gray-100 p-5 flex flex-col items-center text-center">
-                <div className="text-sm text-gray-500 font-medium">Revenue Lost</div>
-                <div className="text-3xl font-bold mt-4 mb-8">€{statsData.revenueLost}</div>
-                <div className="text-sm text-gray-500">Variance LY</div>
-                <div className={`text-md font-medium ${statsData.revenueLostVariance >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+              <div className="rounded-lg border border-gray-100 p-3 sm:p-5 flex flex-col items-center text-center">
+                <div className="text-xs sm:text-sm text-gray-500 font-medium">Revenue Lost</div>
+                <div className="text-xl sm:text-3xl font-bold mt-2 sm:mt-4 mb-4 sm:mb-8">€{statsData.revenueLost}</div>
+                <div className="text-xs sm:text-sm text-gray-500">Variance LY</div>
+                <div className={`text-sm sm:text-md font-medium ${statsData.revenueLostVariance >= 0 ? 'text-green-500' : 'text-red-500'}`}>
                   {statsData.revenueLostVariance >= 0 ? '+' : ''}{statsData.revenueLostVariance}%
                 </div>
               </div>
               
-              <div className="rounded-lg border border-gray-100 p-5 flex flex-col items-center text-center">
-                <div className="text-sm text-gray-500 font-medium">Rooms Available</div>
-                <div className="text-3xl font-bold mt-4 mb-8">{statsData.roomsAvailable}</div>
-                <div className="text-sm text-gray-500">Variance LY</div>
-                <div className={`text-md font-medium ${statsData.roomsAvailableVariance >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+              <div className="rounded-lg border border-gray-100 p-3 sm:p-5 flex flex-col items-center text-center">
+                <div className="text-xs sm:text-sm text-gray-500 font-medium">Rooms Available</div>
+                <div className="text-xl sm:text-3xl font-bold mt-2 sm:mt-4 mb-4 sm:mb-8">{statsData.roomsAvailable}</div>
+                <div className="text-xs sm:text-sm text-gray-500">Variance LY</div>
+                <div className={`text-sm sm:text-md font-medium ${statsData.roomsAvailableVariance >= 0 ? 'text-green-500' : 'text-red-500'}`}>
                   {statsData.roomsAvailableVariance >= 0 ? '+' : ''}{statsData.roomsAvailableVariance}%
                 </div>
               </div>
               
-              <div className="rounded-lg border border-gray-100 p-5 flex flex-col items-center text-center">
-                <div className="text-sm text-gray-500 font-medium">RevPAR</div>
-                <div className="text-3xl font-bold mt-4 mb-8">€{statsData.revPAR}</div>
-                <div className="text-sm text-gray-500">Variance LY</div>
-                <div className={`text-md font-medium ${statsData.revPARVariance >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+              <div className="rounded-lg border border-gray-100 p-3 sm:p-5 flex flex-col items-center text-center">
+                <div className="text-xs sm:text-sm text-gray-500 font-medium">RevPAR</div>
+                <div className="text-xl sm:text-3xl font-bold mt-2 sm:mt-4 mb-4 sm:mb-8">€{statsData.revPAR}</div>
+                <div className="text-xs sm:text-sm text-gray-500">Variance LY</div>
+                <div className={`text-sm sm:text-md font-medium ${statsData.revPARVariance >= 0 ? 'text-green-500' : 'text-red-500'}`}>
                   {statsData.revPARVariance >= 0 ? '+' : ''}{statsData.revPARVariance}%
                 </div>
               </div>

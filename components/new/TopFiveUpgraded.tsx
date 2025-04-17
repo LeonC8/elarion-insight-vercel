@@ -439,23 +439,20 @@ export function TopFiveUpgraded({
   return (
     <>
       <Card className={`${withBorder ? 'bg-white border-gray-300 ' : 'bg-transparent shadow-none border-0'}`}>
-        <CardHeader className="flex flex-row items-start justify-between pb-2">
-          {/* Title and subtitle column */}
-          <div className="flex flex-col">
+        <CardHeader className="flex flex-col md:flex-row items-start justify-between pb-2">
+          <div className="flex flex-col w-full md:w-auto">
             <CardTitle className="text-lg font-semibold text-gray-800">{title}</CardTitle>
             {subtitle && <CardDescription className="text-sm text-gray-500 mt-1">{subtitle}</CardDescription>}
           </div>
           
-          {/* Controls bundled at top right */}
-          <div className="flex items-center space-x-2 mt-0">
-            {/* Primary group dropdown */}
+          <div className="flex items-center flex-wrap gap-2 w-full md:w-auto mt-6 pt-3 md:mt-0 justify-start md:justify-end">
             {availablePrimaryGroups.length > 0 && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button 
                     variant="ghost" 
                     size="sm"
-                    className="bg-[#f2f8ff] hover:bg-[#f2f8ff] text-[#342630] rounded-full px-4 font-semibold"
+                    className="bg-[#f2f8ff] hover:bg-[#f2f8ff] text-[#342630] rounded-full px-4 font-semibold flex-shrink-0"
                   >
                     {currentPrimaryGroupLabel} <TriangleDown className="ml-2" />
                   </Button>
@@ -473,14 +470,13 @@ export function TopFiveUpgraded({
               </DropdownMenu>
             )}
             
-            {/* Only render the category dropdown if categories are provided */}
             {categories && categories.length > 0 && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button 
                     variant="ghost" 
                     size="sm"
-                    className="bg-[#f2f8ff] hover:bg-[#f2f8ff] text-[#342630] rounded-full px-4 font-semibold"
+                    className="bg-[#f2f8ff] hover:bg-[#f2f8ff] text-[#342630] rounded-full px-4 font-semibold flex-shrink-0"
                   >
                     {currentCategoryLabel} <TriangleDown className="ml-2" />
                   </Button>
@@ -502,7 +498,7 @@ export function TopFiveUpgraded({
               variant="ghost"
               size="sm"
               onClick={() => setShowPercentage(!showPercentage)}
-              className="flex items-center justify-center w-8 h-8 rounded-full bg-[#f2f8ff] hover:bg-[#f2f8ff] text-[#342630] p-0"
+              className="flex items-center justify-center w-8 h-8 rounded-full bg-[#f2f8ff] hover:bg-[#f2f8ff] text-[#342630] p-0 flex-shrink-0"
             >
               {showPercentage ? (
                 <PercentIcon className="h-4 w-4" />
@@ -516,7 +512,7 @@ export function TopFiveUpgraded({
                 <Button 
                   variant="ghost" 
                   size="sm"
-                  className="bg-[#f2f8ff] hover:bg-[#f2f8ff] text-[#342630] rounded-full px-4 font-semibold"
+                  className="bg-[#f2f8ff] hover:bg-[#f2f8ff] text-[#342630] rounded-full px-4 font-semibold flex-shrink-0"
                 >
                   {filterDisplayNames[filterType]} <TriangleDown className="ml-2" />
                 </Button>
@@ -542,7 +538,7 @@ export function TopFiveUpgraded({
                 <Button 
                   variant="ghost" 
                   size="sm"
-                  className="bg-[#f2f8ff] hover:bg-[#f2f8ff] text-[#342630] rounded-full px-4"
+                  className="bg-[#f2f8ff] hover:bg-[#f2f8ff] text-[#342630] rounded-full px-4 flex-shrink-0"
                 >
                   {currentMetric?.label || 'Select Metric'} <TriangleDown className="ml-2" />
                 </Button>
@@ -562,28 +558,24 @@ export function TopFiveUpgraded({
         </CardHeader>
         
         <CardContent className="pt-3">
-          {/* Loading state */}
           {apiLoading && (
             <div className="flex justify-center items-center py-4">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
             </div>
           )}
           
-          {/* Error state */}
           {apiError && (
             <div className="bg-red-50 text-red-700 p-3 rounded-md mb-4">
               <p>Error loading data: {apiError}</p>
             </div>
           )}
           
-          {/* No data selected state */}
           {!apiLoading && !apiError && apiData && !selectedPrimaryGroup && (
             <div className="text-center py-6 text-gray-500">
               Please select a {primaryField.replace('_', ' ')} from the dropdown
             </div>
           )}
           
-          {/* No data available state */}
           {!apiLoading && !apiError && apiData && selectedPrimaryGroup && 
            (!apiData[selectedPrimaryGroup] || filteredData.length === 0) && (
             <div className="text-center py-6 text-gray-500">
@@ -591,10 +583,8 @@ export function TopFiveUpgraded({
             </div>
           )}
           
-          {/* Data display */}
           {!apiLoading && !apiError && (
             <>
-              {/* Display the actual data rows */}
               {displayData.map((item, index) => (
                 <div
                   key={item.code || item.name}
@@ -608,23 +598,20 @@ export function TopFiveUpgraded({
                       </span>
                       <span 
                         className={`flex items-center text-sm ${
-                          // Color based on the actual change value
                           item.change > 0 ? 'text-green-500' : item.change < 0 ? 'text-red-500' : 'text-gray-500'
-                        } w-20 justify-end`} // Increased width slightly if needed
+                        } w-20 justify-end`}
                       >
-                        {item.change !== 0 ? ( // Show icon only if change is non-zero
+                        {item.change !== 0 ? (
                           item.change > 0 ? (
                             <ArrowUpIcon className="h-4 w-4 mr-1" />
                           ) : (
                             <ArrowDownIcon className="h-4 w-4 mr-1" />
                           )
-                        ) : null /* No icon for zero change */ } 
-                        {/* Display formatted change (absolute or percentage) */}
+                        ) : null } 
                         {formatChange(item)}
                       </span>
                     </div>
                   </div>
-                  {/* Progress bar container */}
                   <div className="absolute bottom-0 left-0 right-0 h-1 bg-gray-100">
                     <div 
                       className={`h-full ${getColorClass('bg')} transition-all duration-300`}
@@ -636,7 +623,6 @@ export function TopFiveUpgraded({
                 </div>
               ))}
               
-              {/* Add empty rows to ensure 5 total rows */}
               {Array.from({ length: Math.max(0, 5 - displayData.length) }).map((_, index) => (
                 <div
                   key={`empty-${index}`}
@@ -653,7 +639,6 @@ export function TopFiveUpgraded({
                       </span>
                     </div>
                   </div>
-                  {/* Empty progress bar container */}
                   <div className="absolute bottom-0 left-0 right-0 h-1 bg-gray-100">
                     <div className="h-full bg-gray-100" style={{ width: "0%" }} />
                   </div>
@@ -662,7 +647,6 @@ export function TopFiveUpgraded({
             </>
           )}
           
-          {/* View Details button section */}
           {!apiLoading && !apiError && displayData.length > 0 && (
             <div className="mt-4 pt-4 border-t border-gray-200">
               <div className="flex justify-end">
@@ -679,7 +663,6 @@ export function TopFiveUpgraded({
         </CardContent>
       </Card>
 
-      {/* CategoriesDetailsDialog - show when useCategoriesDialog is true */}
       {useCategoriesDialog && (
         <CategoriesDetailsDialog 
           open={showDetails}
@@ -699,7 +682,6 @@ export function TopFiveUpgraded({
         />
       )}
 
-      {/* Simple table dialog - show when useCategoriesDialog is false */}
       <Dialog open={showDetailsTable} onOpenChange={setShowDetailsTable}>
         <DialogContent className="max-w-[45vw] max-h-[90vh] flex flex-col p-0">
           <DialogHeader className="flex-none py-6 pb-2" showBorder={true}>
@@ -710,7 +692,6 @@ export function TopFiveUpgraded({
           
           <div className="flex-1 overflow-y-auto pr-6 bg-[#f2f8ff] px-4 pb-4 pt-4">
             <div className="flex flex-col gap-6">
-              {/* Table Card */}
               <div className="bg-white rounded-lg p-6 shadow-sm border border-gray-300">
                 <h3 className="text-base mb-6 font-medium">Details for {currentMetric?.label || 'Metric'}</h3>
                 <div className="border rounded-lg">
@@ -723,7 +704,6 @@ export function TopFiveUpgraded({
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {/* Show all data points, not just the filtered ones */}
                       {currentData.sort((a, b) => {
                         switch (filterType) {
                           case 'top':
@@ -746,7 +726,6 @@ export function TopFiveUpgraded({
                             {currentMetric?.prefix || ''}{formatNumberWithCommas(item.value)}{currentMetric?.suffix || ''}
                           </TableCell>
                           <TableCell className={item.change > 0 ? "text-emerald-500" : item.change < 0 ? "text-red-500" : "text-gray-700"}>
-                            {/* Show absolute change and percentage change */}
                             {item.change >= 0 ? '+' : ''}{formatNumberWithCommas(item.change)} 
                             &nbsp;({formatPercentageDisplay(calculatePercentageChange(item.value, item.change))})
                           </TableCell>

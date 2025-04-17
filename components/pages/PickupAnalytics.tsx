@@ -17,7 +17,7 @@ import { TopFive } from '../new/TopFive'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { ChartConfig } from '@/components/ui/chart'
 import dynamic from 'next/dynamic'
-import { DollarSign, Hotel, Percent } from 'lucide-react'
+import { DollarSign, Hotel, Percent, DownloadIcon } from 'lucide-react'
 
 // Dynamic import for WorldMap with loading state
 const WorldMap = dynamic(
@@ -139,7 +139,7 @@ const countryChartConfig = {
   }
 } satisfies ChartConfig;
 
-// Define the structure for the API response (can be shared or redefined)
+// Define the structure for the API response including fluctuation
 interface KpiData {
   kpiName: 'roomsSold' | 'roomsRevenue' | 'adr' | 'cancellations' | 'revenueLost';
   title: string;
@@ -147,6 +147,11 @@ interface KpiData {
   comparisonValue: number;
   prefix?: string;
   suffix?: string;
+  fluctuation: Array<{ // Make sure this matches the API and Kpi component prop
+    date: string;
+    current: number;
+    previous: number;
+  }>;
 }
 
 type PickupKpiResponse = KpiData[];
@@ -194,14 +199,16 @@ export function PickupAnalytics() {
       viewType: selectedView,
       comparison: selectedComparison,
       // hotelIds: selectedHotels.join(','), // If needed later
+      // Ensure string values for query params if API expects them
+      limit: "5" // Example: Ensure limit is a string if required by API/component
     };
     setPickupAnalysisApiParams(params);
-    // Fetch KPIs and World Map data when base params change
-    fetchKpiData(params);
-    fetchWorldMapData(params, selectedMapMetric); // Fetch map data with current metric
-  }, [reportDate, selectedView, selectedComparison, selectedHotels]);
+    fetchKpiData({ ...params }); // Pass a copy to prevent modification issues
+    // Pass a copy of params to fetchWorldMapData as well
+    fetchWorldMapData({ ...params }, selectedMapMetric);
+  }, [reportDate, selectedView, selectedComparison, selectedHotels, selectedMapMetric]); // Added selectedMapMetric dependency
 
-  // Fetch KPI data function (modified to accept params)
+  // Fetch KPI data function (expects new fluctuation field now)
   const fetchKpiData = async (params: any) => {
     setLoadingKpis(true);
     setKpiError(null);
@@ -217,7 +224,7 @@ export function PickupAnalytics() {
     } catch (err) {
       console.error("Failed to fetch KPI data:", err);
       setKpiError(err instanceof Error ? err.message : "An unknown error occurred");
-      setKpiData(null); // Clear data on error
+      setKpiData(null);
     } finally {
       setLoadingKpis(false);
     }
@@ -276,7 +283,7 @@ export function PickupAnalytics() {
     }
   };
 
-  // Helper to get KPI data by name
+  // Helper to get KPI data by name (unchanged, but returns object with fluctuation now)
   const getKpiValue = (name: KpiData['kpiName']): KpiData | null => {
     if (!kpiData) return null;
     return kpiData.find(kpi => kpi.kpiName === name) || null;
@@ -290,16 +297,22 @@ export function PickupAnalytics() {
   ];
 
   return (
-    <div className="flex-1 overflow-auto bg-[#f5f8ff]"> {/* Added bg color like Overview */}
-       {/* Header with Filters - Adjusted Styling */}
-       <div className="fixed top-0 left-[256px] right-0 z-30 flex justify-between items-center mb-6 bg-white py-6 px-12 border-b border-gray-300 shadow-sm">
-          <div>
+    <div className="flex-1 overflow-auto bg-[#f5f8ff]">
+       {/* Header with Filters - Apply responsive layout like BookingChannels */}
+       {/* Use xl:fixed, adjust flex direction, padding, etc. */}
+       <div className="xl:fixed top-0 left-[256px] right-0 z-30 flex flex-col xl:flex-row xl:items-center xl:justify-between bg-white py-4 xl:py-6 xl:px-12 border-b border-gray-300 shadow-sm">
+          {/* Title Block - Hide on smaller screens */}
+          <div className="hidden xl:block px-4 xl:px-0 mb-2 xl:mb-0"> {/* Adjusted padding/margin */}
             <h2 className="text-xl font-bold text-gray-800 mb-1">Pickup Analytics</h2>
-            <span className='text-gray-400 font-light mt-3 pt-2 text-sm'>{`Pickup for ${selectedView} ${format(reportDate, 'yyyy-MM-dd')} vs ${selectedComparison}`}</span>
+            <span className='text-gray-400 font-light text-sm'>{`Pickup for ${selectedView} ${format(reportDate, 'yyyy-MM-dd')} vs ${selectedComparison}`}</span>
           </div>
-          <div className="flex items-center space-x-8"> {/* Use space-x-8 like Overview */}
+
+          {/* Filters container - Enable horizontal scrolling on smaller screens */}
+          {/* Changed structure to match BookingChannels */}
+          <div className="flex flex-nowrap items-end gap-x-4 xl:gap-x-8 gap-y-3 overflow-x-auto pb-2 xl:pb-0 w-full xl:w-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100 px-4 md:px-6 xl:px-0">
              {/* View Type Dropdown */}
-              <div className="flex flex-col">
+              {/* Add flex-shrink-0 */}
+              <div className="flex flex-col flex-shrink-0">
                 <span className="text-xs text-gray-500 mb-2">View type</span>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
@@ -319,13 +332,15 @@ export function PickupAnalytics() {
               </div>
 
               {/* Report Date Picker */}
-              <div className="flex flex-col">
+              {/* Add flex-shrink-0 */}
+              <div className="flex flex-col flex-shrink-0">
                 <span className="text-xs text-gray-500 mb-2">Report date</span>
                 <DatePicker date={reportDate} onDateChange={handleDateChange} />
               </div>
 
               {/* Comparison Dropdown */}
-              <div className="flex flex-col">
+              {/* Add flex-shrink-0 */}
+              <div className="flex flex-col flex-shrink-0">
                 <span className="text-xs text-gray-500 mb-2">Compare with</span>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
@@ -346,20 +361,38 @@ export function PickupAnalytics() {
               </div>
 
               {/* Hotel Selector */}
-              <div className="flex flex-col">
+              {/* Add flex-shrink-0 */}
+              <div className="flex flex-col flex-shrink-0">
                 <span className="text-xs text-gray-500 mb-2">Property</span>
                 <HotelSelector selectedHotels={selectedHotels} setSelectedHotels={setSelectedHotels} />
               </div>
+
+             {/* Optional Export Button - Add flex-shrink-0 if uncommented */}
+             {/* <Button
+              variant="ghost"
+              className="flex items-center space-x-2 text-blue-600 mt-7 flex-shrink-0" // Added flex-shrink-0
+             >
+              <DownloadIcon className="h-4 w-4" />
+              <span>Export to Excel</span>
+             </Button> */}
           </div>
         </div>
 
+      {/* Main Content Area - Adjust padding-top for fixed header, adjust overall padding */}
+      {/* Changed lg:pt-[140px] to xl:pt-[140px] */}
+      {/* Changed p-8 px-12 to match BookingChannels */}
+      <div className="xl:pt-[140px] p-4 md:p-6 lg:p-8 xl:px-12">
+        {/* Overview Title - Show ONLY on screens smaller than xl */}
+        {/* Added duplicate title block */}
+        <div className="block xl:hidden mb-6 md:mb-8">
+           <h2 className="text-xl md:text-2xl font-bold text-gray-800 mb-1">Pickup Analytics</h2>
+           <span className='text-gray-500 font-light text-sm'>{`Pickup for ${selectedView} ${format(reportDate, 'yyyy-MM-dd')} vs ${selectedComparison}`}</span>
+        </div>
 
-      <div className="p-8 px-12 pt-[140px]"> {/* Added padding like Overview */}
         {/* KPI Loading/Error State */}
+        {/* Add mb-6 md:mb-8 */}
         {loadingKpis && (
-             <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mt-6 h-24 items-center justify-center">
-                 {/* Basic Loading Text */}
-                 {/* <p className="text-gray-500 col-span-5 text-center">Loading KPIs...</p> */}
+             <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-6 md:mb-8 h-24 items-center justify-center">
                  {/* Skeleton Loaders for KPIs */}
                  {[...Array(5)].map((_, index) => (
                     <Card key={index} className="bg-white p-4">
@@ -372,15 +405,17 @@ export function PickupAnalytics() {
                  ))}
             </div>
         )}
+        {/* Add mb-6 md:mb-8 */}
         {kpiError && !loadingKpis && (
-             <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mt-6 h-auto items-center justify-center bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-6">
+             <div className="grid grid-cols-1 md:grid-cols-5 gap-6 h-auto items-center justify-center bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-6 md:mb-8">
                 <p className="col-span-5 text-center">Error loading KPIs: {kpiError}</p>
             </div>
         )}
 
-        {/* KPI Cards - Updated to use fetched data */}
+        {/* KPI Cards - Updated to pass fluctuation data to chartData */}
+        {/* Add mb-6 md:mb-8 */}
         {!loadingKpis && !kpiError && kpiData && (
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mt-6">
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-6 md:mb-8">
             <Kpi
               title={getKpiValue('roomsSold')?.title || "Rooms sold"}
               currentValue={getKpiValue('roomsSold')?.currentValue ?? 0}
@@ -390,8 +425,7 @@ export function PickupAnalytics() {
               )}
               prefix={getKpiValue('roomsSold')?.prefix ?? ""}
               color="blue"
-              // Removed chart data - Kpi component might need update or ignore this
-              // mainTimeSeriesData={...}
+              chartData={getKpiValue('roomsSold')?.fluctuation ?? []} // Pass fluctuation data
             />
             <Kpi
               title={getKpiValue('roomsRevenue')?.title || "Rooms revenue"}
@@ -402,7 +436,7 @@ export function PickupAnalytics() {
               )}
               prefix={getKpiValue('roomsRevenue')?.prefix ?? "€"}
               color="blue"
-              // mainTimeSeriesData={...}
+              chartData={getKpiValue('roomsRevenue')?.fluctuation ?? []} // Pass fluctuation data
             />
             <Kpi
               title={getKpiValue('adr')?.title || "ADR"}
@@ -413,7 +447,7 @@ export function PickupAnalytics() {
               )}
               prefix={getKpiValue('adr')?.prefix ?? "€"}
               color="green"
-              // mainTimeSeriesData={...}
+              chartData={getKpiValue('adr')?.fluctuation ?? []} // Pass fluctuation data
             />
             <Kpi
               title={getKpiValue('cancellations')?.title || "Cancellations"}
@@ -423,8 +457,8 @@ export function PickupAnalytics() {
                 getKpiValue('cancellations')?.comparisonValue ?? 0
               )}
               prefix={getKpiValue('cancellations')?.prefix ?? ""}
-              color="red" // Changed color for cancellations
-              // mainTimeSeriesData={...}
+              color="blue"
+              chartData={getKpiValue('cancellations')?.fluctuation ?? []} // Pass fluctuation data
             />
             <Kpi
               title={getKpiValue('revenueLost')?.title || "Revenue lost"}
@@ -434,21 +468,23 @@ export function PickupAnalytics() {
                 getKpiValue('revenueLost')?.comparisonValue ?? 0
               )}
               prefix={getKpiValue('revenueLost')?.prefix ?? "€"}
-              color="red" // Changed color for revenue lost
-              // mainTimeSeriesData={...}
+              color="blue"
+              chartData={getKpiValue('revenueLost')?.fluctuation ?? []} // Pass fluctuation data
             />
           </div>
         )}
 
         {/* Market Segments, Booking Channels, Room Types - Updated to fetch data */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-8">
+        {/* Add mb-6 md:mb-8, adjust grid breakpoint */}
+        {/* Change grid breakpoint from md to xl */}
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 md:gap-8 mb-6 md:mb-8">
           <TopFive
             title="Market Segments"
             color="blue"
             metrics={topFiveMetricsBase} // Structure only
             chartConfig={segmentsChartConfig}
             apiEndpoint="/api/pickup-analytics/distribution"
-            apiParams={{ ...pickupAnalysisApiParams, field: 'market_group_code', limit: 5 }}
+            apiParams={{ ...pickupAnalysisApiParams, field: 'market_group_code', limit: "5" }} // LINTER FIX: limit: "5" (string)
             simpleDetails={true} // Enable simple details view
           />
           <TopFive
@@ -457,7 +493,7 @@ export function PickupAnalytics() {
             metrics={topFiveMetricsBase} // Structure only
             chartConfig={bookingChannelsChartConfig}
             apiEndpoint="/api/pickup-analytics/distribution"
-            apiParams={{ ...pickupAnalysisApiParams, field: 'booking_channel', limit: 5 }}
+            apiParams={{ ...pickupAnalysisApiParams, field: 'booking_channel', limit: "5" }} // LINTER FIX: limit: "5" (string)
             simpleDetails={true} // Enable simple details view
           />
           <TopFive
@@ -466,25 +502,30 @@ export function PickupAnalytics() {
             metrics={topFiveMetricsBase} // Structure only
             chartConfig={roomTypesChartConfig}
             apiEndpoint="/api/pickup-analytics/distribution"
-            apiParams={{ ...pickupAnalysisApiParams, field: 'room_type', limit: 5 }}
+            apiParams={{ ...pickupAnalysisApiParams, field: 'room_type', limit: "5" }} // LINTER FIX: limit: "5" (string)
             simpleDetails={true} // Enable simple details view
           />
         </div>
 
         {/* Geo Source (World Map) - Updated TopFive */}
-        <div className="mt-8">
+        {/* Add mb-6 md:mb-8 */}
+        <div className="mb-6 md:mb-8">
           <Card className="bg-white rounded-lg overflow-hidden">
-            <CardHeader className="flex flex-col items-start">
+            {/* Adjust CardHeader padding */}
+            <CardHeader className="flex flex-col items-start px-4 py-4 md:px-6 md:py-5">
               <div className="flex w-full justify-between items-center">
                 <div>
-                  <CardTitle className="text-lg font-semibold text-gray-800 mb-3">
+                   {/* Adjust CardTitle styles */}
+                  <CardTitle className="text-base md:text-lg font-semibold text-gray-800 mb-2 md:mb-3">
                     Global Distribution - Pickup {selectedMapMetric.charAt(0).toUpperCase() + selectedMapMetric.slice(1)}
                   </CardTitle>
                 </div>
               </div>
             </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 gap-8">
+             {/* Adjust CardContent padding */}
+            <CardContent className="px-2 py-4 md:px-6 md:py-6">
+              {/* Change grid breakpoint from implicit/none to xl */}
+              <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 md:gap-8">
                 {/* World Map Side */}
                 <div>
                   {loadingWorldMap && (
@@ -498,12 +539,13 @@ export function PickupAnalytics() {
                      </div>
                   )}
                   {!loadingWorldMap && !worldMapError && (
-                    <div className="h-[500px] flex justify-center items-center">
+                    /* Adjust map container height, change lg breakpoint to xl */
+                    <div className="h-[350px] sm:h-[450px] xl:h-[500px] flex justify-center items-center mb-4">
                       <WorldMap
                         color="rgb(59, 130, 246)"
                         title="" // Title handled in CardHeader
                         valueSuffix={selectedMapMetric === 'revenue' ? '€' : selectedMapMetric === 'adr' ? '€' : ''} // Use €
-                        size="xl"
+                        size="responsive" // Use responsive size
                         data={worldMapData} // Use state variable
                         tooltipBgColor="black"
                         tooltipTextColor="white"
@@ -526,8 +568,9 @@ export function PickupAnalytics() {
                   </div>
                 </div>
 
-                {/* Top Five Countries Side - Updated */}
-                <div className="border-l border-gray-100 pl-8">
+                {/* Top Five Countries Side - Adjust border/padding for stacking */}
+                {/* Changed lg: prefixes to xl: */}
+                <div className="xl:border-l xl:border-gray-100 xl:pl-6 xl:pl-8 pt-6 xl:pt-0 border-t border-gray-100 xl:border-t-0">
                   <TopFive
                     title="Top Countries"
                     color="blue"
@@ -535,12 +578,13 @@ export function PickupAnalytics() {
                     metrics={topFiveMetricsBase} // Structure only
                     chartConfig={countryChartConfig}
                     apiEndpoint="/api/pickup-analytics/distribution" // Use pickup endpoint
-                    apiParams={{ ...pickupAnalysisApiParams, field: 'guest_country', limit: 5 }}
+                    apiParams={{ ...pickupAnalysisApiParams, field: 'guest_country', limit: "5" }} // LINTER FIX: limit: "5" (string)
                     // Add onMetricChange handler
                     onMetricChange={(metric) => {
                       setSelectedMapMetric(metric);
                       // Fetch world map data again with the new metric and existing filters
-                      fetchWorldMapData(pickupAnalysisApiParams, metric);
+                      // Pass a copy of params here too
+                      fetchWorldMapData({ ...pickupAnalysisApiParams }, metric);
                     }}
                     simpleDetails={true} // Enable simple details view
                   />

@@ -217,6 +217,21 @@ const formatCurrency = (value: number): string => {
   }).format(value);
 }
 
+// Add this helper function
+function TriangleDown({ className }: { className?: string }) {
+  return (
+    <svg 
+      width="8" 
+      height="6" 
+      viewBox="0 0 8 6" 
+      fill="currentColor" 
+      className={className}
+    >
+      <path d="M4 6L0 0L8 0L4 6Z" />
+    </svg>
+  )
+}
+
 export function PaceDashboard() {
   const [selectedHotels, setSelectedHotels] = useState<string[]>(["Hotel 1"])
   const allHotels = ["Hotel 1", "Hotel 2", "Hotel 3"]
@@ -701,12 +716,25 @@ export function PaceDashboard() {
   // Add the new CustomDialog for metrics near the end of the component, alongside the existing dialogs
   return (
     <div className="flex-1 overflow-auto bg-[#f5f8ff]">
-      <div className="fixed top-0 left-[256px] right-0 z-30 flex justify-between items-center mb-6 bg-white py-6 px-12 border-b border-gray-300 shadow-sm">
-        <div>
+      {/* Header Section - Apply responsive classes */}
+      {/* Use xl:fixed for fixed positioning only on extra large screens. */}
+      <div className="xl:fixed top-0 left-[256px] right-0 z-30 flex flex-col xl:flex-row xl:items-center xl:justify-between bg-white py-4 xl:py-6 xl:px-12 border-b border-gray-300 shadow-sm">
+        
+        {/* Title Block - Hide on small/medium/large screens */}
+        {/* Changed lg:block to xl:block */}
+        <div className="hidden xl:block px-4 xl:px-0 mb-2 xl:mb-0"> {/* Adjusted padding/margin */}
           <h2 className="text-xl font-bold text-gray-800 mb-1">Pace</h2>
+          {/* Optional: Add subtitle like in BookingChannels if needed */}
+          {/* <span className='text-gray-400 font-ligth text-sm'>{`${selectedTimeframe === "Month" ? 'Month View' : 'Year View'}`}</span> */}
         </div>
-        <div className="flex space-x-8 items-center">
-          <div className="flex flex-col">
+
+        {/* Filters container - Enable horizontal scrolling on smaller screens */}
+        {/* Changed lg: prefixes to xl: */}
+        {/* Added overflow-x-auto, scrollbar styling, responsive padding/width */}
+        <div className="flex flex-nowrap items-end gap-x-4 xl:gap-x-8 gap-y-3 overflow-x-auto pb-2 xl:pb-0 w-full xl:w-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100 px-4 md:px-6 xl:px-0">
+          
+          {/* View Type Filter - Add flex-shrink-0 */}
+          <div className="flex flex-col flex-shrink-0">
             <span className="text-xs text-gray-500 mb-2">View type</span>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -714,7 +742,7 @@ export function PaceDashboard() {
                   variant="ghost"
                   className="bg-[#f2f8ff] hover:bg-[#f2f8ff] text-[#342630] rounded-full px-4"
                 >
-                  {selectedTimeframe === "Month" ? 'Month View' : 'Year View'} <ChevronDownIcon className="ml-2 h-4 w-4" />
+                  {selectedTimeframe === "Month" ? 'Month View' : 'Year View'} <TriangleDown className="ml-2" /> {/* Use TriangleDown */}
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent>
@@ -728,7 +756,8 @@ export function PaceDashboard() {
             </DropdownMenu>
           </div>
 
-          <div className="flex flex-col">
+          {/* Property Filter - Add flex-shrink-0 */}
+          <div className="flex flex-col flex-shrink-0">
             <span className="text-xs text-gray-500 mb-2">Property</span>
             <HotelSelector 
               selectedHotels={selectedHotels}
@@ -736,7 +765,8 @@ export function PaceDashboard() {
             />
           </div>
           
-          <div className="flex flex-col">
+          {/* Compare With Filter - Add flex-shrink-0 */}
+          <div className="flex flex-col flex-shrink-0">
             <span className="text-xs text-gray-500 mb-2">Compare with</span>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -744,30 +774,55 @@ export function PaceDashboard() {
                   variant="ghost" 
                   className="bg-[#f2f8ff] hover:bg-[#f2f8ff] text-[#342630] rounded-full px-4"
                 >
-                  {comparisonType} <ChevronDownIcon className="ml-2 h-4 w-4" />
+                  {comparisonType} <TriangleDown className="ml-2" /> {/* Use TriangleDown */}
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent>
                 <DropdownMenuItem onSelect={() => setComparisonType('Last year')}>
                   Last year
                 </DropdownMenuItem>
+                {/* Add other comparison options if needed */}
+                {/* <DropdownMenuItem onSelect={() => setComparisonType('Budget')}>
+                  Budget
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => setComparisonType('No comparison')}>
+                  No comparison
+                </DropdownMenuItem> */}
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
         </div>
       </div>
 
-      <div className="p-8 px-12 pt-[140px]">
-        <div className="mt-2">
-          <PacingChart
-            viewType={selectedTimeframe as "Month" | "Year"} 
-            data={pacingData}
-            isLoading={isLoadingPacing}
-            error={errorPacing}
-          />
+      {/* Main Content Area - Adjust padding-top for the fixed header */}
+      <div className="xl:pt-[140px] p-4 md:p-6 lg:p-8 xl:px-12">
+        {/* Overview Title - Show ONLY on screens smaller than xl */}
+        {/* Added this block */}
+        <div className="block xl:hidden mb-6 md:mb-8">
+          <h2 className="text-xl md:text-2xl font-bold text-gray-800 mb-1">Pace</h2>
+           {/* Optional: Add subtitle */}
+          <span className='text-gray-500 font-light text-sm'>{`${selectedTimeframe === "Month" ? 'Month View' : 'Year View'}`}</span>
         </div>
+
+        {/* Pacing Chart Section - Wrap for horizontal scrolling */}
+        <div className="mb-6 md:mb-8 overflow-x-auto"> {/* Add overflow-x-auto here */}
+          {/* Inner div to enforce minimum width */}
+          <div className="min-w-[700px]"> {/* Adjust min-width as needed */}
+            <PacingChart
+              viewType={selectedTimeframe as "Month" | "Year"} 
+              data={pacingData}
+              isLoading={isLoadingPacing}
+              error={errorPacing}
+            />
+          </div>
+        </div>
+
+        {/* Removed the grid for numerical cards as they are handled by the CustomDialog now? 
+            If you still have a grid here or other content, apply similar responsive patterns (e.g., xl:grid-cols-4, gap-6 md:gap-8, mb-6 md:mb-8) */}
+      
       </div>
 
+      {/* Dialogs remain unchanged */}
       <CustomDialog
         selectedCard={selectedCard}
         closeDialog={closeDialog}

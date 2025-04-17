@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import {
   ChartConfig,
   ChartContainer,
@@ -63,13 +63,27 @@ export function HorizontalBarChart({ data, title, leftMargin = -10 }: Horizontal
   ])
   const [fullScreenTable, setFullScreenTable] = React.useState(false)
 
+  // Parse the title
+  let mainTitle = title;
+  let subtitle: string | null = null;
+  const titleParts = title.split(" by ");
+  if (titleParts.length > 1) {
+    mainTitle = titleParts[0];
+    subtitle = `By ${titleParts.slice(1).join(" by ")}`; // Handle cases with multiple "by"
+  }
+
   return (
     <>
       <Card className="border-gray-300">
         <CardHeader>
           <CardTitle className="text-lg font-semibold text-gray-800">
-            {title}
+            {mainTitle}
           </CardTitle>
+          {subtitle && (
+            <CardDescription className="text-sm text-gray-500 pt-1">
+              {subtitle}
+            </CardDescription>
+          )}
         </CardHeader>
         <CardContent>
           <ChartContainer config={chartConfig} className="min-h-[345px] w-full">

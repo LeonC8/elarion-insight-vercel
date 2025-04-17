@@ -148,7 +148,7 @@ export function CategoryTimeSeriesCard({
   }, [effectiveCategoryData, activeCategories]);
   
   // Create the chart content component to reuse in both normal and fullscreen mode
-  const ChartContent = React.useCallback(({ bottom = 30 }: { bottom?: number }) => {
+  const ChartContent = React.useCallback(() => {
     // Calculate the maximum value in the data for Y-axis scaling
     const maxValue = React.useMemo(() => {
       let max = 0;
@@ -181,14 +181,13 @@ export function CategoryTimeSeriesCard({
     return (
       <>
         {/* Area Chart */}
-        <ChartContainer config={colorizedCategoryConfig}>
+        <ChartContainer config={colorizedCategoryConfig} className="h-[450px] w-full">
           <AreaChart
             data={effectiveCategoryData}
-            height={300}
             margin={{
               top: 30,
               right: 10,
-              bottom: bottom,
+              bottom: 20,
               left: getLeftMargin(),
             }}
           >
@@ -285,7 +284,7 @@ export function CategoryTimeSeriesCard({
         </ChartContainer>
 
         {/* Categories Over Time Legend - Responsive Flex Wrap */}
-        <div className="flex justify-center gap-2 sm:gap-3 mt-8 flex-wrap">
+        <div className="flex justify-center gap-2 sm:gap-3 mt-6 flex-wrap">
           {Object.keys(colorizedCategoryConfig).map((key) => (
             <div
               key={key}
@@ -400,7 +399,7 @@ export function CategoryTimeSeriesCard({
           </div>
         </CardHeader>
         <CardContent>
-          <ChartContent bottom={0} />
+          <ChartContent />
         </CardContent>
       </Card>
       
@@ -487,8 +486,7 @@ export function CategoryTimeSeriesCard({
             {/* Ensure chart content takes remaining height */}
             <div className="flex-1 overflow-hidden"> 
               <div className="h-full"> {/* Changed from fixed calc height */}
-                {/* Adjust bottom margin dynamically based on expected legend height */}
-                <ChartContent bottom={100} /> 
+                <ChartContent />
               </div>
             </div>
           </div>

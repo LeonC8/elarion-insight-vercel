@@ -24,7 +24,6 @@ import dynamic from 'next/dynamic'
 import { TopFive } from '../new/TopFive'
 import { KpiWithChart } from '../new/KpiWithChart'
 import { Kpi } from '../new/Kpi'
-import { KpiWithSubtleChart } from '../new/KpiWithSubtleChart'
 import { ChartConfig } from '@/components/ui/chart'
 import { CategoriesDetailsDialog, type CategoryTimeSeriesData } from '@/components/new/CategoriesDetailsDialog'
 import { ReservationsByDayChart } from '../new/ReservationsByDayChart'
@@ -209,16 +208,24 @@ export function RoomTypes() {
 
   return (
     <div className="flex-1 overflow-auto bg-[#f5f8ff]">
-        {/* Header with Filters */}
-        <div className="fixed top-0 left-[256px] right-0 z-30 flex justify-between items-center mb-6 bg-white py-6 px-12 border-b border-gray-300 shadow-sm">
-          <div>
+        {/* Header with Filters - Apply responsive layout */}
+        {/* Use xl:fixed for fixed positioning only on extra large screens. */}
+        {/* Adjusted left margin to account for potential sidebar width changes if needed */}
+        {/* Changed lg: prefixes to xl: */}
+        <div className="xl:fixed top-0 left-[256px] right-0 z-30 flex flex-col xl:flex-row xl:items-center xl:justify-between bg-white py-4 xl:py-6 xl:px-12 border-b border-gray-300 shadow-sm">
+          {/* Title Block - Hide on small/medium/large screens */}
+          {/* Changed lg:block to xl:block */}
+          <div className="hidden xl:block px-4 xl:px-0 mb-2 xl:mb-0"> {/* Adjusted padding/margin */}
             <h2 className="text-xl font-bold text-gray-800 mb-1">Room Types</h2>
-            <span className='text-gray-400 font-ligth mt-3 pt-2 text-sm'>{`${selectedTimeFrame} ${selectedViewType}`}</span>
+            <span className='text-gray-400 font-ligth text-sm'>{`${selectedTimeFrame} ${selectedViewType}`}</span>
           </div>
 
-          <div className="flex items-center space-x-8">
+          {/* Filters container - Enable horizontal scrolling on smaller screens */}
+          {/* Changed lg: prefixes to xl: */}
+          <div className="flex flex-nowrap items-end gap-x-4 xl:gap-x-8 gap-y-3 overflow-x-auto pb-2 xl:pb-0 w-full xl:w-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100 px-4 md:px-6 xl:px-0">
             {/* Combined Time Frame and View Type Dropdown */}
-            <div className="flex flex-col">
+            {/* Add flex-shrink-0 to prevent shrinking */}
+            <div className="flex flex-col flex-shrink-0">
               <span className="text-xs text-gray-500 mb-2">Selected period</span>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -282,7 +289,8 @@ export function RoomTypes() {
             </div>
 
             {/* Comparison Dropdown with Label */}
-            <div className="flex flex-col">
+            {/* Add flex-shrink-0 */}
+            <div className="flex flex-col flex-shrink-0">
               <span className="text-xs text-gray-500 mb-2">Compare with:</span>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -311,7 +319,8 @@ export function RoomTypes() {
             </div>
             
             {/* Date Picker with Label */}
-            <div className="flex flex-col">
+            {/* Add flex-shrink-0 */}
+            <div className="flex flex-col flex-shrink-0">
               <span className="text-xs text-gray-500 mb-2">Business date</span>
               <DatePicker
                 date={date} // Uses date from the hook
@@ -320,7 +329,8 @@ export function RoomTypes() {
             </div>
 
             {/* Hotel Selector with Label */}
-            <div className="flex flex-col">
+            {/* Add flex-shrink-0 */}
+            <div className="flex flex-col flex-shrink-0">
               <span className="text-xs text-gray-500 mb-2">Property</span>
               <HotelSelector
                 selectedHotels={selectedHotels} // Uses local selectedHotels
@@ -329,9 +339,10 @@ export function RoomTypes() {
             </div>
 
             {/* Export Button */}
+            {/* Optional: Add flex-shrink-0 if uncommented */}
             {/* <Button 
               variant="ghost" 
-              className="flex items-center space-x-2 text-blue-600 mt-7"
+              className="flex items-center space-x-2 text-blue-600 mt-7" // Adjusted alignment if needed
             >
               <DownloadIcon className="h-4 w-4" />
               <span>Export to Excel</span>
@@ -339,10 +350,19 @@ export function RoomTypes() {
           </div>
         </div>
 
-        {/* Add the charts */}
-        <div className="mt-[140px] px-12 py-0">
-          {/* Use the correct URL pattern for CategoriesDetailsDialog */}
-          <div className="mb-8">
+        {/* Main Content Area - Adjust padding-top for the fixed header */}
+        {/* Changed mt-[140px] to xl:pt-[140px] and added base padding */}
+        <div className="xl:pt-[140px] p-4 md:p-6 lg:p-8 xl:px-12">
+          {/* Overview Title - Show ONLY on screens smaller than xl */}
+          {/* Changed lg:hidden to xl:hidden */}
+          <div className="block xl:hidden mb-6 md:mb-8">
+            <h2 className="text-xl md:text-2xl font-bold text-gray-800 mb-1">Room Types</h2>
+            <span className='text-gray-500 font-light text-sm'>{`${selectedTimeFrame} ${selectedViewType}`}</span>
+          </div>
+
+          {/* CategoriesDetailsDialog section */}
+          {/* Add mb-6 md:mb-8 for responsive margin */}
+          <div className="mb-6 md:mb-8">
             <CategoriesDetailsDialog
               isDialog={false}
               title="Room Types Analysis"
@@ -357,8 +377,9 @@ export function RoomTypes() {
           </div>
 
           
-          {/* Add the TopFiveMultiple component underneath */}
-          <div className="mb-8 grid grid-cols-2 gap-6">
+          {/* Top Producers & LOS Chart Grid */}
+          {/* Change grid breakpoint from lg/default to xl, adjust margin */}
+          <div className="mb-6 md:mb-8 grid grid-cols-1 xl:grid-cols-2 gap-6 md:gap-8">
             <Card className="bg-white rounded-lg overflow-hidden">
               <CardContent className="p-0">
                 <TopFiveUpgraded
@@ -391,9 +412,10 @@ export function RoomTypes() {
             </div>
           </div>
 
-
-          <div className="mb-8 grid grid-cols-2 gap-6">
-          <Card className="bg-white rounded-lg overflow-hidden">
+          {/* Secondary TopFive Grid */}
+          {/* Change grid breakpoint to xl, adjust margin */}
+          <div className="mb-6 md:mb-8 grid grid-cols-1 xl:grid-cols-2 gap-6 md:gap-8">
+            <Card className="bg-white rounded-lg overflow-hidden">
               <CardContent className="p-0">
                 <TopFiveUpgraded
                   title="Room types"
@@ -416,7 +438,7 @@ export function RoomTypes() {
                   title="Room types"
                   subtitle="By booking channel"
                   metrics={metricOptions}
-                  apiEndpoint="/api/booking-channels/distribution-upgraded"
+                  apiEndpoint="/api/booking-channels/distribution-upgraded" // Note: Endpoint change might be intended or a copy-paste remnant
                   apiParams={analysisApiParams}
                   primaryField="booking_channel"
                   secondaryField="room_type"
@@ -428,28 +450,34 @@ export function RoomTypes() {
             </Card>
           </div>
           
-          {/* Add the new World Map with TopFiveMultiple component in a new row */}
-          <div className="mt-8">
+          {/* World Map & Top Countries Grid */}
+          {/* Adjust margin */}
+          <div className="mt-6 md:mt-8">
             <Card className="bg-white rounded-lg overflow-hidden">
-              <CardHeader className="flex flex-col items-start">
+              {/* Add responsive padding/text size to header */}
+              <CardHeader className="flex flex-col items-start px-4 py-4 md:px-6 md:py-5">
                 <div className="flex w-full justify-between items-center">
                   <div>
-                    <CardTitle className="text-lg font-semibold text-gray-800 mb-3">Global Distribution by Room Type</CardTitle>
+                     {/* Add responsive text/margin */}
+                    <CardTitle className="text-base md:text-lg font-semibold text-gray-800 mb-2 md:mb-3">Global Distribution by Room Type</CardTitle>
                   </div>
                 </div>
               </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-2 gap-8">
+               {/* Add responsive padding */}
+              <CardContent className="px-2 py-4 md:px-6 md:py-6">
+                 {/* Change grid breakpoint to xl */}
+                <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 md:gap-8">
                   {/* World Map Side */}
                   <div>
-                    <div className="h-[500px] flex justify-center items-center">
+                    {/* Adjust map container height, change size to responsive */}
+                    <div className="h-[350px] sm:h-[450px] xl:h-[500px] flex justify-center items-center mb-4">
                       {/* Ensure WorldMap receives the updated currentMapData */}
                       {currentMapData.length > 0 ? (
                         <WorldMap
                           color="rgb(59, 130, 246)"
                           title=""
                           valueSuffix="€" // Adjust suffix based on actual metric if needed
-                          size="xl"
+                          size="responsive" // Use responsive size
                           data={currentMapData}
                           tooltipBgColor="black"
                           tooltipTextColor="white"
@@ -459,6 +487,7 @@ export function RoomTypes() {
                         <div className="text-gray-500">Select data to display on map</div>
                       )}
                     </div>
+                    {/* Legend */}
                     <div className="flex justify-center mt-4">
                       <div className="flex items-center space-x-8">
                         <div className="flex items-center">
@@ -473,8 +502,9 @@ export function RoomTypes() {
                     </div>
                   </div>
 
-                  {/* Top Five by Country Side - ensure 'id' is set */}
-                  <div className="border-l border-gray-100 pl-8">
+                  {/* Top Five by Country Side - Adjust border/padding for stacking */}
+                   {/* Changed lg: prefixes to xl: */}
+                   <div className="xl:border-l xl:border-gray-100 xl:pl-6 xl:pl-8 pt-6 xl:pt-0 border-t border-gray-100 xl:border-t-0">
                     <TopFiveUpgraded
                       id="top-countries" // This ID is crucial for the event subscription
                       title="Top Countries"
@@ -487,16 +517,19 @@ export function RoomTypes() {
                       defaultPrimaryValue="SUP" // Or fetch the first available one
                       color="blue"
                       withBorder={false}
+                      // Decide if useCategoriesDialog is needed here based on functionality
+                      // useCategoriesDialog={true} 
                     />
                   </div>
                 </div>
               </CardContent>
             </Card>
           </div>
-        </div>
+        </div> {/* End of main content padding wrapper */}
 
-        {/* Add this section at the bottom of the return statement before the final closing div */}
-        <div className="mt-8 px-12 pb-12 grid grid-cols-2 gap-6">
+        {/* Bottom Charts section - Make grid responsive, adjust margins */}
+        {/* Change grid breakpoint to xl, adjust padding/margin */}
+        <div className="mt-6 md:mt-8 px-4 md:px-6 xl:px-12 pb-12 grid grid-cols-1 xl:grid-cols-2 gap-6 md:gap-8">
           <div className="bg-white rounded-lg shadow overflow-hidden">
             <HorizontalBarChartMultipleDatasetsUpgraded 
               title="Lead Times by Room Type"
@@ -517,11 +550,12 @@ export function RoomTypes() {
               apiEndpoint="/api/room-types/reservation-trends"
               apiParams={analysisApiParams}
               defaultDataset="occupancyByDayOfWeek"
+              // Consider adding defaultCategory if applicable
               leftMargin={20}
               orientation="vertical"
             />
           </div>
         </div>
-    </div>
+    </div> // End of main component div
   )
 } 
