@@ -440,7 +440,7 @@ export function MarketSegments() {
               <CardContent className="p-0">
                 <TopFiveUpgraded
                   title="Top Producers"
-                  subtitle="By market group"
+                  subtitle="By market segment"
                   metrics={metricOptions}
                   apiEndpoint="/api/market-segments/distribution-upgraded"
                   apiParams={{
@@ -457,7 +457,7 @@ export function MarketSegments() {
             
             <div className="bg-white rounded-lg shadow overflow-hidden">
               <HorizontalBarChartMultipleDatasetsUpgraded 
-                title="Length of Stay by Market Group"
+                title="Length of Stay by Market Segment"
                 datasetTitle="Length of Stay"
                 apiEndpoint="/api/market-segments/length-of-stay"
                 apiParams={analysisApiParams}
@@ -478,7 +478,7 @@ export function MarketSegments() {
               <CardHeader className="flex flex-col items-start px-4 py-4 md:px-6 md:py-5">
                 <div className="flex w-full justify-between items-center">
                   <div>
-                    <CardTitle className="text-base md:text-lg font-semibold text-gray-800 mb-2 md:mb-3">Global Distribution by Market Group</CardTitle>
+                    <CardTitle className="text-base md:text-lg font-semibold text-gray-800 mb-2 md:mb-3">Global Distribution by Market Segment</CardTitle>
                   </div>
                 </div>
               </CardHeader>
@@ -526,7 +526,7 @@ export function MarketSegments() {
                     <TopFiveUpgraded
                       id="top-countries" // This ID is crucial for the event subscription
                       title="Top Countries"
-                      subtitle="by Market Group"
+                      subtitle="by Market Segment"
                       metrics={metricOptions} // Pass the metric options config
                       apiEndpoint="/api/market-segments/distribution-upgraded"
                       apiParams={analysisApiParams} // Use the shared analysisApiParams
@@ -549,7 +549,7 @@ export function MarketSegments() {
         <div className="mt-6 md:mt-8 px-4 md:px-6 xl:px-12 pb-12 grid grid-cols-1 xl:grid-cols-2 gap-6 md:gap-8">
           <div className="bg-white rounded-lg shadow overflow-hidden">
             <HorizontalBarChartMultipleDatasetsUpgraded 
-              title="Lead Times by Market Group"
+              title="Lead Times by Market Segment"
               datasetTitle="Lead Times"
               apiEndpoint="/api/market-segments/lead-times"
               apiParams={analysisApiParams}

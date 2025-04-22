@@ -419,7 +419,7 @@ export function RoomTypes() {
               <CardContent className="p-0">
                 <TopFiveUpgraded
                   title="Room types"
-                  subtitle="By market group"
+                  subtitle="By market segment"
                   metrics={metricOptions}
                   apiEndpoint="/api/room-types/distribution-upgraded"
                   apiParams={analysisApiParams}
@@ -517,6 +517,7 @@ export function RoomTypes() {
                       defaultPrimaryValue="SUP" // Or fetch the first available one
                       color="blue"
                       withBorder={false}
+                      useCategoriesDialog={true}
                       // Decide if useCategoriesDialog is needed here based on functionality
                       // useCategoriesDialog={true} 
                     />

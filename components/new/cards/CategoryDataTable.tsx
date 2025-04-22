@@ -64,6 +64,9 @@ export function CategoryDataTable({
 }: CategoryDataTableProps) {
   const metricKeys = Object.keys(availableMetrics);
   
+  // Process the title to remove "Top" and surrounding whitespace
+  const processedTitle = title.replace(/\s?Top\s?/i, ' ').trim();
+
   // Add ref for table container to enable scrolling
   const tableContainerRef = React.useRef<HTMLDivElement>(null)
   
@@ -117,7 +120,7 @@ export function CategoryDataTable({
     <Card className="border-gray-300">
       <CardHeader>
         <div className="flex justify-between items-center">
-          <h3 className="text-lg font-medium">All {title}</h3>
+          <h3 className="text-lg font-medium">All {processedTitle}</h3>
           {metricKeys.length > 3 && (
             <div className="flex items-center gap-2">
               <Button 

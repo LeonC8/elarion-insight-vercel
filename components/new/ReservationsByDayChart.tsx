@@ -67,26 +67,27 @@ const chartConfig = {
 } satisfies ChartConfig
 
 // Exact copy of KpiWithChart's margin calculation
-const getLeftMargin = (data: Array<{ bookingsCreated: number; staysStarting: number }>) => {
-  // Find the largest number in both datasets
+// Updated to use the transformed data structure (current/previous)
+const getLeftMargin = (data: Array<{ current: number; previous: number }>) => {
+  // Find the largest number in both current and previous datasets
   const maxNumber = Math.max(
-    ...data.flatMap(item => [item.bookingsCreated, item.staysStarting])
+    ...data.flatMap(item => [item.current, item.previous])
   )
   
   // Convert to string and count digits
-  const numLength = Math.round(maxNumber).toString().length
+  const numLength = Math.round(maxNumber).toString().replace(/,/g, '').length
 
-  // Map number length to margin values
+  // Map number length to margin values (copied from KpiWithChart)
   const marginMap: { [key: number]: number } = {
-    3: 35,  // 100-999
-    4: 42,  // 1,000-9,999
-    5: 48,  // 10,000-99,999
-    6: 56,  // 100,000-999,999
-    7: 64   // 1,000,000-9,999,999
+    3: -5,  // 100-999
+    4: 3,   // 1,000-9,999
+    5: 9,   // 10,000-99,999
+    6: 18,  // 100,000-999,999
+    7: 27   // 1,000,000-9,999,999
   }
 
-  // Return the appropriate margin or default to 42 if not found
-  return marginMap[numLength] || 42
+  // Return the appropriate margin or default to 3 if not found
+  return marginMap[numLength] || 3
 }
 
 function TriangleDown({ className }: { className?: string }) {
@@ -261,6 +262,9 @@ export function ReservationsByDayChart({
       }))
     : []; // Default to empty array if not ready or data is null/undefined
 
+  // Calculate left margin based on the actual chart data
+  const leftMarginForRender = chartData.length > 0 ? getLeftMargin(chartData) : 0;
+
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
       const current = payload.find((p: any) => p.dataKey === 'current');
@@ -397,7 +401,7 @@ export function ReservationsByDayChart({
                        top: 10,
                        right: 10,
                        bottom: 20,
-                       left: -20,
+                       left: leftMarginForRender, // Use the calculated margin
                      }}
                    >
                      <CartesianGrid strokeDasharray="3 3" vertical={false} />

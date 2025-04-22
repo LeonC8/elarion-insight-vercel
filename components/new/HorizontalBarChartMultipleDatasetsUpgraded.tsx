@@ -7,7 +7,7 @@ import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { ChartConfig, ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
 import { ArrowRight } from 'lucide-react'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import * as React from "react"
 
@@ -37,6 +37,34 @@ const formatPercentageChange = (current: number, previous: number): string => {
   const clampedChange = Math.max(-1000, Math.min(1000, change));
   return `${clampedChange > 0 ? '+' : ''}${clampedChange.toFixed(1)}%`;
 };
+
+// --- Start: Added getLeftMargin function (copied from KpiWithChart) ---
+const getLeftMarginForVertical = (data: Array<{ current: number; previous: number }>) => {
+  // Find the largest number in both current and previous datasets
+  const maxNumber = Math.max(
+    0, // Ensure we handle cases with no data or only zeros
+    ...data.flatMap(item => [item.current, item.previous])
+  );
+  
+  // Convert to string and count digits (handling potential floating point values from max)
+  const numLength = Math.round(maxNumber).toString().replace(/,/g, '').length;
+
+  // Map number length to margin values
+  const marginMap: { [key: number]: number } = {
+    0: -20, // Handle 0 or no data case
+    1: -20, // 1-9
+    2: -15, // 10-99
+    3: -5,  // 100-999
+    4: 3,   // 1,000-9,999
+    5: 9,   // 10,000-99,999
+    6: 18,  // 100,000-999,999
+    7: 27   // 1,000,000-9,999,999
+  };
+
+  // Return the appropriate margin or default to 3 for very large numbers
+  return marginMap[numLength] !== undefined ? marginMap[numLength] : 3; 
+};
+// --- End: Added getLeftMargin function ---
 
 export interface CategoryData {
   [key: string]: {
@@ -444,7 +472,12 @@ export function HorizontalBarChartMultipleDatasetsUpgraded({
         <Dialog open={fullScreenTable} onOpenChange={setFullScreenTable}>
           <DialogContent className="max-w-7xl min-h-fit max-h-[90vh]">
             <DialogHeader className="pb-6">
-              <DialogTitle>{displayTitle}</DialogTitle>
+              <DialogTitle className="mb-2">
+                {selectedDatasetLabel}
+              </DialogTitle>
+              <DialogDescription className="text-sm text-gray-500">
+                {selectedCategoryLabel}
+              </DialogDescription>
             </DialogHeader>
             <div className="border rounded-lg bg-[#f0f4fa]/40 border-[#d0d7e3]">
               <div className="overflow-y-auto max-h-[calc(90vh-120px)]">
@@ -574,7 +607,8 @@ export function HorizontalBarChartMultipleDatasetsUpgraded({
                 top: 10,
                 right: 10,
                 bottom: 20,
-                left: -20,
+                // Calculate left margin dynamically for vertical chart
+                left: getLeftMarginForVertical(verticalChartData), 
               }}
             >
               <CartesianGrid strokeDasharray="3 3" vertical={false} />
@@ -655,9 +689,12 @@ export function HorizontalBarChartMultipleDatasetsUpgraded({
       <Dialog open={fullScreenTable} onOpenChange={setFullScreenTable}>
         <DialogContent className="max-w-7xl min-h-fit max-h-[90vh]">
           <DialogHeader className="pb-6">
-            <DialogTitle>
-              {displayTitle} – {selectedCategoryLabel}
+            <DialogTitle className="mb-2">
+              {selectedDatasetLabel}
             </DialogTitle>
+            <DialogDescription className="text-sm text-gray-500">
+              {selectedCategoryLabel}
+            </DialogDescription>
           </DialogHeader>
           <div className="border rounded-lg bg-[#f0f4fa]/40 border-[#d0d7e3]">
             <div className="overflow-y-auto max-h-[calc(90vh-120px)]">

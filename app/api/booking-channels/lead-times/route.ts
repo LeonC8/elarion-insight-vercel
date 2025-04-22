@@ -183,7 +183,7 @@ export async function GET(request: Request) {
       // Make sure the booking_lead_time dataset exists
       if (!dataByBookingChannel[bookingChannel].datasets.booking_lead_time) {
         dataByBookingChannel[bookingChannel].datasets.booking_lead_time = {
-          title: "Lead Time",
+          title: "Booking lead time",
           data: []
         };
       }
@@ -213,7 +213,7 @@ export async function GET(request: Request) {
       // Make sure the cancellation_lead_time dataset exists
       if (!dataByBookingChannel[bookingChannel].datasets.cancellation_lead_time) {
         dataByBookingChannel[bookingChannel].datasets.cancellation_lead_time = {
-          title: "Cancellation Lead Time",
+          title: "Cancellation lead time",
           data: []
         };
       }
@@ -241,7 +241,7 @@ export async function GET(request: Request) {
       // Make sure the booking_lead_time dataset exists
       if (!dataByBookingChannel[bookingChannel].datasets.booking_lead_time) {
         dataByBookingChannel[bookingChannel].datasets.booking_lead_time = {
-          title: "Lead Time",
+          title: "Booking lead time",
           data: []
         };
       }
@@ -276,7 +276,7 @@ export async function GET(request: Request) {
       // Make sure the cancellation_lead_time dataset exists
       if (!dataByBookingChannel[bookingChannel].datasets.cancellation_lead_time) {
         dataByBookingChannel[bookingChannel].datasets.cancellation_lead_time = {
-          title: "Cancellation Lead Time",
+          title: "Cancellation lead time",
           data: []
         };
       }
@@ -316,7 +316,7 @@ export async function GET(request: Request) {
       } else {
         // Create the dataset if it doesn't exist
         dataByBookingChannel[channel].datasets.booking_lead_time = {
-          title: "Lead Time",
+          title: "Booking lead time",
           data: Array.from(bookingLeadTimeBuckets).map(bucket => ({
             range: bucket,
             current: 0,
@@ -344,7 +344,7 @@ export async function GET(request: Request) {
       } else {
         // Create the dataset if it doesn't exist
         dataByBookingChannel[channel].datasets.cancellation_lead_time = {
-          title: "Cancellation Lead Time",
+          title: "Cancellation lead time",
           data: Array.from(cancellationLeadTimeBuckets).map(bucket => ({
             range: bucket,
             current: 0,

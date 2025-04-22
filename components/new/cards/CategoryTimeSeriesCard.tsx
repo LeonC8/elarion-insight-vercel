@@ -50,6 +50,17 @@ interface MetricConfig {
   }
 }
 
+// Add type for colorized category config item
+interface ColorizedCategoryConfigItem {
+  label: string;
+  color: string;
+}
+
+// Add type for the entire colorized config object
+interface ColorizedCategoryConfig {
+  [key: string]: ColorizedCategoryConfigItem;
+}
+
 // Define props interface for CategoryTimeSeriesCard
 interface CategoryTimeSeriesCardProps {
   title?: string;
@@ -102,14 +113,12 @@ export function CategoryTimeSeriesCard({
   const colorizedCategoryConfig = React.useMemo(() => {
     const categoryKeys = Object.keys(effectiveCategoryConfig);
     return categoryKeys.reduce((acc, key, index) => {
-      return {
-        ...acc,
-        [key]: {
-          ...effectiveCategoryConfig[key as keyof typeof effectiveCategoryConfig],
-          color: colorPalette[index % colorPalette.length]
-        }
+      acc[key] = {
+        ...effectiveCategoryConfig[key as keyof typeof effectiveCategoryConfig],
+        color: colorPalette[index % colorPalette.length]
       };
-    }, {});
+      return acc;
+    }, {} as ColorizedCategoryConfig); // Explicitly type the initial value and accumulator
   }, [effectiveCategoryConfig]);
   
   // Determine if stacked mode is supported for the current KPI - Use selectedKPI
@@ -195,12 +204,12 @@ export function CategoryTimeSeriesCard({
               {Object.keys(colorizedCategoryConfig).map((categoryKey) => (
                 <React.Fragment key={categoryKey}>
                   <linearGradient id={`gradient-${categoryKey}`} x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor={colorizedCategoryConfig[categoryKey as keyof typeof colorizedCategoryConfig].color} stopOpacity={0.3}/>
-                    <stop offset="95%" stopColor={colorizedCategoryConfig[categoryKey as keyof typeof colorizedCategoryConfig].color} stopOpacity={0.1}/>
+                    <stop offset="5%" stopColor={colorizedCategoryConfig[categoryKey].color} stopOpacity={0.3}/>
+                    <stop offset="95%" stopColor={colorizedCategoryConfig[categoryKey].color} stopOpacity={0.1}/>
                   </linearGradient>
                   <linearGradient id={`gradient-${categoryKey}-previous`} x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor={colorizedCategoryConfig[categoryKey as keyof typeof colorizedCategoryConfig].color} stopOpacity={0.05}/>
-                    <stop offset="100%" stopColor={colorizedCategoryConfig[categoryKey as keyof typeof colorizedCategoryConfig].color} stopOpacity={0.05}/>
+                    <stop offset="0%" stopColor={colorizedCategoryConfig[categoryKey].color} stopOpacity={0.05}/>
+                    <stop offset="100%" stopColor={colorizedCategoryConfig[categoryKey].color} stopOpacity={0.05}/>
                   </linearGradient>
                 </React.Fragment>
               ))}
@@ -220,7 +229,7 @@ export function CategoryTimeSeriesCard({
               tickFormatter={(value) => `${Math.round(value).toLocaleString()}`}
               tickMargin={8}
               width={45}
-              tickCount={yAxisTickCount}
+              domain={[0, maxValue]}
             />
             <ChartTooltip 
               content={({ active, payload, label }) => {
@@ -238,9 +247,9 @@ export function CategoryTimeSeriesCard({
                         return (
                           <div key={categoryKey} className="mb-2">
                             <p className="font-medium" style={{ 
-                                color: colorizedCategoryConfig[categoryKey as keyof typeof colorizedCategoryConfig].color 
+                                color: colorizedCategoryConfig[categoryKey].color 
                               }}>
-                              {colorizedCategoryConfig[categoryKey as keyof typeof colorizedCategoryConfig].label}
+                              {colorizedCategoryConfig[categoryKey].label}
                             </p>
                             <p className="text-sm">
                               {prefix}{Number(entry.value).toLocaleString()}
@@ -268,14 +277,14 @@ export function CategoryTimeSeriesCard({
                   key={categoryKey}
                   type="monotone"
                   dataKey={`categories.${categoryKey}.current`}
-                  stroke={colorizedCategoryConfig[categoryKey as keyof typeof colorizedCategoryConfig].color}
+                  stroke={colorizedCategoryConfig[categoryKey].color}
                   fill={categoryChartMode === 'stacked' 
-                    ? colorizedCategoryConfig[categoryKey as keyof typeof colorizedCategoryConfig].color 
+                    ? colorizedCategoryConfig[categoryKey].color 
                     : `url(#gradient-${categoryKey})`}
                   fillOpacity={categoryChartMode === 'stacked' ? 0.4 : 1}
                   strokeWidth={2}
                   dot={false}
-                  name={String(colorizedCategoryConfig[categoryKey as keyof typeof colorizedCategoryConfig].label)}
+                  name={String(colorizedCategoryConfig[categoryKey].label)}
                   stackId={categoryChartMode === 'stacked' ? "1" : undefined}
                 />
               )
@@ -301,12 +310,12 @@ export function CategoryTimeSeriesCard({
             >
               <div 
                 style={{ 
-                  backgroundColor: colorizedCategoryConfig[key as keyof typeof colorizedCategoryConfig].color 
+                  backgroundColor: colorizedCategoryConfig[key].color 
                 }} 
                 className="w-2 h-2 rounded-full" 
               />
               <span className="text-xs text-gray-500 font-medium">
-                {colorizedCategoryConfig[key as keyof typeof colorizedCategoryConfig].label}
+                {colorizedCategoryConfig[key].label}
               </span>
             </div>
           ))}

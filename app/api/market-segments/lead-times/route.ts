@@ -183,7 +183,7 @@ export async function GET(request: Request) {
       // Make sure the booking_lead_time dataset exists
       if (!dataByMarketSegment[marketSegment].datasets.booking_lead_time) {
         dataByMarketSegment[marketSegment].datasets.booking_lead_time = {
-          title: "Lead Time",
+          title: "Booking Lead Time",
           data: []
         };
       }
@@ -241,7 +241,7 @@ export async function GET(request: Request) {
       // Make sure the booking_lead_time dataset exists
       if (!dataByMarketSegment[marketSegment].datasets.booking_lead_time) {
         dataByMarketSegment[marketSegment].datasets.booking_lead_time = {
-          title: "Lead Time",
+          title: "Booking Lead Time",
           data: []
         };
       }
@@ -316,7 +316,7 @@ export async function GET(request: Request) {
       } else {
         // Create the dataset if it doesn't exist
         dataByMarketSegment[segment].datasets.booking_lead_time = {
-          title: "Lead Time",
+          title: "Booking Lead Time",
           data: Array.from(bookingLeadTimeBuckets).map(bucket => ({
             range: bucket,
             current: 0,

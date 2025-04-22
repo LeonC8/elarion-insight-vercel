@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { ClickHouseClient, createClient, ResultSet, DataFormat } from '@clickhouse/client';
 import { calculateDateRanges, calculateComparisonDateRanges } from '@/lib/dateUtils';
+import { getFullNameFromCode, getCodeFromFullName } from '@/lib/countryUtils';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -193,15 +194,26 @@ function roundValue(value: number): number {
   return value >= 100 ? Math.round(value) : Number(value.toFixed(2));
 }
 
-// Helper function to generate a code from a name
-function generateCode(name: string): string {
+// Updated Helper function to generate a code from a name, considering the field type
+function generateCode(name: string, field: string): string {
+  // Use the utility function for guest countries to get the 2-letter code
+  if (field === 'guest_country') {
+    // If the input 'name' is already a code (e.g., during time series processing), return it directly
+    // Otherwise, assume it's a full name and get the code.
+    // This check might need refinement based on exactly what's passed in different scenarios.
+    // A simpler approach might be to consistently pass the full name here.
+    // For now, let's assume 'name' is the display name (full country name).
+    return getCodeFromFullName(name);
+  }
+  // Keep original logic for other fields (like producers)
   return name.toString().toLowerCase().replace(/\s+/g, '_');
 }
 
 // Interface for raw metric data from consolidated query
 interface ConsolidatedMetricItem {
     primary_field: string;
-    field_name: string; // This is the secondary field value
+    // field_name will store the raw value (e.g., country code or producer ID string)
+    field_name: string; 
     current_rooms_sold: number;
     current_room_revenue: number;
     current_total_revenue: number;
@@ -214,7 +226,8 @@ interface ConsolidatedMetricItem {
 interface ConsolidatedTimeSeriesItem {
     primary_field: string;
     date_period: string;
-    field_name: string; // This is the secondary field value
+    // field_name will store the raw value (e.g., country code or producer ID string)
+    field_name: string; 
     is_current_period: 1 | 0;
     rooms_sold: number;
     room_revenue: number;
@@ -283,16 +296,46 @@ export async function GET(request: Request) {
       password: process.env.CLICKHOUSE_PASSWORD || 'elarion'
     });
 
-    // Add field-specific filters
-    const primaryFieldFilters = `
-      AND ${primaryField} != ''
-      AND ${primaryField} IS NOT NULL
-    `;
+    // Add field-specific filters based on field type
+    let primaryFieldSpecificFilters = '';
+    if (primaryField === 'guest_country') {
+      primaryFieldSpecificFilters = `
+        AND ${primaryField} != 'UNDEFINED'
+        AND ${primaryField} != ''
+        AND ${primaryField} IS NOT NULL
+      `;
+    } else {
+        // Default filters for other string-like fields
+        primaryFieldSpecificFilters = `
+            AND ${primaryField} != ''
+            AND ${primaryField} IS NOT NULL
+        `;
+        // Add specific filters for numeric IDs like 'producer' if needed
+        if (primaryField === 'producer') {
+             primaryFieldSpecificFilters += ` AND ${primaryField} != -1`;
+        }
+    }
     
-    const secondaryFieldFilters = `
-      AND toString(${secondaryField}) != ''
-      AND ${secondaryField} IS NOT NULL
-    `;
+    let secondaryFieldSpecificFilters = '';
+    // Use toString() only if the secondary field is not already a string type like guest_country
+    const secondaryFieldSelector = secondaryField === 'guest_country' ? secondaryField : `toString(${secondaryField})`;
+    
+    if (secondaryField === 'guest_country') {
+      secondaryFieldSpecificFilters = `
+        AND ${secondaryField} != 'UNDEFINED'
+        AND ${secondaryField} != ''
+        AND ${secondaryField} IS NOT NULL
+      `;
+    } else {
+      secondaryFieldSpecificFilters = `
+        AND ${secondaryFieldSelector} != '' 
+        AND ${secondaryField} IS NOT NULL 
+      `;
+       // Add specific filters for numeric IDs like 'producer' if needed
+       if (secondaryField === 'producer') {
+           secondaryFieldSpecificFilters += ` AND ${secondaryField} != -1`;
+       }
+    }
 
     // Rewrite the primary field query using a CTE to avoid the subquery scope issue
     const primaryFieldQuery = `
@@ -305,7 +348,7 @@ export async function GET(request: Request) {
               toDate(occupancy_date) BETWEEN '${startDate}' AND '${endDate}'
               AND date(scd_valid_from) <= DATE('${businessDateParam}')
               AND DATE('${businessDateParam}') < date(scd_valid_to)
-              ${primaryFieldFilters}
+              ${primaryFieldSpecificFilters} // Use specific filters
           GROUP BY field_value
       )
       SELECT field_value
@@ -328,11 +371,11 @@ export async function GET(request: Request) {
     // Maps for name lookups (for producer names, etc)
     const nameMap = new Map<string, string>();
     
-    // If the secondary field is producer, get the producer names
+    // Get producer names ONLY if the secondary field is producer
     if (secondaryField === 'producer') {
       const producerQuery = `
         SELECT 
-          producer,
+          toString(producer) as producer_id_str, // Select as string for map key consistency
           producer_name
         FROM SAND01CN.producers
         WHERE 
@@ -350,9 +393,9 @@ export async function GET(request: Request) {
       
       const producerData = await producerResultSet.json() as any[];
       
-      // Build producer ID to name mapping
+      // Build producer ID string to name mapping
       producerData.forEach(item => {
-        nameMap.set(item.producer.toString(), item.producer_name);
+        nameMap.set(item.producer_id_str, item.producer_name);
       });
     }
 
@@ -360,7 +403,7 @@ export async function GET(request: Request) {
     const consolidatedMetricsQuery = `
       SELECT
         ${primaryField} AS primary_field,
-        toString(${secondaryField}) AS field_name,
+        ${secondaryFieldSelector} AS field_name, // Use adjusted selector
         SUM(CASE WHEN is_current THEN sold_rooms ELSE 0 END) AS current_rooms_sold,
         SUM(CASE WHEN is_current THEN roomRevenue ELSE 0 END) AS current_room_revenue,
         SUM(CASE WHEN is_current THEN totalRevenue ELSE 0 END) AS current_total_revenue,
@@ -376,10 +419,10 @@ export async function GET(request: Request) {
           toDate(occupancy_date) BETWEEN '${startDate}' AND '${endDate}'
           AND date(scd_valid_from) <= DATE('${businessDateParam}')
           AND DATE('${businessDateParam}') < date(scd_valid_to)
-          ${primaryFieldFilters}
-          ${secondaryFieldFilters}
+          ${primaryFieldSpecificFilters} // Use specific filters
+          ${secondaryFieldSpecificFilters} // Use specific filters
           -- Filter only for the top primary fields fetched earlier
-          AND ${primaryField} IN (${primaryFieldValues.map(v => `'${v}'`).join(',')})
+          AND ${primaryField} IN (${primaryFieldValues.map(v => typeof v === 'string' ? `'${v}'` : v).join(',')}) // Quote strings
 
         UNION ALL
 
@@ -391,10 +434,10 @@ export async function GET(request: Request) {
           toDate(occupancy_date) BETWEEN '${prevStartDate}' AND '${prevEndDate}'
           AND date(scd_valid_from) <= DATE('${prevBusinessDateParam}')
           AND DATE('${prevBusinessDateParam}') < date(scd_valid_to)
-          ${primaryFieldFilters}
-          ${secondaryFieldFilters}
+          ${primaryFieldSpecificFilters} // Use specific filters
+          ${secondaryFieldSpecificFilters} // Use specific filters
           -- Filter only for the top primary fields fetched earlier
-          AND ${primaryField} IN (${primaryFieldValues.map(v => `'${v}'`).join(',')})
+          AND ${primaryField} IN (${primaryFieldValues.map(v => typeof v === 'string' ? `'${v}'` : v).join(',')}) // Quote strings
       ) AS combined_data
       GROUP BY primary_field, field_name
     `;
@@ -408,7 +451,7 @@ export async function GET(request: Request) {
       SELECT
         ${primaryField} AS primary_field,
         ${timeScaleClause},
-        toString(${secondaryField}) AS field_name,
+        ${secondaryFieldSelector} AS field_name, // Use adjusted selector
         CASE
           WHEN toDate(occupancy_date) BETWEEN '${startDate}' AND '${endDate}'
             AND date(scd_valid_from) <= DATE('${businessDateParam}')
@@ -434,10 +477,10 @@ export async function GET(request: Request) {
             AND DATE('${prevBusinessDateParam}') < date(scd_valid_to)
           )
         )
-        ${primaryFieldFilters}
-        ${secondaryFieldFilters}
+        ${primaryFieldSpecificFilters} // Use specific filters
+        ${secondaryFieldSpecificFilters} // Use specific filters
         -- Filter only for the top primary fields fetched earlier
-        AND ${primaryField} IN (${primaryFieldValues.map(v => `'${v}'`).join(',')})
+        AND ${primaryField} IN (${primaryFieldValues.map(v => typeof v === 'string' ? `'${v}'` : v).join(',')}) // Quote strings
       GROUP BY primary_field, date_period, field_name, is_current_period
     `;
 
@@ -476,75 +519,90 @@ export async function GET(request: Request) {
     });
 
     // Process each primary field's data
-    for (const primaryValue of metricsByPrimaryField.keys()) {
+    for (const primaryValue of Array.from(metricsByPrimaryField.keys())) {
         const metricsData = metricsByPrimaryField.get(primaryValue) || [];
 
         // Skip if no data for this primary value in the current period
-        if (!metricsData.some((item: ConsolidatedMetricItem) => parseFloat(item.current_total_revenue || '0') > 0)) {
+        if (!metricsData.some((item: ConsolidatedMetricItem) => Number(item.current_total_revenue || 0) > 0)) {
             continue;
         }
         
         // Sort by current total revenue and limit to top N items
         metricsData.sort((a: ConsolidatedMetricItem, b: ConsolidatedMetricItem) =>
-            (b.current_total_revenue || 0) - (a.current_total_revenue || 0)
+            Number(b.current_total_revenue || 0) - Number(a.current_total_revenue || 0)
         );
         const topNMetricsData = metricsData.slice(0, limit);
         
-        // Helper function to get display name
-        const getDisplayName = (fieldValue: string): string => {
-            if (secondaryField === 'producer' && nameMap.has(fieldValue)) {
-                return nameMap.get(fieldValue) || `Producer ${fieldValue}`;
-            }
-            return fieldValue;
+        // Updated helper function to get display name, considering the field type
+        const getDisplayName = (fieldValue: string, field: string): string => {
+          if (field === 'guest_country') {
+            // Use the utility function to convert code to full name
+            return getFullNameFromCode(fieldValue); // Assumes fieldValue is the country code
+          }
+          if (field === 'producer' && nameMap.has(fieldValue)) {
+            // Use the pre-fetched producer name map
+            return nameMap.get(fieldValue) || `Producer ${fieldValue}`;
+          }
+          // Fallback for other fields or if lookup fails
+          return fieldValue; 
         };
         
         // Process revenue data
         const revenueData: AnalysisData[] = topNMetricsData.map((item: ConsolidatedMetricItem) => {
-            const value = parseFloat(item.current_total_revenue || '0');
-            const prevValue = parseFloat(item.previous_total_revenue || '0');
+            // Fix parseFloat error by converting input to string or using Number()
+            const value = Number(item.current_total_revenue || 0);
+            const prevValue = Number(item.previous_total_revenue || 0);
             const change = value - prevValue;
-            const displayName = getDisplayName(item.field_name);
+            // Get display name using the secondary field value and type
+            const displayName = getDisplayName(item.field_name, secondaryField); 
             
             return {
                 name: displayName,
                 value: roundValue(value),
                 change: roundValue(change),
-                code: generateCode(displayName)
+                // Generate code using the display name and secondary field type
+                code: generateCode(displayName, secondaryField) 
             };
         });
 
         // Process rooms sold data
         const roomsSoldData: AnalysisData[] = topNMetricsData.map((item: ConsolidatedMetricItem) => {
-            const value = parseFloat(item.current_rooms_sold || '0');
-            const prevValue = parseFloat(item.previous_rooms_sold || '0');
+            // Fix parseFloat error by converting input to string or using Number()
+            const value = Number(item.current_rooms_sold || 0);
+            const prevValue = Number(item.previous_rooms_sold || 0);
             const change = value - prevValue;
-            const displayName = getDisplayName(item.field_name);
+            // Get display name using the secondary field value and type
+            const displayName = getDisplayName(item.field_name, secondaryField);
 
             return {
                 name: displayName,
                 value: roundValue(value),
                 change: roundValue(change),
-                code: generateCode(displayName)
+                // Generate code using the display name and secondary field type
+                code: generateCode(displayName, secondaryField)
             };
         });
 
         // Process ADR (Average Daily Rate)
         const adrData: AnalysisData[] = topNMetricsData.map((item: ConsolidatedMetricItem) => {
-            const currentRoomsSold = parseFloat(item.current_rooms_sold || '0');
-            const currentRoomRevenue = parseFloat(item.current_room_revenue || '0');
-            const prevRoomsSold = parseFloat(item.previous_rooms_sold || '0');
-            const prevRoomRevenue = parseFloat(item.previous_room_revenue || '0');
+            // Fix parseFloat error by converting input to string or using Number()
+            const currentRoomsSold = Number(item.current_rooms_sold || 0);
+            const currentRoomRevenue = Number(item.current_room_revenue || 0);
+            const prevRoomsSold = Number(item.previous_rooms_sold || 0);
+            const prevRoomRevenue = Number(item.previous_room_revenue || 0);
             
             const currentAdr = currentRoomsSold > 0 ? currentRoomRevenue / currentRoomsSold : 0;
             const prevAdr = prevRoomsSold > 0 ? prevRoomRevenue / prevRoomsSold : 0;
             const change = currentAdr - prevAdr;
-            const displayName = getDisplayName(item.field_name);
+            // Get display name using the secondary field value and type
+            const displayName = getDisplayName(item.field_name, secondaryField);
 
             return {
                 name: displayName,
                 value: roundValue(currentAdr),
                 change: roundValue(change),
-                code: generateCode(displayName)
+                // Generate code using the display name and secondary field type
+                code: generateCode(displayName, secondaryField)
             };
         });
         
@@ -552,12 +610,15 @@ export async function GET(request: Request) {
         const timeSeriesForPrimary = timeSeriesByPrimaryField.get(primaryValue) || [];
         const timeSeriesMap = new Map<string, Map<string, { current: number; previous: number }>>();
         const dateSet = new Set<string>();
-        const topNFieldCodes = new Set(topNMetricsData.map((item: ConsolidatedMetricItem) => generateCode(getDisplayName(item.field_name)))); // Get codes for top N fields
+        // Generate codes for the top N secondary fields based on their display names
+        const topNFieldCodes = new Set(topNMetricsData.map((item: ConsolidatedMetricItem) => generateCode(getDisplayName(item.field_name, secondaryField), secondaryField))); 
 
         timeSeriesForPrimary.forEach((item: ConsolidatedTimeSeriesItem) => {
             const date = item.date_period.toString();
-            const displayName = getDisplayName(item.field_name);
-            const fieldCode: string = generateCode(displayName); // Explicitly type fieldCode as string
+            // Get display name first from the raw field_name (e.g., country code)
+            const displayName = getDisplayName(item.field_name, secondaryField);
+            // Generate the code (e.g., 2-letter country code) from the display name
+            const fieldCode: string = generateCode(displayName, secondaryField); 
             
             // Only process data for fields that are in the top N for the overall period
             if (!topNFieldCodes.has(fieldCode)) {
@@ -575,11 +636,12 @@ export async function GET(request: Request) {
                 dateMap.set(fieldCode, { current: 0, previous: 0 });
             }
             const entry = dateMap.get(fieldCode)!;
-            const revenue = item.total_revenue || 0;
-            const isCurrent = item.is_current_period === 1; // Check the flag from the query
+            // Use Number() to ensure correct type
+            const revenue = Number(item.total_revenue || 0); 
+            const isCurrent = item.is_current_period === 1; 
 
             if (isCurrent) {
-                entry.current += revenue; // Use += in case data for same day/field/period split across rows
+                entry.current += revenue; 
             } else {
                 entry.previous += revenue;
             }
@@ -595,7 +657,7 @@ export async function GET(request: Request) {
                 // Ensure all top N field codes are present, even if they have zero values for this date
                 topNFieldCodes.forEach(fieldCode => { // fieldCode is already string here
                     const data = categoryMap.get(fieldCode) || { current: 0, previous: 0 };
-                    // Round the final values here if desired
+                    // Round the final values here
                     categories[fieldCode] = {
                         current: roundValue(data.current),
                         previous: roundValue(data.previous)
@@ -608,7 +670,11 @@ export async function GET(request: Request) {
                 };
             });
 
-        // Add to groupedData
+        // Add to groupedData (using the raw primaryValue as the key)
+        // If primaryField is guest_country, primaryValue will be the country code.
+        // If you need the full name as the key, you'd use:
+        // const primaryDisplayKey = getDisplayName(primaryValue, primaryField);
+        // groupedData[primaryDisplayKey] = { ... }
         groupedData[primaryValue] = {
           revenue: revenueData,
           roomsSold: roomsSoldData,
