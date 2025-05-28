@@ -1,82 +1,80 @@
-"use client"
+"use client";
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect } from "react";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { 
-  ChevronDownIcon, 
+} from "@/components/ui/dropdown-menu";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  ChevronDownIcon,
   DownloadIcon,
   Check,
-  DollarSign, 
-  Percent, 
-  Hotel, 
-  Building
-} from 'lucide-react'
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
-import { DatePickerDemo as DatePicker } from "@/components/ui/date-picker"
-import dynamic from 'next/dynamic'
-import { TopFive } from '../new/TopFive'
-import { KpiWithChart } from '../new/KpiWithChart'
-import { Kpi } from '../new/Kpi'
-import { ChartConfig } from '@/components/ui/chart'
-import type { CategoryTimeSeriesData } from '@/components/new/CategoriesDetailsDialog'
-import { ReservationsByDayChart } from '../new/ReservationsByDayChart'
-import { HorizontalBarChart } from '../new/HorizontalBarChart'
-import { HotelSelector } from '../new/HotelSelector'
-import { HorizontalBarChartMultipleDatasets } from "../new/HorizontalBarChartMultipleDatasets"
-import { addDays } from "date-fns"
-import { OccupancyAnalysisChart } from '../new/OccupancyAnalysisChart'
-import { KpiResponse } from '@/app/api/overview/general/route'
-import { KpiWithAlignedChart } from '../new/KpiWithAlignedChart'
-import { usePersistentOverviewFilters } from '@/hooks/usePersistentOverviewFilters'; // Import the custom hook
-import { getCodeFromFullName } from '@/lib/countryUtils'; // <-- Import the utility function
+  DollarSign,
+  Percent,
+  Hotel,
+  Building,
+} from "lucide-react";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { DatePickerDemo as DatePicker } from "@/components/ui/date-picker";
+import dynamic from "next/dynamic";
+import { TopFive } from "../new/TopFive";
+import { KpiWithChart } from "../new/KpiWithChart";
+import { Kpi } from "../new/Kpi";
+import { ChartConfig } from "@/components/ui/chart";
+import type { CategoryTimeSeriesData } from "@/components/new/CategoriesDetailsDialog";
+import { ReservationsByDayChart } from "../new/ReservationsByDayChart";
+import { HorizontalBarChart } from "../new/HorizontalBarChart";
+import { HotelSelector } from "../new/HotelSelector";
+import { HorizontalBarChartMultipleDatasets } from "../new/HorizontalBarChartMultipleDatasets";
+import { addDays } from "date-fns";
+import { OccupancyAnalysisChart } from "../new/OccupancyAnalysisChart";
+import { KpiResponse } from "@/app/api/overview/general/route";
+import { KpiWithAlignedChart } from "../new/KpiWithAlignedChart";
+import { usePersistentOverviewFilters } from "@/hooks/usePersistentOverviewFilters"; // Import the custom hook
+import { getCodeFromFullName } from "@/lib/countryUtils"; // <-- Import the utility function
 
 // Dynamic import for WorldMap with loading state
 const WorldMap = dynamic(
-  () => import('react-svg-worldmap').then(mod => mod.default),
-  { 
-    ssr: false, 
+  () => import("react-svg-worldmap").then((mod) => mod.default),
+  {
+    ssr: false,
     loading: () => (
       <div className="h-[500px] flex items-center justify-center">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
       </div>
-    )
+    ),
   }
-)
+);
 
 // Keep utility functions and component definitions
 function TriangleDown({ className }: { className?: string }) {
   return (
-    <svg 
-      width="8" 
-      height="6" 
-      viewBox="0 0 8 6" 
-      fill="currentColor" 
+    <svg
+      width="8"
+      height="6"
+      viewBox="0 0 8 6"
+      fill="currentColor"
       className={className}
     >
       <path d="M4 6L0 0L8 0L4 6Z" />
     </svg>
-  )
+  );
 }
 
 // First, let's add a Skeleton component at the top of the file after the imports
 function Skeleton({ className }: { className?: string }) {
-  return (
-    <div className={`animate-pulse rounded bg-gray-200 ${className}`} />
-  )
+  return <div className={`animate-pulse rounded bg-gray-200 ${className}`} />;
 }
 
 // Add a mapping for the metric keys
 const metricKeyMapping: Record<string, string> = {
-  'revenue': 'revenue',
-  'rooms': 'roomsSold', // Map 'rooms' to 'roomsSold' as returned by the API
-  'adr': 'adr'
+  revenue: "revenue",
+  rooms: "roomsSold", // Map 'rooms' to 'roomsSold' as returned by the API
+  adr: "adr",
 };
 
 export function Overview() {
@@ -93,100 +91,103 @@ export function Overview() {
   } = usePersistentOverviewFilters();
 
   // Basic state for hotel selection
-  const [selectedHotels, setSelectedHotels] = useState<string[]>(["Hotel 1"])
-  const allHotels = ["Hotel 1", "Hotel 2", "Hotel 3"] // Keep this simple example or fetch dynamically later
+  const [selectedHotels, setSelectedHotels] = useState<string[]>(["Hotel 1"]);
+  const allHotels = ["Hotel 1", "Hotel 2", "Hotel 3"]; // Keep this simple example or fetch dynamically later
 
   // Add state for API data
-  const [kpiData, setKpiData] = useState<KpiResponse | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const [kpiData, setKpiData] = useState<KpiResponse | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [primaryDataLoaded, setPrimaryDataLoaded] = useState(false); // Keep this
-  const [worldMapData, setWorldMapData] = useState<Array<{ country: string; value: number }>>([]); // Keep this
-  const [selectedMapMetric, setSelectedMapMetric] = useState('revenue'); // Keep this
+  const [worldMapData, setWorldMapData] = useState<
+    Array<{ country: string; value: number }>
+  >([]); // Keep this
+  const [selectedMapMetric, setSelectedMapMetric] = useState("revenue"); // Keep this
 
   // Keep analysisApiParams state and its useEffect (it now depends on the hook's state)
   const [analysisApiParams, setAnalysisApiParams] = useState({
-    businessDate: date.toISOString().split('T')[0],
+    businessDate: date.toISOString().split("T")[0],
     periodType: selectedTimeFrame,
     viewType: selectedViewType,
-    comparison: selectedComparison
+    comparison: selectedComparison,
   });
 
   useEffect(() => {
     setAnalysisApiParams({
-      businessDate: date.toISOString().split('T')[0], // Uses date from the hook
-      periodType: selectedTimeFrame,                 // Uses selectedTimeFrame from the hook
-      viewType: selectedViewType,                   // Uses selectedViewType from the hook
-      comparison: selectedComparison                // Uses selectedComparison from the hook
+      businessDate: date.toISOString().split("T")[0], // Uses date from the hook
+      periodType: selectedTimeFrame, // Uses selectedTimeFrame from the hook
+      viewType: selectedViewType, // Uses selectedViewType from the hook
+      comparison: selectedComparison, // Uses selectedComparison from the hook
     });
   }, [date, selectedTimeFrame, selectedViewType, selectedComparison]); // Dependencies are now from the hook
 
   // Modify the fetchKpiData function to mark primary data as loaded
   const fetchKpiData = async () => {
     try {
-      setLoading(true)
-      setPrimaryDataLoaded(false)
-      setError(null)
-      
+      setLoading(true);
+      setPrimaryDataLoaded(false);
+      setError(null);
+
       // Format the date for the API
-      const formattedDate = date.toISOString().split('T')[0]
-      
+      const formattedDate = date.toISOString().split("T")[0];
+
       // Construct the query parameters
       const params = new URLSearchParams({
         businessDate: formattedDate,
         periodType: selectedTimeFrame,
         viewType: selectedViewType,
-        comparison: selectedComparison
-      })
-      
+        comparison: selectedComparison,
+      });
+
       // Fetch data from the API
-      const response = await fetch(`/api/overview/general?${params.toString()}`)
-      
+      const response = await fetch(
+        `/api/overview/general?${params.toString()}`
+      );
+
       if (!response.ok) {
-        throw new Error(`Failed to fetch data: ${response.status}`)
+        throw new Error(`Failed to fetch data: ${response.status}`);
       }
-      
-      const data = await response.json()
-      setKpiData(data)
-      
+
+      const data = await response.json();
+      setKpiData(data);
+
       // Mark primary data as loaded and trigger secondary data loads
-      setPrimaryDataLoaded(true)
-      
+      setPrimaryDataLoaded(true);
     } catch (err) {
-      console.error('Error fetching KPI data:', err)
-      setError(err instanceof Error ? err.message : 'An unknown error occurred')
+      console.error("Error fetching KPI data:", err);
+      setError(
+        err instanceof Error ? err.message : "An unknown error occurred"
+      );
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   // Update the initial data loading useEffect
   useEffect(() => {
-    fetchKpiData()
+    fetchKpiData();
     // Only fetch primary data here
-  }, [date, selectedTimeFrame, selectedViewType, selectedComparison])
+  }, [date, selectedTimeFrame, selectedViewType, selectedComparison]);
 
   const toggleHotel = (hotel: string) => {
-    setSelectedHotels(prev => 
-      prev.includes(hotel) 
-        ? prev.filter(h => h !== hotel) 
-        : [...prev, hotel]
-    )
-  }
+    setSelectedHotels((prev) =>
+      prev.includes(hotel) ? prev.filter((h) => h !== hotel) : [...prev, hotel]
+    );
+  };
 
   const toggleAllHotels = () => {
-    setSelectedHotels(prev => 
+    setSelectedHotels((prev) =>
       prev.length === allHotels.length ? [] : [...allHotels]
-    )
-  }
+    );
+  };
 
   const toggleRegion = (regionHotels: string[], e: React.MouseEvent) => {
     // Note: This relies on hotelsByRegion which was removed.
     // You'll need to fetch/manage hotel groupings differently if this feature is kept.
     // For now, this function will likely not work as expected without the constant.
     // Consider disabling or refactoring hotel grouping.
-    e.preventDefault()
-    e.stopPropagation()
+    e.preventDefault();
+    e.stopPropagation();
 
     // Example: Assuming you fetch or manage regions elsewhere
     // const allSelected = regionHotels.every(hotel => selectedHotels.includes(hotel))
@@ -195,13 +196,13 @@ export function Overview() {
     // } else {
     //   setSelectedHotels(prev => [...Array.from(new Set([...prev, ...regionHotels]))])
     // }
-  }
+  };
 
   const toggleBrand = (brandHotels: string[], e: React.MouseEvent) => {
     // Note: This relies on hotelsByBrand which was removed.
     // Similar to toggleRegion, this needs refactoring.
-    e.preventDefault()
-    e.stopPropagation()
+    e.preventDefault();
+    e.stopPropagation();
 
     // Example: Assuming you fetch or manage brands elsewhere
     // const allSelected = brandHotels.every(hotel => selectedHotels.includes(hotel))
@@ -210,50 +211,51 @@ export function Overview() {
     // } else {
     //   setSelectedHotels(prev => [...Array.from(new Set([...prev, ...brandHotels]))])
     // }
-  }
+  };
 
   // Update handleDateChange to use the setter from the hook
   const handleDateChange = (newDate: Date | undefined) => {
     // The hook's setDate handles the undefined case and checks for actual change
     setDate(newDate);
     // Data fetching is handled by the main useEffect dependency change
-  }
+  };
 
   // Modify the fetchWorldMapData function to use the mapping and convert country names
   const fetchWorldMapData = async (metric: string = selectedMapMetric) => {
     try {
       const params = new URLSearchParams({
-        businessDate: date.toISOString().split('T')[0],
+        businessDate: date.toISOString().split("T")[0],
         periodType: selectedTimeFrame,
         viewType: selectedViewType,
         comparison: selectedComparison,
-        field: 'guest_country',
-        limit: '50'
+        field: "guest_country",
+        limit: "50",
       });
-      
+
       const response = await fetch(`/api/overview/distribution?${params}`);
-      if (!response.ok) throw new Error('Failed to fetch world map data');
-      
+      if (!response.ok) throw new Error("Failed to fetch world map data");
+
       const data = await response.json();
-      
+
       // Use the mapped metric key to access the correct data
       const mappedMetric = metricKeyMapping[metric] || metric;
-      
+
       // Check if the data for the mapped metric exists and is an array
       if (data && Array.isArray(data[mappedMetric])) {
-          const transformedData = data[mappedMetric].map((item: any) => ({
-            // Convert the full name to a 2-letter code using the utility function
-            country: getCodeFromFullName(item.name), 
-            value: item.value
-          }));
-          setWorldMapData(transformedData);
+        const transformedData = data[mappedMetric].map((item: any) => ({
+          // Convert the full name to a 2-letter code using the utility function
+          country: getCodeFromFullName(item.name),
+          value: item.value,
+        }));
+        setWorldMapData(transformedData);
       } else {
-         console.warn(`Data for metric '${mappedMetric}' not found or not an array in API response.`);
-         setWorldMapData([]); // Set to empty array if data is missing/invalid
+        console.warn(
+          `Data for metric '${mappedMetric}' not found or not an array in API response.`
+        );
+        setWorldMapData([]); // Set to empty array if data is missing/invalid
       }
-      
     } catch (error) {
-      console.error('Error fetching world map data:', error);
+      console.error("Error fetching world map data:", error);
       setWorldMapData([]); // Reset data on error
     }
   };
@@ -261,155 +263,228 @@ export function Overview() {
   // Update useEffect to include selectedMapMetric in dependencies
   useEffect(() => {
     fetchWorldMapData();
-  }, [date, selectedTimeFrame, selectedViewType, selectedComparison, selectedMapMetric]);
+  }, [
+    date,
+    selectedTimeFrame,
+    selectedViewType,
+    selectedComparison,
+    selectedMapMetric,
+  ]);
 
   return (
     <div className="flex-1 overflow-auto bg-[#f5f8ff]">
-        {/* Header Section */}
-        {/* Update the header div to support flex-row and space-between layout on large screens */}
-        <div className="sticky top-0 left-0 right-0 z-30 flex flex-col lg:flex-row lg:items-center lg:justify-between bg-white py-4 lg:py-6 lg:px-12 border-b border-gray-300 shadow-sm">
-          
-          {/* Title Block - Visible ONLY on Large Screens */}
-          <div className="hidden lg:block"> {/* This block is hidden by default, shown on lg screens */}
-            <h2 className="text-xl md:text-2xl font-bold text-gray-800 mb-1">Overview</h2>
-            <span className='text-gray-500 font-light mt-1 pt-1 text-sm'>{`${selectedTimeFrame} ${selectedViewType}`}</span>
-          </div>
-
-          {/* Filters container - Adjust padding and width for large screens */}
-          {/* Change w-full to lg:w-auto so it doesn't take full width on large screens */}
-          <div className="flex flex-nowrap items-end gap-x-4 lg:gap-x-8 gap-y-3 overflow-x-auto pb-2 lg:pb-0 w-full lg:w-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100 px-4 md:px-6 lg:px-0"> 
-            {/* Combined Time Frame and View Type Dropdown */}
-            {/* No changes needed here */}
-            <div className="flex flex-col flex-shrink-0"> 
-              <span className="text-xs text-gray-500 mb-2">Selected period</span>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button 
-                    variant="ghost" 
-                    className="bg-[#f2f8ff] hover:bg-[#f2f8ff] text-[#342630] rounded-full px-4"
-                  >
-                    {`${selectedTimeFrame} ${selectedViewType}`} <TriangleDown className="ml-2" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent className="w-56">
-                  {/* Day Group */}
-                  <div className="px-2 py-2 text-sm font-semibold text-gray-800  border-b border-gray-300">
-                    Day
-                  </div>
-                  <div className="p-1 text-gray-600">
-                    <DropdownMenuItem onSelect={() => { setSelectedTimeFrame("Day"); setSelectedViewType("Actual"); }}>
-                      Actual
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onSelect={() => { setSelectedTimeFrame("Day"); setSelectedViewType("OTB"); }}>
-                      OTB
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onSelect={() => { setSelectedTimeFrame("Day"); setSelectedViewType("Projected"); }}>
-                      Projected
-                    </DropdownMenuItem>
-                  </div>
-                  
-                  {/* Month Group */}
-                  <div className="px-2 py-2 text-sm font-semibold text-gray-800  border-y border-gray-300">
-                    Month
-                  </div>
-                  <div className="p-1 text-gray-600">
-                    <DropdownMenuItem onSelect={() => { setSelectedTimeFrame("Month"); setSelectedViewType("Actual"); }}>
-                      Actual
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onSelect={() => { setSelectedTimeFrame("Month"); setSelectedViewType("OTB"); }}>
-                      OTB
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onSelect={() => { setSelectedTimeFrame("Month"); setSelectedViewType("Projected"); }}>
-                      Projected
-                    </DropdownMenuItem>
-                  </div>
-                  
-                  {/* Year Group */}
-                  <div className="px-2 py-2 text-sm font-semibold text-gray-800  border-y border-gray-300">
-                    Year
-                  </div>
-                  <div className="p-1">
-                    <DropdownMenuItem onSelect={() => { setSelectedTimeFrame("Year"); setSelectedViewType("Actual"); }}>
-                      Actual
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onSelect={() => { setSelectedTimeFrame("Year"); setSelectedViewType("OTB"); }}>
-                      OTB
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onSelect={() => { setSelectedTimeFrame("Year"); setSelectedViewType("Projected"); }}>
-                      Projected
-                    </DropdownMenuItem>
-                  </div>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-
-            {/* Comparison Dropdown with Label */}
-            <div className="flex flex-col flex-shrink-0"> 
-              <span className="text-xs text-gray-500 mb-2">Compare with:</span>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button 
-                    variant="ghost" 
-                    className="bg-[#f2f8ff] hover:bg-[#f2f8ff] text-[#342630] rounded-full px-4"
-                  >
-                    {selectedComparison} <TriangleDown className="ml-2" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent>
-                  <DropdownMenuItem onSelect={() => setSelectedComparison("Last year - OTB")}>
-                     Last year - OTB
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onSelect={() => setSelectedComparison("Last year (match day of week) - OTB")}>
-                     Last year (match day of week) - OTB
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onSelect={() => setSelectedComparison("Last year - Actual")}>
-                     Last year - Actual
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onSelect={() => setSelectedComparison("Last year (match day of week) - Actual")}>
-                     Last year (match day of week) - Actual
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-
-            {/* Date Picker with Label */}
-            <div className="flex flex-col flex-shrink-0"> 
-              <span className="text-xs text-gray-500 mb-2">Business date</span>
-              <DatePicker
-                date={date} // Uses date from the hook
-                onDateChange={handleDateChange} // Uses the updated handler
-              />
-            </div>
-
-            {/* Hotel Selector with Label */}
-            <div className="flex flex-col flex-shrink-0"> 
-              <span className="text-xs text-gray-500 mb-2">Property</span>
-              <HotelSelector 
-                selectedHotels={selectedHotels}
-                setSelectedHotels={setSelectedHotels}
-              />
-            </div>
-
-            {/* Export Button - Removed for brevity, add back if needed */}
-            
-          </div>
+      {/* Header Section */}
+      {/* Update the header div to support flex-row and space-between layout on large screens */}
+      <div className="sticky top-0 left-0 right-0 z-30 flex flex-col lg:flex-row lg:items-center lg:justify-between bg-white py-4 lg:py-6 lg:px-12 border-b border-gray-300 shadow-sm">
+        {/* Title Block - Visible ONLY on Large Screens */}
+        <div className="hidden lg:block">
+          {" "}
+          {/* This block is hidden by default, shown on lg screens */}
+          <h2 className="text-xl md:text-2xl font-bold text-gray-800 mb-1">
+            Overview
+          </h2>
+          <span className="text-gray-500 font-light mt-1 pt-1 text-sm">{`${selectedTimeFrame} ${selectedViewType}`}</span>
         </div>
+
+        {/* Filters container - Adjust padding and width for large screens */}
+        {/* Change w-full to lg:w-auto so it doesn't take full width on large screens */}
+        <div className="flex flex-nowrap items-end gap-x-4 lg:gap-x-8 gap-y-3 overflow-x-auto pb-2 lg:pb-0 w-full lg:w-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100 px-4 md:px-6 lg:px-0">
+          {/* Combined Time Frame and View Type Dropdown */}
+          {/* No changes needed here */}
+          <div className="flex flex-col flex-shrink-0">
+            <span className="text-xs text-gray-500 mb-2">Selected period</span>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  className="bg-[#f2f8ff] hover:bg-[#f2f8ff] text-[#342630] rounded-full px-4"
+                >
+                  {`${selectedTimeFrame} ${selectedViewType}`}{" "}
+                  <TriangleDown className="ml-2" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent className="w-56">
+                {/* Day Group */}
+                <div className="px-2 py-2 text-sm font-semibold text-gray-800  border-b border-gray-300">
+                  Day
+                </div>
+                <div className="p-1 text-gray-600">
+                  <DropdownMenuItem
+                    onSelect={() => {
+                      setSelectedTimeFrame("Day");
+                      setSelectedViewType("Actual");
+                    }}
+                  >
+                    Actual
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onSelect={() => {
+                      setSelectedTimeFrame("Day");
+                      setSelectedViewType("OTB");
+                    }}
+                  >
+                    OTB
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onSelect={() => {
+                      setSelectedTimeFrame("Day");
+                      setSelectedViewType("Projected");
+                    }}
+                  >
+                    Projected
+                  </DropdownMenuItem>
+                </div>
+
+                {/* Month Group */}
+                <div className="px-2 py-2 text-sm font-semibold text-gray-800  border-y border-gray-300">
+                  Month
+                </div>
+                <div className="p-1 text-gray-600">
+                  <DropdownMenuItem
+                    onSelect={() => {
+                      setSelectedTimeFrame("Month");
+                      setSelectedViewType("Actual");
+                    }}
+                  >
+                    Actual
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onSelect={() => {
+                      setSelectedTimeFrame("Month");
+                      setSelectedViewType("OTB");
+                    }}
+                  >
+                    OTB
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onSelect={() => {
+                      setSelectedTimeFrame("Month");
+                      setSelectedViewType("Projected");
+                    }}
+                  >
+                    Projected
+                  </DropdownMenuItem>
+                </div>
+
+                {/* Year Group */}
+                <div className="px-2 py-2 text-sm font-semibold text-gray-800  border-y border-gray-300">
+                  Year
+                </div>
+                <div className="p-1">
+                  <DropdownMenuItem
+                    onSelect={() => {
+                      setSelectedTimeFrame("Year");
+                      setSelectedViewType("Actual");
+                    }}
+                  >
+                    Actual
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onSelect={() => {
+                      setSelectedTimeFrame("Year");
+                      setSelectedViewType("OTB");
+                    }}
+                  >
+                    OTB
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onSelect={() => {
+                      setSelectedTimeFrame("Year");
+                      setSelectedViewType("Projected");
+                    }}
+                  >
+                    Projected
+                  </DropdownMenuItem>
+                </div>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+
+          {/* Comparison Dropdown with Label */}
+          <div className="flex flex-col flex-shrink-0">
+            <span className="text-xs text-gray-500 mb-2">Compare with:</span>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  className="bg-[#f2f8ff] hover:bg-[#f2f8ff] text-[#342630] rounded-full px-4"
+                >
+                  {selectedComparison} <TriangleDown className="ml-2" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent>
+                <DropdownMenuItem
+                  onSelect={() => setSelectedComparison("Last year - OTB")}
+                >
+                  Last year - OTB
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onSelect={() =>
+                    setSelectedComparison("Last year (match day of week) - OTB")
+                  }
+                >
+                  Last year (match day of week) - OTB
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onSelect={() => setSelectedComparison("Last year - Actual")}
+                >
+                  Last year - Actual
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onSelect={() =>
+                    setSelectedComparison(
+                      "Last year (match day of week) - Actual"
+                    )
+                  }
+                >
+                  Last year (match day of week) - Actual
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+
+          {/* Date Picker with Label */}
+          <div className="flex flex-col flex-shrink-0">
+            <span className="text-xs text-gray-500 mb-2">Business date</span>
+            <DatePicker
+              date={date} // Uses date from the hook
+              onDateChange={handleDateChange} // Uses the updated handler
+            />
+          </div>
+
+          {/* Hotel Selector with Label */}
+          <div className="flex flex-col flex-shrink-0">
+            <span className="text-xs text-gray-500 mb-2">Property</span>
+            <HotelSelector
+              selectedHotels={selectedHotels}
+              setSelectedHotels={setSelectedHotels}
+            />
+          </div>
+
+          {/* Export Button - Removed for brevity, add back if needed */}
+        </div>
+      </div>
 
       {/* Main Content Area */}
       <div className="p-4 md:p-6 lg:p-8 lg:px-12">
         {/* Overview Title - MOVED LOGICALLY, this block now ONLY renders on mobile/medium */}
         {/* Add 'block lg:hidden' to hide this on large screens */}
-        <div className="block lg:hidden mb-6 md:mb-8"> {/* Added block lg:hidden */}
-          <h2 className="text-xl md:text-2xl font-bold text-gray-800 mb-1">Overview</h2>
-          <span className='text-gray-500 font-light mt-1 pt-1 text-sm'>{`${selectedTimeFrame} ${selectedViewType}`}</span>
+        <div className="block lg:hidden mb-6 md:mb-8">
+          {" "}
+          {/* Added block lg:hidden */}
+          <h2 className="text-xl md:text-2xl font-bold text-gray-800 mb-1">
+            Overview
+          </h2>
+          <span className="text-gray-500 font-light mt-1 pt-1 text-sm">{`${selectedTimeFrame} ${selectedViewType}`}</span>
         </div>
 
         {/* Show primary error if it exists */}
-        {error && !loading && ( // Only show if primary loading is done and error exists
-          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-6">
-            <p>Error loading main KPIs: {error}</p>
-          </div>
-        )}
+        {error &&
+          !loading && ( // Only show if primary loading is done and error exists
+            <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-6">
+              <p>Error loading main KPIs: {error}</p>
+            </div>
+          )}
 
         {/* KPI Grid - Responsive columns */}
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 md:gap-6 mb-6 md:mb-8">
@@ -427,7 +502,7 @@ export function Overview() {
             <>
               {/* Use empty array [] as fallback instead of hardcoded data */}
               <KpiWithAlignedChart
-                title="Revenue"
+                title="Total Revenue"
                 currentValue={kpiData?.totalRevenue.value ?? 0}
                 percentageChange={kpiData?.totalRevenue.percentageChange ?? 0}
                 chartData={kpiData?.totalRevenue.fluctuation ?? []} // Use []
@@ -473,15 +548,18 @@ export function Overview() {
           {loading ? ( // Use primary loading state for KPI skeletons
             <>
               {/* Apply col-span-2 to the first skeleton on mobile */}
-              <Card key={0} className="bg-white p-3 md:p-4 col-span-2 sm:col-span-1"> 
-                 <div className="flex justify-between items-start mb-2 md:mb-3">
-                   <Skeleton className="h-4 md:h-5 w-16 md:w-24" />
-                 </div>
-                 <Skeleton className="h-6 md:h-8 w-16 md:w-24 mb-1 md:mb-2" />
-                 <Skeleton className="h-3 md:h-4 w-10 md:w-16" />
+              <Card
+                key={0}
+                className="bg-white p-3 md:p-4 col-span-2 sm:col-span-1"
+              >
+                <div className="flex justify-between items-start mb-2 md:mb-3">
+                  <Skeleton className="h-4 md:h-5 w-16 md:w-24" />
+                </div>
+                <Skeleton className="h-6 md:h-8 w-16 md:w-24 mb-1 md:mb-2" />
+                <Skeleton className="h-3 md:h-4 w-10 md:w-16" />
               </Card>
               {/* Render the remaining skeletons */}
-              {[...Array(4)].map((_, index) => ( 
+              {[...Array(4)].map((_, index) => (
                 <Card key={index + 1} className="bg-white p-3 md:p-4">
                   <div className="flex justify-between items-start mb-2 md:mb-3">
                     <Skeleton className="h-4 md:h-5 w-16 md:w-24" />
@@ -495,7 +573,7 @@ export function Overview() {
             <>
               {/* Apply col-span-2 on mobile (default), revert on sm and up */}
               <div className="col-span-2 sm:col-span-1">
-                 {/* Use empty array [] as fallback instead of hardcoded data */}
+                {/* Use empty array [] as fallback instead of hardcoded data */}
                 <Kpi
                   title="Room Revenue"
                   currentValue={kpiData?.roomRevenue.value ?? 0}
@@ -544,14 +622,14 @@ export function Overview() {
 
         {/* Top Producers and Occupancy Analysis - Stack vertically on medium screens */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8 mt-6 md:mt-8">
-           {/* Remove hardcoded data from metrics, use empty fallbacks for distribution/category/config */}
+          {/* Remove hardcoded data from metrics, use empty fallbacks for distribution/category/config */}
           <TopFive
             title="Producers"
             color="blue"
             metrics={[
-              { key: 'revenue', label: 'Revenue', prefix: '€', data: [] }, // Remove hardcoded data
-              { key: 'rooms', label: 'Rooms Sold', data: [] }, // Remove hardcoded data
-              { key: 'adr', label: 'ADR', prefix: '€', data: [] } // Remove hardcoded data
+              { key: "revenue", label: "Revenue", prefix: "€", data: [] }, // Remove hardcoded data
+              { key: "rooms", label: "Rooms Sold", data: [] }, // Remove hardcoded data
+              { key: "adr", label: "ADR", prefix: "€", data: [] }, // Remove hardcoded data
             ]}
             distributionData={[]} // Use []
             categoryTimeSeriesData={[]} // Use []
@@ -559,8 +637,8 @@ export function Overview() {
             apiEndpoint="/api/overview/distribution"
             apiParams={{
               ...analysisApiParams,
-              field: 'producer',
-              limit: '5'
+              field: "producer",
+              limit: "5",
             }}
             lazyLoad={true}
           />
@@ -578,7 +656,9 @@ export function Overview() {
             <CardHeader className="flex flex-col items-start px-4 py-4 md:px-6 md:py-5">
               <div className="flex w-full justify-between items-center">
                 <div>
-                  <CardTitle className="text-base md:text-lg font-semibold text-gray-800 mb-2 md:mb-3">Global Distribution</CardTitle>
+                  <CardTitle className="text-base md:text-lg font-semibold text-gray-800 mb-2 md:mb-3">
+                    Global Distribution
+                  </CardTitle>
                 </div>
               </div>
             </CardHeader>
@@ -592,7 +672,13 @@ export function Overview() {
                     <WorldMap
                       color="rgb(59, 130, 246)"
                       title=""
-                      valueSuffix={selectedMapMetric === 'revenue' ? '€' : selectedMapMetric === 'adr' ? '€' : ''}
+                      valueSuffix={
+                        selectedMapMetric === "revenue"
+                          ? "€"
+                          : selectedMapMetric === "adr"
+                          ? "€"
+                          : ""
+                      }
                       size="responsive" // Use responsive size if available, or adjust based on container
                       data={worldMapData} // Already uses state initialized to []
                       tooltipBgColor="black"
@@ -622,9 +708,14 @@ export function Overview() {
                     color="blue"
                     withBorder={false}
                     metrics={[
-                      { key: 'revenue', label: 'Revenue', prefix: '€', data: [] }, // Remove hardcoded data
-                      { key: 'rooms', label: 'Rooms Sold', data: [] }, // Remove hardcoded data
-                      { key: 'adr', label: 'ADR', prefix: '€', data: [] } // Remove hardcoded data
+                      {
+                        key: "revenue",
+                        label: "Revenue",
+                        prefix: "€",
+                        data: [],
+                      }, // Remove hardcoded data
+                      { key: "rooms", label: "Rooms Sold", data: [] }, // Remove hardcoded data
+                      { key: "adr", label: "ADR", prefix: "€", data: [] }, // Remove hardcoded data
                     ]}
                     distributionData={[]} // Use []
                     categoryTimeSeriesData={[]} // Use []
@@ -633,8 +724,8 @@ export function Overview() {
                     apiEndpoint="/api/overview/distribution"
                     apiParams={{
                       ...analysisApiParams,
-                      field: 'guest_country',
-                      limit: '5'
+                      field: "guest_country",
+                      limit: "5",
                     }}
                     onMetricChange={(metric) => {
                       setSelectedMapMetric(metric);
@@ -650,14 +741,14 @@ export function Overview() {
 
         {/* Market Segments, Booking Channels, Room Types - Responsive Columns */}
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 md:gap-8 mt-6 md:mt-8">
-           {/* Remove hardcoded data from metrics, use empty fallbacks for distribution/category/config */}
+          {/* Remove hardcoded data from metrics, use empty fallbacks for distribution/category/config */}
           <TopFive
             title="Market Segments "
             color="blue"
             metrics={[
-              { key: 'revenue', label: 'Revenue', prefix: '€', data: [] }, // Remove hardcoded data
-              { key: 'rooms', label: 'Rooms Sold', data: [] }, // Remove hardcoded data
-              { key: 'adr', label: 'ADR', prefix: '€', data: [] } // Remove hardcoded data
+              { key: "revenue", label: "Revenue", prefix: "€", data: [] }, // Remove hardcoded data
+              { key: "rooms", label: "Rooms Sold", data: [] }, // Remove hardcoded data
+              { key: "adr", label: "ADR", prefix: "€", data: [] }, // Remove hardcoded data
             ]}
             distributionData={[]} // Use []
             categoryTimeSeriesData={[]} // Use []
@@ -666,19 +757,19 @@ export function Overview() {
             apiEndpoint="/api/overview/distribution"
             apiParams={{
               ...analysisApiParams,
-              field: 'market_group_code',
-              limit: '5'
+              field: "market_group_code",
+              limit: "5",
             }}
             lazyLoad={true}
           />
-           {/* Remove hardcoded data from metrics, use empty fallbacks for distribution/category/config */}
+          {/* Remove hardcoded data from metrics, use empty fallbacks for distribution/category/config */}
           <TopFive
             title="Booking Channels"
             color="blue"
             metrics={[
-              { key: 'revenue', label: 'Revenue', prefix: '€', data: [] }, // Remove hardcoded data
-              { key: 'rooms', label: 'Rooms Sold', data: [] }, // Remove hardcoded data
-              { key: 'adr', label: 'ADR', prefix: '€', data: [] } // Remove hardcoded data
+              { key: "revenue", label: "Revenue", prefix: "€", data: [] }, // Remove hardcoded data
+              { key: "rooms", label: "Rooms Sold", data: [] }, // Remove hardcoded data
+              { key: "adr", label: "ADR", prefix: "€", data: [] }, // Remove hardcoded data
             ]}
             distributionData={[]} // Use []
             categoryTimeSeriesData={[]} // Use []
@@ -687,19 +778,19 @@ export function Overview() {
             apiEndpoint="/api/overview/distribution"
             apiParams={{
               ...analysisApiParams,
-              field: 'booking_channel',
-              limit: '5'
+              field: "booking_channel",
+              limit: "5",
             }}
             lazyLoad={true}
           />
-           {/* Remove hardcoded data from metrics, use empty fallbacks for distribution/category/config */}
+          {/* Remove hardcoded data from metrics, use empty fallbacks for distribution/category/config */}
           <TopFive
             title="Room Types"
             color="green"
             metrics={[
-              { key: 'revenue', label: 'Revenue', prefix: '€', data: [] }, // Remove hardcoded data
-              { key: 'rooms', label: 'Rooms Sold', data: [] }, // Remove hardcoded data
-              { key: 'adr', label: 'ADR', prefix: '€', data: [] } // Remove hardcoded data
+              { key: "revenue", label: "Revenue", prefix: "€", data: [] }, // Remove hardcoded data
+              { key: "rooms", label: "Rooms Sold", data: [] }, // Remove hardcoded data
+              { key: "adr", label: "ADR", prefix: "€", data: [] }, // Remove hardcoded data
             ]}
             distributionData={[]} // Use []
             categoryTimeSeriesData={[]} // Use []
@@ -708,8 +799,8 @@ export function Overview() {
             apiEndpoint="/api/overview/distribution"
             apiParams={{
               ...analysisApiParams,
-              field: 'room_type',
-              limit: '5'
+              field: "room_type",
+              limit: "5",
             }}
             lazyLoad={true}
           />
@@ -728,18 +819,18 @@ export function Overview() {
             lazyLoad={true} // <-- Already added
             fixedTitle="Lead time distribution" // <-- Add this fixed title
           />
-           {/* Update ReservationsByDayChart to fetch its own data and lazy load */}
+          {/* Update ReservationsByDayChart to fetch its own data and lazy load */}
           <ReservationsByDayChart
-             url="/api/overview/reservation-trends" // Pass the URL
-             apiParams={analysisApiParams} // Pass the common API parameters
-             lazyLoad={true} // <-- Add this prop
+            url="/api/overview/reservation-trends" // Pass the URL
+            apiParams={analysisApiParams} // Pass the common API parameters
+            lazyLoad={true} // <-- Add this prop
           />
         </div>
 
         {/* New KPIs section - Stack on large screens */}
         {/* These components already fetch their own data, no hardcoded data was passed */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8 mt-6 md:mt-8">
-           {/* KpiWithChart already fetches its own data */}
+          {/* KpiWithChart already fetches its own data */}
           <KpiWithChart
             title="Booking Status" // This title is now less prominent, primarily for internal identification
             fixedTitle="Cancellations statistics" // <-- Add the fixed title here
@@ -750,32 +841,32 @@ export function Overview() {
               {
                 apiField: "cancelledRooms",
                 label: "Cancelled rooms",
-                prefix: ""
+                prefix: "",
               },
               {
                 apiField: "noShowRooms",
                 label: "No-Show rooms",
-                prefix: ""
+                prefix: "",
               },
               {
                 apiField: "revenueLost",
                 label: "Revenue Lost",
-                prefix: "€"
-              }
+                prefix: "€",
+              },
             ]}
           />
-           {/* Update HorizontalBarChartMultipleDatasets for Length of Stay */}
+          {/* Update HorizontalBarChartMultipleDatasets for Length of Stay */}
           <HorizontalBarChartMultipleDatasets
             // Add the necessary props to fetch data
             url="/api/overview/length-of-stay" // Specify the API endpoint
-            apiParams={analysisApiParams}      // Pass the common API parameters
-            defaultDataset="lengthOfStay"      // Specify the data key in the API response
-            leftMargin={10}                   // Keep existing margin if needed
-            lazyLoad={true}                    // Enable lazy loading
+            apiParams={analysisApiParams} // Pass the common API parameters
+            defaultDataset="lengthOfStay" // Specify the data key in the API response
+            leftMargin={10} // Keep existing margin if needed
+            lazyLoad={true} // Enable lazy loading
             fixedTitle="Length of stay distribution" // Add a fixed title
           />
         </div>
       </div>
     </div>
-  )
-} 
+  );
+}
