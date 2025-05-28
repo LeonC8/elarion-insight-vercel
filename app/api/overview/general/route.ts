@@ -548,23 +548,20 @@ export async function GET(request: Request) {
     const prevAdr = prevRoomsSold > 0 ? prevRoomRevenue / prevRoomsSold : 0;
 
     // Calculate Occupancy Rate
-    // const occupancyRate = roomsAvailable > 0 ? (roomsSold / roomsAvailable) * 100 : 0;
-    // const prevOccupancyRate = prevRoomsAvailable > 0 ? (prevRoomsSold / prevRoomsAvailable) * 100 : 0;
+    const occupancyRate =
+      roomsAvailable > 0 ? (roomsSold / roomsAvailable) * 100 : 0;
+    const prevOccupancyRate =
+      prevRoomsAvailable > 0 ? (prevRoomsSold / prevRoomsAvailable) * 100 : 0;
 
     // Calculate RevPAR (Revenue Per Available Room)
-    // const revpar = roomsAvailable > 0 ? roomRevenue / roomsAvailable : 0;
-    // const prevRevpar = prevRoomsAvailable > 0 ? prevRoomRevenue / prevRoomsAvailable : 0;
+    const revpar = roomsAvailable > 0 ? roomRevenue / roomsAvailable : 0;
+    const prevRevpar =
+      prevRoomsAvailable > 0 ? prevRoomRevenue / prevRoomsAvailable : 0;
 
     // Calculate TRevPAR (Total Revenue Per Available Room)
-    // const trevpar = roomsAvailable > 0 ? totalRevenue / roomsAvailable : 0;
-    // const prevTrevpar = prevRoomsAvailable > 0 ? prevTotalRevenue / prevRoomsAvailable : 0;
-
-    const occupancyRate = 75;
-    const prevOccupancyRate = 70;
-    const revpar = 436.97;
-    const prevRevpar = 439.4;
-    const trevpar = 439.4;
-    const prevTrevpar = 420.4;
+    const trevpar = roomsAvailable > 0 ? totalRevenue / roomsAvailable : 0;
+    const prevTrevpar =
+      prevRoomsAvailable > 0 ? prevTotalRevenue / prevRoomsAvailable : 0;
 
     // Calculate percentage changes - UPDATED LOGIC
     const calculatePercentageChange = (
