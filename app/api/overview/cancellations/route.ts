@@ -1,6 +1,9 @@
-import { NextResponse } from 'next/server';
-import { ClickHouseClient, createClient } from '@clickhouse/client';
-import { calculateDateRanges, calculateComparisonDateRanges } from '@/lib/dateUtils';
+import { NextResponse } from "next/server";
+import { ClickHouseClient, createClient } from "@clickhouse/client";
+import {
+  calculateDateRanges,
+  calculateComparisonDateRanges,
+} from "@/lib/dateUtils";
 
 // Type for fluctuation data
 type FluctuationData = {
@@ -11,20 +14,20 @@ type FluctuationData = {
 
 // Interface for the API response
 export interface CancellationResponse {
-  cancelledRooms: { 
-    value: number; 
-    percentageChange: number; 
-    fluctuation: FluctuationData 
+  cancelledRooms: {
+    value: number;
+    percentageChange: number;
+    fluctuation: FluctuationData;
   };
-  noShowRooms: { 
-    value: number; 
-    percentageChange: number; 
-    fluctuation: FluctuationData 
+  noShowRooms: {
+    value: number;
+    percentageChange: number;
+    fluctuation: FluctuationData;
   };
-  revenueLost: { 
-    value: number; 
-    percentageChange: number; 
-    fluctuation: FluctuationData 
+  revenueLost: {
+    value: number;
+    percentageChange: number;
+    fluctuation: FluctuationData;
   };
 }
 
@@ -46,25 +49,27 @@ interface AggregateQueryResult {
 export async function GET(request: Request) {
   // Parse query parameters
   const { searchParams } = new URL(request.url);
-  const businessDateParam = searchParams.get('businessDate') || new Date().toISOString().split('T')[0];
-  const periodType = searchParams.get('periodType') || 'Month'; // Month, Year, Day
-  const viewType = searchParams.get('viewType') || 'Actual'; // Actual, OTB, Projected
-  const comparisonType = searchParams.get('comparison') || 'Last year - OTB'; 
-  
+  const businessDateParam =
+    searchParams.get("businessDate") || new Date().toISOString().split("T")[0];
+  const periodType = searchParams.get("periodType") || "Month"; // Month, Year, Day
+  const viewType = searchParams.get("viewType") || "Actual"; // Actual, OTB, Projected
+  const comparisonType = searchParams.get("comparison") || "Last year - OTB";
+
   // Calculate date ranges
   const { startDate, endDate } = calculateDateRanges(
     businessDateParam,
     periodType,
     viewType
   );
-  
+
   // Calculate comparison period date ranges
-  const { prevStartDate, prevEndDate, prevBusinessDateParam } = calculateComparisonDateRanges(
-    startDate,
-    endDate,
-    businessDateParam,
-    comparisonType
-  );
+  const { prevStartDate, prevEndDate, prevBusinessDateParam } =
+    calculateComparisonDateRanges(
+      startDate,
+      endDate,
+      businessDateParam,
+      comparisonType
+    );
 
   // Initialize client variable
   let client: ClickHouseClient | undefined;
@@ -72,9 +77,9 @@ export async function GET(request: Request) {
   try {
     // Create ClickHouse client
     client = createClient({
-      host: process.env.CLICKHOUSE_HOST || 'http://34.34.71.156:8123',
-      username: process.env.CLICKHOUSE_USER || 'default',
-      password: process.env.CLICKHOUSE_PASSWORD || 'elarion'
+      host: process.env.CLICKHOUSE_HOST,
+      username: process.env.CLICKHOUSE_USER,
+      password: process.env.CLICKHOUSE_PASSWORD,
     });
 
     // Build the current period query for aggregates
@@ -135,46 +140,56 @@ export async function GET(request: Request) {
       ORDER BY occupancy_date
     `;
 
-   
-
     // Execute queries
     const currentResultSet = await client.query({
       query: currentQuery,
-      format: 'JSONEachRow'
+      format: "JSONEachRow",
     });
 
     const previousResultSet = await client.query({
       query: previousQuery,
-      format: 'JSONEachRow'
+      format: "JSONEachRow",
     });
 
     const currentDailyResultSet = await client.query({
       query: currentDailyQuery,
-      format: 'JSONEachRow'
+      format: "JSONEachRow",
     });
 
     const previousDailyResultSet = await client.query({
       query: previousDailyQuery,
-      format: 'JSONEachRow'
+      format: "JSONEachRow",
     });
 
-    const currentData = await currentResultSet.json() as AggregateQueryResult[];
-    const previousData = await previousResultSet.json() as AggregateQueryResult[];
-    const currentDailyData = await currentDailyResultSet.json() as DailyData[];
-    const previousDailyData = await previousDailyResultSet.json() as DailyData[];
+    const currentData =
+      (await currentResultSet.json()) as AggregateQueryResult[];
+    const previousData =
+      (await previousResultSet.json()) as AggregateQueryResult[];
+    const currentDailyData =
+      (await currentDailyResultSet.json()) as DailyData[];
+    const previousDailyData =
+      (await previousDailyResultSet.json()) as DailyData[];
 
     // Extract the first (and only) row from each result
-    const current = currentData[0] || { cancelled_rooms: '0', no_show_rooms: '0', totalRevenue_lost: '0' };
-    const previous = previousData[0] || { cancelled_rooms: '0', no_show_rooms: '0', totalRevenue_lost: '0' };
+    const current = currentData[0] || {
+      cancelled_rooms: "0",
+      no_show_rooms: "0",
+      totalRevenue_lost: "0",
+    };
+    const previous = previousData[0] || {
+      cancelled_rooms: "0",
+      no_show_rooms: "0",
+      totalRevenue_lost: "0",
+    };
 
     // Parse numeric values
-    const cancelledRooms = parseFloat(current.cancelled_rooms || '0');
-    const noShowRooms = parseFloat(current.no_show_rooms || '0');
-    const revenueLost = parseFloat(current.totalRevenue_lost || '0');
+    const cancelledRooms = parseFloat(current.cancelled_rooms || "0");
+    const noShowRooms = parseFloat(current.no_show_rooms || "0");
+    const revenueLost = parseFloat(current.totalRevenue_lost || "0");
 
-    const prevCancelledRooms = parseFloat(previous.cancelled_rooms || '0');
-    const prevNoShowRooms = parseFloat(previous.no_show_rooms || '0');
-    const prevRevenueLost = parseFloat(previous.totalRevenue_lost || '0');
+    const prevCancelledRooms = parseFloat(previous.cancelled_rooms || "0");
+    const prevNoShowRooms = parseFloat(previous.no_show_rooms || "0");
+    const prevRevenueLost = parseFloat(previous.totalRevenue_lost || "0");
 
     // Calculate percentage changes
     const calculatePercentageChange = (current: number, previous: number) => {
@@ -191,28 +206,32 @@ export async function GET(request: Request) {
     ): FluctuationData => {
       // Create a map of previous data by date for easy lookup
       const previousDataMap = new Map<string, DailyData>();
-      previousDailyData.forEach(day => {
+      previousDailyData.forEach((day) => {
         // Extract month and day from the previous year's date (ignore year)
         const prevDate = new Date(day.occupancy_date);
-        const monthDay = `${(prevDate.getMonth() + 1).toString().padStart(2, '0')}/${prevDate.getDate().toString().padStart(2, '0')}`;
+        const monthDay = `${(prevDate.getMonth() + 1)
+          .toString()
+          .padStart(2, "0")}/${prevDate.getDate().toString().padStart(2, "0")}`;
         previousDataMap.set(monthDay, day);
       });
 
       // Create the fluctuation data array
-      return currentDailyData.map(currentDay => {
+      return currentDailyData.map((currentDay) => {
         const date = new Date(currentDay.occupancy_date);
-        
+
         // Format the date to match what your frontend expects
         // If using month names: const formattedDate = date.toLocaleString('default', { month: 'long' });
-        // If using MM/DD: 
-        const formattedDate = `${(date.getMonth() + 1).toString().padStart(2, '0')}/${date.getDate().toString().padStart(2, '0')}`;
-        
+        // If using MM/DD:
+        const formattedDate = `${(date.getMonth() + 1)
+          .toString()
+          .padStart(2, "0")}/${date.getDate().toString().padStart(2, "0")}`;
+
         // Use the month/day as key to look up previous data (ignoring year)
         const previousDay = previousDataMap.get(formattedDate) || {
           occupancy_date: currentDay.occupancy_date,
           cancelled_rooms: 0,
           no_show_rooms: 0,
-          totalRevenue_lost: 0
+          totalRevenue_lost: 0,
         };
 
         return {
@@ -225,49 +244,58 @@ export async function GET(request: Request) {
 
     // Create fluctuation data for each metric
     const cancelledRoomsFluctuation = createFluctuationData(
-      currentDailyData, 
+      currentDailyData,
       previousDailyData,
-      day => day.cancelled_rooms || 0,
-      day => day.cancelled_rooms || 0
+      (day) => day.cancelled_rooms || 0,
+      (day) => day.cancelled_rooms || 0
     );
 
     const noShowRoomsFluctuation = createFluctuationData(
-      currentDailyData, 
+      currentDailyData,
       previousDailyData,
-      day => day.no_show_rooms || 0,
-      day => day.no_show_rooms || 0
+      (day) => day.no_show_rooms || 0,
+      (day) => day.no_show_rooms || 0
     );
 
     const revenueLostFluctuation = createFluctuationData(
-      currentDailyData, 
+      currentDailyData,
       previousDailyData,
-      day => day.totalRevenue_lost || 0,
-      day => day.totalRevenue_lost || 0
+      (day) => day.totalRevenue_lost || 0,
+      (day) => day.totalRevenue_lost || 0
     );
 
     const response: CancellationResponse = {
       cancelledRooms: {
         value: cancelledRooms,
-        percentageChange: calculatePercentageChange(cancelledRooms, prevCancelledRooms),
-        fluctuation: cancelledRoomsFluctuation
+        percentageChange: calculatePercentageChange(
+          cancelledRooms,
+          prevCancelledRooms
+        ),
+        fluctuation: cancelledRoomsFluctuation,
       },
       noShowRooms: {
         value: noShowRooms,
-        percentageChange: calculatePercentageChange(noShowRooms, prevNoShowRooms),
-        fluctuation: noShowRoomsFluctuation
+        percentageChange: calculatePercentageChange(
+          noShowRooms,
+          prevNoShowRooms
+        ),
+        fluctuation: noShowRoomsFluctuation,
       },
       revenueLost: {
         value: revenueLost,
-        percentageChange: calculatePercentageChange(revenueLost, prevRevenueLost),
-        fluctuation: revenueLostFluctuation
-      }
+        percentageChange: calculatePercentageChange(
+          revenueLost,
+          prevRevenueLost
+        ),
+        fluctuation: revenueLostFluctuation,
+      },
     };
 
     return NextResponse.json(response);
   } catch (error) {
-    console.error('Error querying ClickHouse:', error);
+    console.error("Error querying ClickHouse:", error);
     return NextResponse.json(
-      { error: 'Failed to fetch cancellation data from ClickHouse' },
+      { error: "Failed to fetch cancellation data from ClickHouse" },
       { status: 500 }
     );
   } finally {
@@ -276,4 +304,4 @@ export async function GET(request: Request) {
       await client.close();
     }
   }
-} 
+}

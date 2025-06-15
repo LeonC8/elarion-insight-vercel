@@ -1,6 +1,9 @@
-import { NextResponse } from 'next/server';
-import { ClickHouseClient, createClient } from '@clickhouse/client';
-import { calculateDateRanges, calculateComparisonDateRanges } from '@/lib/dateUtils';
+import { NextResponse } from "next/server";
+import { ClickHouseClient, createClient } from "@clickhouse/client";
+import {
+  calculateDateRanges,
+  calculateComparisonDateRanges,
+} from "@/lib/dateUtils";
 
 // Interface for the response
 export interface LengthOfStayByRoomTypeResponse {
@@ -14,34 +17,36 @@ export interface LengthOfStayByRoomTypeResponse {
             current: number;
             previous: number;
           }>;
-        }
-      }
-    }
+        };
+      };
+    };
   };
 }
 
 export async function GET(request: Request) {
   // Parse query parameters
   const { searchParams } = new URL(request.url);
-  const businessDateParam = searchParams.get('businessDate') || new Date().toISOString().split('T')[0];
-  const periodType = searchParams.get('periodType') || 'Month'; // Month, Year, Day
-  const viewType = searchParams.get('viewType') || 'Actual'; // Actual, OTB, Projected
-  const comparisonType = searchParams.get('comparison') || 'Last year - OTB'; 
-  
+  const businessDateParam =
+    searchParams.get("businessDate") || new Date().toISOString().split("T")[0];
+  const periodType = searchParams.get("periodType") || "Month"; // Month, Year, Day
+  const viewType = searchParams.get("viewType") || "Actual"; // Actual, OTB, Projected
+  const comparisonType = searchParams.get("comparison") || "Last year - OTB";
+
   // Calculate date ranges
   const { startDate, endDate } = calculateDateRanges(
     businessDateParam,
     periodType,
     viewType
   );
-  
+
   // Calculate comparison period date ranges
-  const { prevStartDate, prevEndDate, prevBusinessDateParam } = calculateComparisonDateRanges(
-    startDate,
-    endDate,
-    businessDateParam,
-    comparisonType
-  );
+  const { prevStartDate, prevEndDate, prevBusinessDateParam } =
+    calculateComparisonDateRanges(
+      startDate,
+      endDate,
+      businessDateParam,
+      comparisonType
+    );
 
   // Initialize client variable
   let client: ClickHouseClient | undefined;
@@ -49,9 +54,9 @@ export async function GET(request: Request) {
   try {
     // Create ClickHouse client
     client = createClient({
-      host: process.env.CLICKHOUSE_HOST || 'http://34.34.71.156:8123',
-      username: process.env.CLICKHOUSE_USER || 'default',
-      password: process.env.CLICKHOUSE_PASSWORD || 'elarion'
+      host: process.env.CLICKHOUSE_HOST,
+      username: process.env.CLICKHOUSE_USER,
+      password: process.env.CLICKHOUSE_PASSWORD,
     });
 
     // Build the query for current period - now with room_type grouping
@@ -109,119 +114,121 @@ export async function GET(request: Request) {
     // Execute queries
     const currentResultSet = await client.query({
       query: currentQuery,
-      format: 'JSONEachRow'
+      format: "JSONEachRow",
     });
 
     const previousResultSet = await client.query({
       query: previousQuery,
-      format: 'JSONEachRow'
+      format: "JSONEachRow",
     });
 
-    const currentData = await currentResultSet.json() as any[];
-    const previousData = await previousResultSet.json() as any[];
+    const currentData = (await currentResultSet.json()) as any[];
+    const previousData = (await previousResultSet.json()) as any[];
 
     // Create a map for previous data for easier lookup
     const previousDataMap = new Map();
-    previousData.forEach(item => {
+    previousData.forEach((item) => {
       const key = `${item.room_type}|${item.stay_range}`;
       previousDataMap.set(key, item);
     });
 
     // Process data to organize by room type
-    const dataByRoomType: LengthOfStayByRoomTypeResponse['data'] = {};
+    const dataByRoomType: LengthOfStayByRoomTypeResponse["data"] = {};
 
     // First pass: collect all data and identify all unique buckets
     const allBuckets = new Set<string>();
-    
+
     // Process current data
-    currentData.forEach(item => {
+    currentData.forEach((item) => {
       const roomType = item.room_type;
       const stayRange = item.stay_range;
       allBuckets.add(stayRange);
-      
+
       const key = `${roomType}|${stayRange}`;
       const prevItem = previousDataMap.get(key) || { count: 0 };
-      
+
       if (!dataByRoomType[roomType]) {
         dataByRoomType[roomType] = {
           datasets: {
             length_of_stay: {
               title: "Length of Stay",
-              data: []
-            }
-          }
+              data: [],
+            },
+          },
         };
       }
-      
+
       // Make sure the dataset exists
       if (!dataByRoomType[roomType].datasets.length_of_stay) {
         dataByRoomType[roomType].datasets.length_of_stay = {
           title: "Length of Stay",
-          data: []
+          data: [],
         };
       }
-      
+
       dataByRoomType[roomType].datasets.length_of_stay.data.push({
         range: stayRange,
-        current: parseInt(item.count || '0', 10),
-        previous: parseInt(prevItem.count || '0', 10)
+        current: parseInt(item.count || "0", 10),
+        previous: parseInt(prevItem.count || "0", 10),
       });
     });
 
     // Add any room types and buckets from previous data that might not be in current data
-    previousData.forEach(prevItem => {
+    previousData.forEach((prevItem) => {
       const roomType = prevItem.room_type;
       const stayRange = prevItem.stay_range;
       allBuckets.add(stayRange);
-      
+
       // Check if this room type exists in our result
       if (!dataByRoomType[roomType]) {
         dataByRoomType[roomType] = {
           datasets: {
             length_of_stay: {
               title: "Length of Stay",
-              data: []
-            }
-          }
+              data: [],
+            },
+          },
         };
       }
-      
+
       // Make sure the dataset exists
       if (!dataByRoomType[roomType].datasets.length_of_stay) {
         dataByRoomType[roomType].datasets.length_of_stay = {
           title: "Length of Stay",
-          data: []
+          data: [],
         };
       }
-      
+
       // Check if this stay range exists for this room type
-      const existingEntry = dataByRoomType[roomType].datasets.length_of_stay.data.find(
-        item => item.range === stayRange
-      );
-      
+      const existingEntry = dataByRoomType[
+        roomType
+      ].datasets.length_of_stay.data.find((item) => item.range === stayRange);
+
       if (!existingEntry) {
         dataByRoomType[roomType].datasets.length_of_stay.data.push({
           range: stayRange,
           current: 0,
-          previous: parseInt(prevItem.count || '0', 10)
+          previous: parseInt(prevItem.count || "0", 10),
         });
       }
     });
 
     // Second pass: ensure all room types have entries for all buckets
-    Object.keys(dataByRoomType).forEach(roomType => {
+    Object.keys(dataByRoomType).forEach((roomType) => {
       if (dataByRoomType[roomType].datasets.length_of_stay) {
         const existingBuckets = new Set(
-          dataByRoomType[roomType].datasets.length_of_stay.data.map(item => item.range)
+          dataByRoomType[roomType].datasets.length_of_stay.data.map(
+            (item) => item.range
+          )
         );
-        
+
         // Add any missing buckets with zero values
-        allBuckets.forEach(bucket => {
+        allBuckets.forEach((bucket) => {
           if (!existingBuckets.has(bucket)) {
             dataByRoomType[roomType].datasets.length_of_stay.data.push({
               range: bucket,
               current: 0,
-              previous: 0
+              previous: 0,
             });
           }
         });
@@ -230,20 +237,22 @@ export async function GET(request: Request) {
 
     // Sort data for each room type by the correct order of stay lengths
     const stayRangeOrder = {
-      '1 night': 1,
-      '2 nights': 2,
-      '3 nights': 3,
-      '4 nights': 4,
-      '5 nights': 5,
-      '6 nights': 6,
-      '7+ nights': 7
+      "1 night": 1,
+      "2 nights": 2,
+      "3 nights": 3,
+      "4 nights": 4,
+      "5 nights": 5,
+      "6 nights": 6,
+      "7+ nights": 7,
     };
-    
-    Object.keys(dataByRoomType).forEach(roomType => {
+
+    Object.keys(dataByRoomType).forEach((roomType) => {
       if (dataByRoomType[roomType].datasets.length_of_stay) {
         dataByRoomType[roomType].datasets.length_of_stay.data.sort((a, b) => {
-          return (stayRangeOrder[a.range as keyof typeof stayRangeOrder] || 99) - 
-                 (stayRangeOrder[b.range as keyof typeof stayRangeOrder] || 99);
+          return (
+            (stayRangeOrder[a.range as keyof typeof stayRangeOrder] || 99) -
+            (stayRangeOrder[b.range as keyof typeof stayRangeOrder] || 99)
+          );
         });
       }
     });
@@ -256,19 +265,21 @@ export async function GET(request: Request) {
       // etc.
     };
 
-    Object.keys(dataByRoomType).forEach(roomType => {
+    Object.keys(dataByRoomType).forEach((roomType) => {
       if (roomTypeNameMap[roomType]) {
-        dataByRoomType[roomType].datasets.length_of_stay.title = `Length of Stay`;
+        dataByRoomType[
+          roomType
+        ].datasets.length_of_stay.title = `Length of Stay`;
       }
     });
 
     // Filter out room types with all zeros
-    const filteredDataByRoomType: LengthOfStayByRoomTypeResponse['data'] = {};
+    const filteredDataByRoomType: LengthOfStayByRoomTypeResponse["data"] = {};
     Object.entries(dataByRoomType).forEach(([roomType, roomTypeData]) => {
       const hasNonZeroValue = roomTypeData.datasets.length_of_stay.data.some(
-        item => item.current > 0 || item.previous > 0
+        (item) => item.current > 0 || item.previous > 0
       );
-      
+
       if (hasNonZeroValue) {
         filteredDataByRoomType[roomType] = roomTypeData;
       }
@@ -276,14 +287,17 @@ export async function GET(request: Request) {
 
     // Construct response
     const response: LengthOfStayByRoomTypeResponse = {
-      data: filteredDataByRoomType
+      data: filteredDataByRoomType,
     };
 
     return NextResponse.json(response);
   } catch (error) {
-    console.error('Error querying ClickHouse:', error);
+    console.error("Error querying ClickHouse:", error);
     return NextResponse.json(
-      { error: 'Failed to fetch length of stay distribution data by room type from ClickHouse' },
+      {
+        error:
+          "Failed to fetch length of stay distribution data by room type from ClickHouse",
+      },
       { status: 500 }
     );
   } finally {
@@ -292,4 +306,4 @@ export async function GET(request: Request) {
       await client.close();
     }
   }
-} 
+}

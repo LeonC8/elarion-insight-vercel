@@ -1,6 +1,9 @@
-import { NextResponse } from 'next/server';
-import { ClickHouseClient, createClient } from '@clickhouse/client';
-import { calculateDateRanges, calculateComparisonDateRanges } from '@/lib/dateUtils';
+import { NextResponse } from "next/server";
+import { ClickHouseClient, createClient } from "@clickhouse/client";
+import {
+  calculateDateRanges,
+  calculateComparisonDateRanges,
+} from "@/lib/dateUtils";
 
 // Interface for day of week data
 interface DayOfWeekData {
@@ -17,32 +20,42 @@ export interface ReservationTrendsResponse {
 // Helper to get full day name
 const getDayName = (dayIndex: number): string => {
   // ClickHouse uses 1 for Monday, 2 for Tuesday, etc.
-  const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+  const days = [
+    "Monday",
+    "Tuesday",
+    "Wednesday",
+    "Thursday",
+    "Friday",
+    "Saturday",
+    "Sunday",
+  ];
   return days[(dayIndex - 1) % 7]; // Adjust index to be 0-based for our array
 };
 
 export async function GET(request: Request) {
   // Parse query parameters
   const { searchParams } = new URL(request.url);
-  const businessDateParam = searchParams.get('businessDate') || new Date().toISOString().split('T')[0];
-  const periodType = searchParams.get('periodType') || 'Month'; // Month, Year, Day
-  const viewType = searchParams.get('viewType') || 'Actual'; // Actual, OTB, Projected
-  const comparisonType = searchParams.get('comparison') || 'Last year - OTB'; 
-  
+  const businessDateParam =
+    searchParams.get("businessDate") || new Date().toISOString().split("T")[0];
+  const periodType = searchParams.get("periodType") || "Month"; // Month, Year, Day
+  const viewType = searchParams.get("viewType") || "Actual"; // Actual, OTB, Projected
+  const comparisonType = searchParams.get("comparison") || "Last year - OTB";
+
   // Calculate date ranges using utility functions
   const { startDate, endDate } = calculateDateRanges(
     businessDateParam,
     periodType,
     viewType
   );
-  
+
   // Calculate comparison period date ranges
-  const { prevStartDate, prevEndDate, prevBusinessDateParam } = calculateComparisonDateRanges(
-    startDate,
-    endDate,
-    businessDateParam,
-    comparisonType
-  );
+  const { prevStartDate, prevEndDate, prevBusinessDateParam } =
+    calculateComparisonDateRanges(
+      startDate,
+      endDate,
+      businessDateParam,
+      comparisonType
+    );
 
   // Initialize client variable
   let client: ClickHouseClient | undefined;
@@ -50,9 +63,9 @@ export async function GET(request: Request) {
   try {
     // Create ClickHouse client
     client = createClient({
-      host: process.env.CLICKHOUSE_HOST || 'http://34.34.71.156:8123',
-      username: process.env.CLICKHOUSE_USER || 'default',
-      password: process.env.CLICKHOUSE_PASSWORD || 'elarion'
+      host: process.env.CLICKHOUSE_HOST,
+      username: process.env.CLICKHOUSE_USER,
+      password: process.env.CLICKHOUSE_PASSWORD,
     });
 
     // Build the query for occupancy by day of week (current period)
@@ -111,84 +124,96 @@ export async function GET(request: Request) {
       ORDER BY day_of_week
     `;
 
-   
-
     // Execute queries
     const currentOccupancyResultSet = await client.query({
       query: currentOccupancyQuery,
-      format: 'JSONEachRow'
+      format: "JSONEachRow",
     });
 
     const previousOccupancyResultSet = await client.query({
       query: previousOccupancyQuery,
-      format: 'JSONEachRow'
+      format: "JSONEachRow",
     });
 
     const currentBookingsResultSet = await client.query({
       query: currentBookingsQuery,
-      format: 'JSONEachRow'
+      format: "JSONEachRow",
     });
 
     const previousBookingsResultSet = await client.query({
       query: previousBookingsQuery,
-      format: 'JSONEachRow'
+      format: "JSONEachRow",
     });
 
-    const currentOccupancyData = await currentOccupancyResultSet.json() as any[];
-    const previousOccupancyData = await previousOccupancyResultSet.json() as any[];
-    const currentBookingsData = await currentBookingsResultSet.json() as any[];
-    const previousBookingsData = await previousBookingsResultSet.json() as any[];
+    const currentOccupancyData =
+      (await currentOccupancyResultSet.json()) as any[];
+    const previousOccupancyData =
+      (await previousOccupancyResultSet.json()) as any[];
+    const currentBookingsData =
+      (await currentBookingsResultSet.json()) as any[];
+    const previousBookingsData =
+      (await previousBookingsResultSet.json()) as any[];
 
     // Process occupancy by day of week data
     const previousOccupancyMap = new Map();
-    previousOccupancyData.forEach(item => {
-      previousOccupancyMap.set(parseInt(item.day_of_week), parseInt(item.rooms_sold || '0'));
+    previousOccupancyData.forEach((item) => {
+      previousOccupancyMap.set(
+        parseInt(item.day_of_week),
+        parseInt(item.rooms_sold || "0")
+      );
     });
 
     // Use numbers 1 (Monday) through 7 (Sunday) for days of the week
     const occupancyByDayOfWeek: DayOfWeekData[] = [];
     for (let i = 1; i <= 7; i++) {
-      const currentData = currentOccupancyData.find(item => parseInt(item.day_of_week) === i);
-      const current = currentData ? parseInt(currentData.rooms_sold || '0') : 0;
+      const currentData = currentOccupancyData.find(
+        (item) => parseInt(item.day_of_week) === i
+      );
+      const current = currentData ? parseInt(currentData.rooms_sold || "0") : 0;
       const previous = previousOccupancyMap.get(i) || 0;
-      
+
       occupancyByDayOfWeek.push({
         day: getDayName(i), // Just pass the day index directly
         current,
-        previous
+        previous,
       });
     }
 
     // Process bookings by day of week data
     const previousBookingsMap = new Map();
-    previousBookingsData.forEach(item => {
-      previousBookingsMap.set(parseInt(item.day_of_week), parseInt(item.rooms_sold || '0'));
+    previousBookingsData.forEach((item) => {
+      previousBookingsMap.set(
+        parseInt(item.day_of_week),
+        parseInt(item.rooms_sold || "0")
+      );
     });
 
     const bookingsByDayOfWeek: DayOfWeekData[] = [];
     for (let i = 1; i <= 7; i++) {
-      const currentData = currentBookingsData.find(item => parseInt(item.day_of_week) === i);
-      const current = currentData ? parseInt(currentData.rooms_sold || '0') : 0;
+      const currentData = currentBookingsData.find(
+        (item) => parseInt(item.day_of_week) === i
+      );
+      const current = currentData ? parseInt(currentData.rooms_sold || "0") : 0;
       const previous = previousBookingsMap.get(i) || 0;
-      
+
       bookingsByDayOfWeek.push({
         day: getDayName(i), // Just pass the day index directly
         current,
-        previous
+        previous,
       });
     }
 
     // Construct response
     const response: ReservationTrendsResponse = {
       occupancyByDayOfWeek,
-      bookingsByDayOfWeek
+      bookingsByDayOfWeek,
     };
 
     return NextResponse.json(response);
   } catch (error) {
-    console.error('Error querying ClickHouse:', error);
+    console.error("Error querying ClickHouse:", error);
     return NextResponse.json(
-      { error: 'Failed to fetch reservation trends data from ClickHouse' },
+      { error: "Failed to fetch reservation trends data from ClickHouse" },
       { status: 500 }
     );
   } finally {
@@ -197,4 +222,4 @@ export async function GET(request: Request) {
       await client.close();
     }
   }
-} 
+}

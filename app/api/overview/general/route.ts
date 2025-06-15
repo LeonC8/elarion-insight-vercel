@@ -38,40 +38,6 @@ function getCacheFilePath(key: string): string {
   return path.join(CACHE_DIR, `${safeKey}.json`);
 }
 
-async function getCacheEntry(key: string): Promise<CacheEntry | null> {
-  try {
-    const filePath = getCacheFilePath(key);
-    if (fs.existsSync(filePath)) {
-      const data = fs.readFileSync(filePath, "utf8");
-      return JSON.parse(data);
-    }
-    return null;
-  } catch (error) {
-    console.error(`Cache read error:`, error);
-    return null;
-  }
-}
-
-async function setCacheEntry(key: string, entry: CacheEntry): Promise<void> {
-  try {
-    const filePath = getCacheFilePath(key);
-    fs.writeFileSync(filePath, JSON.stringify(entry), "utf8");
-  } catch (error) {
-    console.error(`Cache write error:`, error);
-  }
-}
-
-async function deleteCacheEntry(key: string): Promise<void> {
-  try {
-    const filePath = getCacheFilePath(key);
-    if (fs.existsSync(filePath)) {
-      fs.unlinkSync(filePath);
-    }
-  } catch (error) {
-    console.error(`Cache delete error:`, error);
-  }
-}
-
 /**
  * Generates a cache key based on relevant query parameters.
  * Ensures the key is consistent regardless of parameter order.
@@ -302,9 +268,9 @@ export async function GET(request: Request) {
   try {
     // Create ClickHouse client
     client = createClient({
-      host: process.env.CLICKHOUSE_HOST || "http://34.34.71.156:8123",
-      username: process.env.CLICKHOUSE_USER || "default",
-      password: process.env.CLICKHOUSE_PASSWORD || "elarion",
+      host: process.env.CLICKHOUSE_HOST,
+      username: process.env.CLICKHOUSE_USER,
+      password: process.env.CLICKHOUSE_PASSWORD,
     });
 
     // Combined query for aggregate data (combines 4 queries into 1)

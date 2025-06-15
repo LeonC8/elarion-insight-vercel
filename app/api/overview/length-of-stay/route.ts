@@ -1,8 +1,11 @@
-import { NextResponse } from 'next/server';
-import { ClickHouseClient, createClient } from '@clickhouse/client';
-import { calculateDateRanges, calculateComparisonDateRanges } from '@/lib/dateUtils';
+import { NextResponse } from "next/server";
+import { ClickHouseClient, createClient } from "@clickhouse/client";
+import {
+  calculateDateRanges,
+  calculateComparisonDateRanges,
+} from "@/lib/dateUtils";
 // Import the DataSet type
-import type { DataSet } from '@/components/new/HorizontalBarChartMultipleDatasets';
+import type { DataSet } from "@/components/new/HorizontalBarChartMultipleDatasets";
 
 // Interface for length of stay distribution data
 interface LengthOfStayItem {
@@ -18,25 +21,27 @@ export interface LengthOfStayResponse {
 export async function GET(request: Request) {
   // Parse query parameters
   const { searchParams } = new URL(request.url);
-  const businessDateParam = searchParams.get('businessDate') || new Date().toISOString().split('T')[0];
-  const periodType = searchParams.get('periodType') || 'Month'; // Month, Year, Day
-  const viewType = searchParams.get('viewType') || 'Actual'; // Actual, OTB, Projected
-  const comparisonType = searchParams.get('comparison') || 'Last year - OTB'; 
-  
+  const businessDateParam =
+    searchParams.get("businessDate") || new Date().toISOString().split("T")[0];
+  const periodType = searchParams.get("periodType") || "Month"; // Month, Year, Day
+  const viewType = searchParams.get("viewType") || "Actual"; // Actual, OTB, Projected
+  const comparisonType = searchParams.get("comparison") || "Last year - OTB";
+
   // Calculate date ranges
   const { startDate, endDate } = calculateDateRanges(
     businessDateParam,
     periodType,
     viewType
   );
-  
+
   // Calculate comparison period date ranges
-  const { prevStartDate, prevEndDate, prevBusinessDateParam } = calculateComparisonDateRanges(
-    startDate,
-    endDate,
-    businessDateParam,
-    comparisonType
-  );
+  const { prevStartDate, prevEndDate, prevBusinessDateParam } =
+    calculateComparisonDateRanges(
+      startDate,
+      endDate,
+      businessDateParam,
+      comparisonType
+    );
 
   // Initialize client variable
   let client: ClickHouseClient | undefined;
@@ -44,22 +49,21 @@ export async function GET(request: Request) {
   try {
     // Create ClickHouse client
     client = createClient({
-      host: process.env.CLICKHOUSE_HOST || 'http://34.34.71.156:8123',
-      username: process.env.CLICKHOUSE_USER || 'default',
-      password: process.env.CLICKHOUSE_PASSWORD || 'elarion'
+      host: process.env.CLICKHOUSE_HOST,
+      username: process.env.CLICKHOUSE_USER,
+      password: process.env.CLICKHOUSE_PASSWORD,
     });
 
-    console.log('Business Date:', businessDateParam);
+    console.log("Business Date:", businessDateParam);
 
-    console.log('Current Period:');
-    console.log('  Start Date:', startDate);
-    console.log('  End Date:', endDate);
+    console.log("Current Period:");
+    console.log("  Start Date:", startDate);
+    console.log("  End Date:", endDate);
 
-    console.log('Previous Period:');
-    console.log('  Start Date:', prevStartDate);
-    console.log('  End Date:', prevEndDate);
-    console.log('  Business Date:', prevBusinessDateParam);
-
+    console.log("Previous Period:");
+    console.log("  Start Date:", prevStartDate);
+    console.log("  End Date:", prevEndDate);
+    console.log("  Business Date:", prevBusinessDateParam);
 
     // Build the query for current period
     const currentQuery = `
@@ -85,7 +89,7 @@ export async function GET(request: Request) {
         END ASC
     `;
 
-    console.log('Current Query:', currentQuery);
+    console.log("Current Query:", currentQuery);
 
     // Build the query for previous period
     const previousQuery = `
@@ -111,47 +115,47 @@ export async function GET(request: Request) {
         END ASC
     `;
 
-   
-
     // Execute queries
     const currentResultSet = await client.query({
       query: currentQuery,
-      format: 'JSONEachRow'
+      format: "JSONEachRow",
     });
 
     const previousResultSet = await client.query({
       query: previousQuery,
-      format: 'JSONEachRow'
+      format: "JSONEachRow",
     });
 
-    const currentData = await currentResultSet.json() as any[];
-    const previousData = await previousResultSet.json() as any[];
+    const currentData = (await currentResultSet.json()) as any[];
+    const previousData = (await previousResultSet.json()) as any[];
 
     // Create a map for previous data for easier lookup
     const previousDataMap = new Map();
-    previousData.forEach(item => {
+    previousData.forEach((item) => {
       previousDataMap.set(item.stay_range, item);
     });
 
     // Combine current and previous data, mapping field names
-    const combinedData = currentData.map(item => {
+    const combinedData = currentData.map((item) => {
       const prevItem = previousDataMap.get(item.stay_range) || { count: 0 };
-      
+
       return {
         range: item.stay_range,
-        current: parseInt(item.count || '0', 10),
-        previous: parseInt(prevItem.count || '0', 10)
+        current: parseInt(item.count || "0", 10),
+        previous: parseInt(prevItem.count || "0", 10),
       };
     });
 
     // Add any buckets from previous data that might not be in current data
-    previousData.forEach(prevItem => {
-      const exists = combinedData.some(item => item.range === prevItem.stay_range);
+    previousData.forEach((prevItem) => {
+      const exists = combinedData.some(
+        (item) => item.range === prevItem.stay_range
+      );
       if (!exists) {
         combinedData.push({
           range: prevItem.stay_range,
           current: 0,
-          previous: parseInt(prevItem.count || '0', 10)
+          previous: parseInt(prevItem.count || "0", 10),
         });
       }
     });
@@ -159,16 +163,19 @@ export async function GET(request: Request) {
     // Sort data by the correct order of stay lengths
     combinedData.sort((a, b) => {
       const order = {
-        '1 night': 1,
-        '2 nights': 2,
-        '3 nights': 3,
-        '4 nights': 4,
-        '5 nights': 5,
-        '6 nights': 6,
-        '7+ nights': 7
+        "1 night": 1,
+        "2 nights": 2,
+        "3 nights": 3,
+        "4 nights": 4,
+        "5 nights": 5,
+        "6 nights": 6,
+        "7+ nights": 7,
       };
-      
-      return (order[a.range as keyof typeof order] || 99) - (order[b.range as keyof typeof order] || 99);
+
+      return (
+        (order[a.range as keyof typeof order] || 99) -
+        (order[b.range as keyof typeof order] || 99)
+      );
     });
 
     // Construct the response as DataSet[]
@@ -176,15 +183,18 @@ export async function GET(request: Request) {
       {
         key: "lengthOfStay", // Match the defaultDataset key used in Overview.tsx
         title: "Length of Stay Distribution",
-        data: combinedData // The processed data array
-      }
+        data: combinedData, // The processed data array
+      },
     ];
 
     return NextResponse.json(response); // Return the DataSet array directly
   } catch (error) {
-    console.error('Error querying ClickHouse:', error);
+    console.error("Error querying ClickHouse:", error);
     return NextResponse.json(
-      { error: 'Failed to fetch length of stay distribution data from ClickHouse' },
+      {
+        error:
+          "Failed to fetch length of stay distribution data from ClickHouse",
+      },
       { status: 500 }
     );
   } finally {
@@ -193,4 +203,4 @@ export async function GET(request: Request) {
       await client.close();
     }
   }
-} 
+}
