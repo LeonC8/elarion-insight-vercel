@@ -290,7 +290,7 @@ export async function GET(request: Request) {
       SUM(fbRevenue) AS fb_revenue,
       SUM(otherRevenue) AS other_revenue,
       SUM(totalRevenue) AS total_revenue
-    FROM SAND01CN.insights
+    FROM JADRANKA.insights
     WHERE 
       toDate(occupancy_date) BETWEEN '${startDate}' AND '${endDate}'
       AND date(scd_valid_from) <= DATE('${businessDateParam}') 
@@ -315,7 +315,7 @@ export async function GET(request: Request) {
       SUM(fbRevenue) AS fb_revenue,
       SUM(otherRevenue) AS other_revenue,
       SUM(totalRevenue) AS total_revenue
-    FROM SAND01CN.insights
+    FROM JADRANKA.insights
     WHERE 
       toDate(occupancy_date) BETWEEN '${
         prevStartDate.toISOString().split("T")[0]
@@ -362,7 +362,7 @@ export async function GET(request: Request) {
         SUM(fbRevenue) AS fb_revenue,
         SUM(otherRevenue) AS other_revenue,
         SUM(totalRevenue) AS total_revenue
-      FROM SAND01CN.insights
+      FROM JADRANKA.insights
       WHERE 
         toDate(occupancy_date) BETWEEN '${startDate}' AND '${endDate}'
         AND date(scd_valid_from) <= DATE('${businessDateParam}') 
@@ -378,7 +378,7 @@ export async function GET(request: Request) {
         SUM(fbRevenue) AS fb_revenue,
         SUM(otherRevenue) AS other_revenue,
         SUM(totalRevenue) AS total_revenue
-      FROM SAND01CN.insights
+      FROM JADRANKA.insights
       WHERE 
         toDate(occupancy_date) BETWEEN '${
           prevStartDate.toISOString().split("T")[0]

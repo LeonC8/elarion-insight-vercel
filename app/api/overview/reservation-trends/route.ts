@@ -73,7 +73,7 @@ export async function GET(request: Request) {
       SELECT 
         toDayOfWeek(occupancy_date) AS day_of_week,
         SUM(sold_rooms) AS rooms_sold
-      FROM SAND01CN.insights
+      FROM JADRANKA.insights
       WHERE 
         toDate(occupancy_date) BETWEEN '${startDate}' AND '${endDate}'
         AND date(scd_valid_from) <= DATE('${businessDateParam}') 
@@ -87,7 +87,7 @@ export async function GET(request: Request) {
       SELECT 
         toDayOfWeek(occupancy_date) AS day_of_week,
         SUM(sold_rooms) AS rooms_sold
-      FROM SAND01CN.insights
+      FROM JADRANKA.insights
       WHERE 
         toDate(occupancy_date) BETWEEN '${prevStartDate}' AND '${prevEndDate}'
         AND date(scd_valid_from) <= DATE('${prevBusinessDateParam}') 
@@ -101,7 +101,7 @@ export async function GET(request: Request) {
       SELECT 
         toDayOfWeek(booking_date) AS day_of_week,
         SUM(sold_rooms) AS rooms_sold
-      FROM SAND01CN.insights
+      FROM JADRANKA.insights
       WHERE 
         toDate(occupancy_date) BETWEEN '${startDate}' AND '${endDate}'
         AND date(scd_valid_from) <= DATE('${businessDateParam}') 
@@ -115,7 +115,7 @@ export async function GET(request: Request) {
       SELECT 
         toDayOfWeek(booking_date) AS day_of_week,
         SUM(sold_rooms) AS rooms_sold
-      FROM SAND01CN.insights
+      FROM JADRANKA.insights
       WHERE 
         toDate(occupancy_date) BETWEEN '${prevStartDate}' AND '${prevEndDate}'
         AND date(scd_valid_from) <= DATE('${prevBusinessDateParam}') 

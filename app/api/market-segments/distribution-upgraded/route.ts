@@ -391,7 +391,7 @@ export async function GET(request: Request) {
           SELECT
               ${primaryField} as field_value,
               SUM(totalRevenue) as current_period_revenue
-          FROM SAND01CN.insights
+          FROM JADRANKA.insights
           WHERE
               toDate(occupancy_date) BETWEEN '${startDate}' AND '${endDate}'
               AND date(scd_valid_from) <= DATE('${businessDateParam}')
@@ -464,7 +464,7 @@ export async function GET(request: Request) {
         -- Current Period Data
         SELECT
           ${primaryField}, ${secondaryField}, sold_rooms, roomRevenue, totalRevenue, 1 AS is_current
-        FROM SAND01CN.insights
+        FROM JADRANKA.insights
         WHERE
           toDate(occupancy_date) BETWEEN '${startDate}' AND '${endDate}'
           AND date(scd_valid_from) <= DATE('${businessDateParam}')
@@ -481,7 +481,7 @@ export async function GET(request: Request) {
         -- Previous Period Data
         SELECT
           ${primaryField}, ${secondaryField}, sold_rooms, roomRevenue, totalRevenue, 0 AS is_current
-        FROM SAND01CN.insights
+        FROM JADRANKA.insights
         WHERE
           toDate(occupancy_date) BETWEEN '${prevStartDate}' AND '${prevEndDate}'
           AND date(scd_valid_from) <= DATE('${prevBusinessDateParam}')
@@ -517,7 +517,7 @@ export async function GET(request: Request) {
         SUM(sold_rooms) AS rooms_sold,
         SUM(roomRevenue) AS room_revenue,
         SUM(totalRevenue) AS total_revenue
-      FROM SAND01CN.insights
+      FROM JADRANKA.insights
       WHERE
         (
           (

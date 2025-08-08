@@ -157,7 +157,7 @@ export async function GET(request: Request) {
         SUM(roomRevenue_lost) AS revenue_lost,
         SUM(sold_rooms + no_show_rooms + cancelled_rooms) AS rooms_available,
         SUM(roomRevenue) / NULLIF(SUM(sold_rooms + no_show_rooms + cancelled_rooms), 0) AS revpar
-      FROM SAND01CN.insights
+      FROM JADRANKA.insights
       WHERE
         ${occupancyClause}
         AND scd_valid_from <= toDateTime('${bookingDate}')
@@ -175,7 +175,7 @@ export async function GET(request: Request) {
         SUM(roomRevenue_lost) AS revenue_lost,
         SUM(sold_rooms + no_show_rooms + cancelled_rooms) AS rooms_available,
         SUM(roomRevenue) / NULLIF(SUM(sold_rooms + no_show_rooms + cancelled_rooms), 0) AS revpar
-      FROM SAND01CN.insights
+      FROM JADRANKA.insights
       WHERE
         ${occupancyClause.replace(/(\d{4})/g, (match) =>
           (parseInt(match) - 1).toString()

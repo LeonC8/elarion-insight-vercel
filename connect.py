@@ -11,7 +11,7 @@ start_time = time.time()
 # Execute query with date filter
 res = client.query("""
     SELECT * 
-    FROM SAND01CN.insights
+    FROM JADRANKA.insights
 """)
 df = pd.DataFrame(res.result_set, columns=res.column_names)
 
