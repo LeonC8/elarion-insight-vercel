@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { ClickHouseClient, createClient } from "@clickhouse/client"
-import { getClickhouseConnection } from '@/lib/clickhouse';;
+import { ClickHouseClient, createClient } from "@clickhouse/client";
+import { getClickhouseConnection } from "@/lib/clickhouse";
 import {
   calculateDateRanges,
   calculateComparisonDateRanges,
@@ -184,7 +184,7 @@ export async function GET(request: Request) {
         SUM(fbRevenue) AS fb_revenue,
         SUM(otherRevenue) AS other_revenue,
         SUM(totalRevenue) AS total_revenue
-      FROM SAND01CN.insights
+      FROM JADRANKA.insights
       WHERE 
         toDate(occupancy_date) BETWEEN '${startDate}' AND '${endDate}'
         AND date(scd_valid_from) <= DATE('${businessDateParam}') 
@@ -203,7 +203,7 @@ export async function GET(request: Request) {
         SUM(fbRevenue) AS fb_revenue,
         SUM(otherRevenue) AS other_revenue,
         SUM(totalRevenue) AS total_revenue
-      FROM SAND01CN.insights
+      FROM JADRANKA.insights
       WHERE 
         toDate(occupancy_date) BETWEEN '${prevStartDate}' AND '${prevEndDate}'
         AND date(scd_valid_from) <= DATE('${prevBusinessDateParam}') 
@@ -226,7 +226,7 @@ export async function GET(request: Request) {
         SUM(sold_rooms) AS rooms_sold,
         SUM(roomRevenue) AS room_revenue,
         SUM(totalRevenue) AS total_revenue
-      FROM SAND01CN.insights
+      FROM JADRANKA.insights
       WHERE 
         (
           (
@@ -247,7 +247,7 @@ export async function GET(request: Request) {
             ? ""
             : `AND ${field} IN (
           SELECT ${field}
-          FROM SAND01CN.insights
+          FROM JADRANKA.insights
           WHERE 
             toDate(occupancy_date) BETWEEN '${startDate}' AND '${endDate}'
             AND date(scd_valid_from) <= DATE('${businessDateParam}') 

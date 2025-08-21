@@ -1,9 +1,9 @@
-'use client'
+"use client";
 
-import { LoginScreen } from '@/components/LoginScreen';
-import { useAuth } from '@/context/AuthContext';
-import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { LoginScreen } from "@/components/LoginScreen";
+import { useAuth } from "@/context/AuthContext";
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
 
 export default function LoginPage() {
   const { user, isLoading } = useAuth();
@@ -12,10 +12,10 @@ export default function LoginPage() {
   // Redirect to overview if already logged in
   useEffect(() => {
     if (!isLoading && user) {
-      router.push('/overview');
+      router.push("/overview");
     }
   }, [user, isLoading, router]);
-
+  c;
   // Show loading spinner while checking auth state
   if (isLoading) {
     return (
@@ -32,4 +32,4 @@ export default function LoginPage() {
 
   // This should not be reached, but just in case
   return null;
-} 
+}

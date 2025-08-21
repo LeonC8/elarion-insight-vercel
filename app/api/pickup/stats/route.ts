@@ -1,6 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { createClient, ClickHouseClient } from '@clickhouse/client';
-import { getClickhouseConnection } from '@/lib/clickhouse';
+import { NextRequest, NextResponse } from "next/server";
+import { createClient, ClickHouseClient } from "@clickhouse/client";
+import { getClickhouseConnection } from "@/lib/clickhouse";
 
 // Type definition for our response data
 export interface PickupStats {
@@ -155,7 +155,7 @@ export async function GET(request: NextRequest) {
         SUM(roomRevenue_lost) AS revenue_lost,
         SUM(sold_rooms + no_show_rooms + cancelled_rooms) AS rooms_available,
         SUM(roomRevenue) / NULLIF(SUM(sold_rooms + no_show_rooms + cancelled_rooms), 0) AS revpar
-      FROM SAND01CN.insights
+      FROM JADRANKA.insights
       WHERE
         ${occupancyClause}
         AND scd_valid_from <= toDateTime('${bookingDate}')
@@ -173,7 +173,7 @@ export async function GET(request: NextRequest) {
         SUM(roomRevenue_lost) AS revenue_lost,
         SUM(sold_rooms + no_show_rooms + cancelled_rooms) AS rooms_available,
         SUM(roomRevenue) / NULLIF(SUM(sold_rooms + no_show_rooms + cancelled_rooms), 0) AS revpar
-      FROM SAND01CN.insights
+      FROM JADRANKA.insights
       WHERE
         ${occupancyClause.replace(/(\d{4})/g, (match) =>
           (parseInt(match) - 1).toString()

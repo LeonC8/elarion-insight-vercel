@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { ClickHouseClient, createClient } from "@clickhouse/client";
 import * as fs from "fs";
 import * as path from "path";
-import { getClickhouseConnection } from '@/lib/clickhouse';
-import { protectApiRoute } from '@/lib/auth-utils';
+import { getClickhouseConnection } from "@/lib/clickhouse";
+import { protectApiRoute } from "@/lib/auth-utils";
 
 // --- START CACHING LOGIC ---
 
@@ -173,10 +173,10 @@ export async function GET(request: NextRequest) {
   if (authResult instanceof NextResponse) {
     return authResult; // Return error response
   }
-  
+
   // User is authenticated, continue with API logic
   const { user } = authResult;
-  console.log('API: Authenticated user:', user?.email || 'Unknown');
+  console.log("API: Authenticated user:", user?.email || "Unknown");
 
   // Parse query parameters
   const { searchParams } = new URL(request.url);
@@ -299,7 +299,7 @@ export async function GET(request: NextRequest) {
       SUM(fbRevenue) AS fb_revenue,
       SUM(otherRevenue) AS other_revenue,
       SUM(totalRevenue) AS total_revenue
-    FROM SAND01CN.insights
+    FROM JADRANKA.insights
     WHERE 
       toDate(occupancy_date) BETWEEN '${startDate}' AND '${endDate}'
       AND date(scd_valid_from) <= DATE('${businessDateParam}') 
@@ -324,7 +324,7 @@ export async function GET(request: NextRequest) {
       SUM(fbRevenue) AS fb_revenue,
       SUM(otherRevenue) AS other_revenue,
       SUM(totalRevenue) AS total_revenue
-    FROM SAND01CN.insights
+    FROM JADRANKA.insights
     WHERE 
       toDate(occupancy_date) BETWEEN '${
         prevStartDate.toISOString().split("T")[0]
@@ -371,7 +371,7 @@ export async function GET(request: NextRequest) {
         SUM(fbRevenue) AS fb_revenue,
         SUM(otherRevenue) AS other_revenue,
         SUM(totalRevenue) AS total_revenue
-      FROM SAND01CN.insights
+      FROM JADRANKA.insights
       WHERE 
         toDate(occupancy_date) BETWEEN '${startDate}' AND '${endDate}'
         AND date(scd_valid_from) <= DATE('${businessDateParam}') 
@@ -387,7 +387,7 @@ export async function GET(request: NextRequest) {
         SUM(fbRevenue) AS fb_revenue,
         SUM(otherRevenue) AS other_revenue,
         SUM(totalRevenue) AS total_revenue
-      FROM SAND01CN.insights
+      FROM JADRANKA.insights
       WHERE 
         toDate(occupancy_date) BETWEEN '${
           prevStartDate.toISOString().split("T")[0]

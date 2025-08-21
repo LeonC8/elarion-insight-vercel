@@ -1,6 +1,6 @@
-import { NextResponse } from 'next/server';
-import { ClickHouseClient, createClient } from '@clickhouse/client'
-import { getClickhouseConnection } from '@/lib/clickhouse';;
+import { NextResponse } from "next/server";
+import { ClickHouseClient, createClient } from "@clickhouse/client";
+import { getClickhouseConnection } from "@/lib/clickhouse";
 
 // Type definition for our response data
 export interface PickupMetric {
@@ -17,20 +17,36 @@ export interface YearlyPickupResponse {
 }
 
 // Helper to get month names for UTC formatting
-const MONTH_NAMES_SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const MONTH_NAMES_SHORT = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
+];
 
 export async function GET(request: Request) {
   // Parse query parameters
   const { searchParams } = new URL(request.url);
-  const businessDateParam = searchParams.get('businessDate');
+  const businessDateParam = searchParams.get("businessDate");
 
   if (!businessDateParam) {
-    return NextResponse.json({ error: 'businessDate parameter is required' }, { status: 400 });
+    return NextResponse.json(
+      { error: "businessDate parameter is required" },
+      { status: 400 }
+    );
   }
 
   // Use businessDate to define the context (year, month, and upper limit for booking dates)
   // Parse the date string and treat components as UTC
-  const [yearStr, monthStr, dayStr] = businessDateParam.split('-').map(Number);
+  const [yearStr, monthStr, dayStr] = businessDateParam.split("-").map(Number);
   const businessDateUTC = new Date(Date.UTC(yearStr, monthStr - 1, dayStr)); // Month is 0-indexed
 
   const year = businessDateUTC.getUTCFullYear();
@@ -47,10 +63,10 @@ export async function GET(request: Request) {
   try {
     // Create ClickHouse client
     client = createClient({
-       host: getClickhouseConnection().host,
-       username: getClickhouseConnection().username,
-       password: getClickhouseConnection().password
-     });
+      host: getClickhouseConnection().host,
+      username: getClickhouseConnection().username,
+      password: getClickhouseConnection().password,
+    });
 
     // Modified query to match the month view's calculation logic
     // This ensures consistency between monthly and yearly views
@@ -64,7 +80,7 @@ export async function GET(request: Request) {
             toStartOfMonth(occupancy_date) AS occupancy_month,
             sold_rooms,
             roomRevenue AS room_revenue
-          FROM SAND01CN.insights
+          FROM JADRANKA.insights
           WHERE
             toDate(booking_date) BETWEEN '${monthStart}' AND '${businessDateStr}'
             AND toDate(occupancy_date) BETWEEN '${monthStart}' AND '${yearEnd}'
@@ -84,10 +100,8 @@ export async function GET(request: Request) {
 
     const resultSet = await client.query({
       query,
-      format: 'JSONEachRow'
+      format: "JSONEachRow",
     });
-
-
 
     const data = await resultSet.json();
 
@@ -97,43 +111,51 @@ export async function GET(request: Request) {
     const bookingDates = generateDatesInMonthUTC(businessDateUTC); // Rows: Dates in the business month up to business date
     const occupancyMonths = generateMonthsInYearUTC(businessDateUTC); // Columns: Months from business month to end of year
 
-    const result: YearlyPickupResponse[] = bookingDates.map(bookingDateString => {
-      const pickupData: { [key: string]: PickupMetric } = {};
+    const result: YearlyPickupResponse[] = bookingDates.map(
+      (bookingDateString) => {
+        const pickupData: { [key: string]: PickupMetric } = {};
 
-      // Initialize all occupancy months with null values
-      occupancyMonths.forEach(occupancyMonth => {
-        pickupData[occupancyMonth] = { soldRooms: null, revenue: null, adr: null };
-      });
-
-      // Find the actual data for this booking date
-      data.forEach((row: any) => {
-        if (row.booking_date === bookingDateString) {
-           // occupancy_month from ClickHouse is YYYY-MM-DD, need to convert to UTC Date for formatting
-           const occupancyMonthDate = new Date(row.occupancy_month + 'T00:00:00Z'); // Treat as UTC
-           const monthStr = formatMonthYearUTC(occupancyMonthDate);
-
-          const rooms = parseFloat(row.sold_rooms) || 0;
-          const revenue = parseFloat(row.room_revenue) || 0;
-
-          pickupData[monthStr] = {
-            soldRooms: rooms,
-            revenue: revenue,
-            adr: rooms > 0 ? Math.round(revenue / rooms) : null
+        // Initialize all occupancy months with null values
+        occupancyMonths.forEach((occupancyMonth) => {
+          pickupData[occupancyMonth] = {
+            soldRooms: null,
+            revenue: null,
+            adr: null,
           };
-        }
-      });
+        });
 
-      return {
-        bookingDate: bookingDateString,
-        pickupData
-      };
-    });
+        // Find the actual data for this booking date
+        data.forEach((row: any) => {
+          if (row.booking_date === bookingDateString) {
+            // occupancy_month from ClickHouse is YYYY-MM-DD, need to convert to UTC Date for formatting
+            const occupancyMonthDate = new Date(
+              row.occupancy_month + "T00:00:00Z"
+            ); // Treat as UTC
+            const monthStr = formatMonthYearUTC(occupancyMonthDate);
+
+            const rooms = parseFloat(row.sold_rooms) || 0;
+            const revenue = parseFloat(row.room_revenue) || 0;
+
+            pickupData[monthStr] = {
+              soldRooms: rooms,
+              revenue: revenue,
+              adr: rooms > 0 ? Math.round(revenue / rooms) : null,
+            };
+          }
+        });
+
+        return {
+          bookingDate: bookingDateString,
+          pickupData,
+        };
+      }
+    );
 
     return NextResponse.json(result);
   } catch (error) {
-    console.error('Error querying ClickHouse:', error);
+    console.error("Error querying ClickHouse:", error);
     return NextResponse.json(
-      { error: 'Failed to fetch data from ClickHouse' },
+      { error: "Failed to fetch data from ClickHouse" },
       { status: 500 }
     );
   } finally {
@@ -159,7 +181,13 @@ function generateDatesInMonthUTC(targetDateUTC: Date): string[] {
   while (currentDate.getTime() <= targetDateUTC.getTime()) {
     dates.push(formatDateUTC(currentDate));
     // Increment date carefully in UTC
-    currentDate = new Date(Date.UTC(currentDate.getUTCFullYear(), currentDate.getUTCMonth(), currentDate.getUTCDate() + 1));
+    currentDate = new Date(
+      Date.UTC(
+        currentDate.getUTCFullYear(),
+        currentDate.getUTCMonth(),
+        currentDate.getUTCDate() + 1
+      )
+    );
   }
 
   return dates;
@@ -182,8 +210,8 @@ function generateMonthsInYearUTC(targetDateUTC: Date): string[] {
 // Formats a UTC Date object as YYYY-MM-DD string.
 function formatDateUTC(date: Date): string {
   const year = date.getUTCFullYear();
-  const month = (date.getUTCMonth() + 1).toString().padStart(2, '0');
-  const day = date.getUTCDate().toString().padStart(2, '0');
+  const month = (date.getUTCMonth() + 1).toString().padStart(2, "0");
+  const day = date.getUTCDate().toString().padStart(2, "0");
   return `${year}-${month}-${day}`;
 }
 
@@ -193,4 +221,4 @@ function formatMonthYearUTC(date: Date): string {
   const month = MONTH_NAMES_SHORT[monthIndex];
   const year = date.getUTCFullYear();
   return `${month} ${year}`;
-} 
+}

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { ClickHouseClient, createClient } from "@clickhouse/client"
-import { getClickhouseConnection } from '@/lib/clickhouse';;
+import { ClickHouseClient, createClient } from "@clickhouse/client";
+import { getClickhouseConnection } from "@/lib/clickhouse";
 
 // Type definition for our response data
 export interface PickupMetric {
@@ -71,7 +71,7 @@ export async function GET(request: Request) {
         toDate(occupancy_date) AS occupancy_date,
         SUM(sold_rooms) as sold_rooms,
         SUM(roomRevenue) AS room_revenue
-      FROM SAND01CN.insights
+      FROM JADRANKA.insights
       WHERE
         toDate(booking_date) BETWEEN '${monthStart}' AND '${businessDateStr}'
         AND toDate(occupancy_date) BETWEEN '${monthStart}' AND '${monthEnd}'
