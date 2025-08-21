@@ -335,11 +335,7 @@ export async function GET(request: Request) {
 
   try {
     // Create ClickHouse client
-    client = createClient({
-      host: process.env.CLICKHOUSE_HOST || "http://34.34.71.156:8123",
-      username: process.env.CLICKHOUSE_USER || "default",
-      password: process.env.CLICKHOUSE_PASSWORD || "elarion",
-    });
+    client = createClient(getClickhouseConnection());
 
     // Add field-specific filters based on field type
     let primaryFieldSpecificFilters = "";

@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { Sidebar } from '@/components/Sidebar'
 import { useRouter } from 'next/navigation'
-import { useAuth } from '@/app/context/AuthContext'
+import { useAuth } from '@/context/AuthContext'
 import { MenuIcon, XIcon } from 'lucide-react'; // Import icons for toggle
 
 export default function DashboardLayout({
@@ -11,32 +11,43 @@ export default function DashboardLayout({
 }: {
   children: React.ReactNode
 }) {
-  const [clientReady, setClientReady] = useState(false)
-  const { isLoggedIn, logout } = useAuth()
+  console.log('DashboardLayout: Component rendered')
+  
+  const { user, isLoading, logout } = useAuth()
   const router = useRouter()
   const [isSidebarOpen, setIsSidebarOpen] = useState(false); // State for sidebar visibility
 
-  // This effect ensures we only render after hydration
   useEffect(() => {
-    setClientReady(true)
-  }, [])
+    console.log('DashboardLayout: Component mounted', { user: !!user, isLoading })
+  }, [user, isLoading])
 
-  const handleLogout = () => {
-    logout()
+  const handleLogout = async () => {
+    console.log('DashboardLayout: Logout attempt')
+    await logout()
   }
 
-  // Don't render anything until client-side code is running
-  if (!clientReady) {
-    return <div className="flex items-center justify-center h-screen">
-      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-slate-900"></div>
-    </div>
+  // Show loading spinner while checking auth state
+  if (isLoading) {
+    console.log('DashboardLayout: Showing loading spinner')
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-slate-900"></div>
+      </div>
+    )
   }
 
-  if (!isLoggedIn) {
-    return <div className="flex items-center justify-center h-screen">
-      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-slate-900"></div>
-    </div>
+  // Redirect to login if not authenticated
+  if (!user) {
+    console.log('DashboardLayout: No user, redirecting to login')
+    router.push('/login')
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-slate-900"></div>
+      </div>
+    )
   }
+
+  console.log('DashboardLayout: Rendering dashboard with user', user.email)
 
   return (
     <div className="flex h-screen bg-gray-0 overflow-hidden"> {/* Prevent body scroll */}

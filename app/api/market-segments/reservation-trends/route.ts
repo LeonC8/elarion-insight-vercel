@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { ClickHouseClient, createClient } from '@clickhouse/client';
+import { ClickHouseClient, createClient } from '@clickhouse/client'
+import { getClickhouseConnection } from '@/lib/clickhouse';;
 import { calculateDateRanges, calculateComparisonDateRanges } from '@/lib/dateUtils';
 
 // Interface for the response with the correct structure
@@ -54,12 +55,9 @@ export async function GET(request: Request) {
   let client: ClickHouseClient | undefined;
 
   try {
-    // Create ClickHouse client
-    client = createClient({
-      url: process.env.CLICKHOUSE_HOST || 'http://34.34.71.156:8123',
-      username: process.env.CLICKHOUSE_USER || 'default',
-      password: process.env.CLICKHOUSE_PASSWORD || 'elarion'
-    });
+    // Create ClickHouse client using centralized config
+    const clickhouseConfig = getClickhouseConnection();
+    client = createClient(clickhouseConfig);
 
     // 1. Query for occupancy (stays) by day of week - current period
     const occupancyCurrentQuery = `

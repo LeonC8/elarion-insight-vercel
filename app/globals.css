@@ -7,7 +7,7 @@
 @font-face {
   font-family: 'Geist Sans';
   src: 
-       url('fonts/GeistVF.woff') format('woff');
+       url('../fonts/GeistVF.woff') format('woff');
   font-weight: normal;
   font-style: normal;
 }

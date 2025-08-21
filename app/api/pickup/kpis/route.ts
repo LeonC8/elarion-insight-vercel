@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { ClickHouseClient, createClient } from '@clickhouse/client';
+import { ClickHouseClient, createClient } from '@clickhouse/client'
+import { getClickhouseConnection } from '@/lib/clickhouse';;
 import { addDays, endOfMonth, endOfYear, format, eachDayOfInterval, parseISO } from 'date-fns';
 
 // Define FluctuationData type
@@ -100,9 +101,9 @@ export async function GET(request: Request) {
 
     try {
         client = createClient({
-            host: process.env.CLICKHOUSE_HOST || 'http://34.34.71.156:8123',
-            username: process.env.CLICKHOUSE_USER || 'default',
-            password: process.env.CLICKHOUSE_PASSWORD || 'elarion',
+            host: getClickhouseConnection().host,
+            username: getClickhouseConnection().username,
+            password: getClickhouseConnection().password,
             database: 'SAND01CN', // Specify database here
         });
 

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { ClickHouseClient, createClient } from '@clickhouse/client';
+import { ClickHouseClient, createClient } from '@clickhouse/client'
+import { getClickhouseConnection } from '@/lib/clickhouse';;
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -159,9 +160,9 @@ export async function GET(request: Request) {
 
     try {
         client = createClient({
-            host: process.env.CLICKHOUSE_HOST || 'http://34.34.71.156:8123',
-            username: process.env.CLICKHOUSE_USER || 'default',
-            password: process.env.CLICKHOUSE_PASSWORD || 'elarion'
+            host: getClickhouseConnection().host,
+            username: getClickhouseConnection().username,
+            password: getClickhouseConnection().password
         });
 
         const query = `

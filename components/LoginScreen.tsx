@@ -1,19 +1,18 @@
+'use client'
+
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { LockIcon, UserIcon, BarChart2Icon } from 'lucide-react';
-import { loginWithEmailAndPassword } from '@/app/lib/firebase';
-import loginImage from '../assets/2.jpg';
+import { useAuth } from '@/context/AuthContext';
+import loginImage from '@/assets/2.jpg';
 
-interface LoginScreenProps {
-  onLogin: (email: string, password: string) => void;
-}
-
-export function LoginScreen({ onLogin }: LoginScreenProps) {
+export function LoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const { login } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -21,11 +20,9 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
     setIsLoading(true);
     
     try {
-      const result = await loginWithEmailAndPassword(email, password);
-      if (result.success) {
-        onLogin(email, password);
-      } else {
-        setError('Invalid email or password');
+      const result = await login(email, password);
+      if (!result.success) {
+        setError(result.error || 'Login failed. Please try again.');
       }
     } catch (err) {
       setError('Login failed. Please try again.');
@@ -78,6 +75,7 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEmail(e.target.value)}
                     className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent transition duration-150 ease-in-out"
                     required
+                    disabled={isLoading}
                   />
                   <UserIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
                 </div>
@@ -93,6 +91,7 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPassword(e.target.value)}
                     className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent transition duration-150 ease-in-out"
                     required
+                    disabled={isLoading}
                   />
                   <LockIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
                 </div>

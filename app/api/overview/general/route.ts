@@ -1,7 +1,9 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { ClickHouseClient, createClient } from "@clickhouse/client";
 import * as fs from "fs";
 import * as path from "path";
+import { getClickhouseConnection } from '@/lib/clickhouse';
+import { protectApiRoute } from '@/lib/auth-utils';
 
 // --- START CACHING LOGIC ---
 
@@ -165,7 +167,17 @@ interface RoomAvailabilityResult {
   available_rooms: string;
 }
 
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
+  // Protect API route
+  const authResult = await protectApiRoute(request);
+  if (authResult instanceof NextResponse) {
+    return authResult; // Return error response
+  }
+  
+  // User is authenticated, continue with API logic
+  const { user } = authResult;
+  console.log('API: Authenticated user:', user?.email || 'Unknown');
+
   // Parse query parameters
   const { searchParams } = new URL(request.url);
 
@@ -266,12 +278,9 @@ export async function GET(request: Request) {
   let client: ClickHouseClient | undefined;
 
   try {
-    // Create ClickHouse client
-    client = createClient({
-      host: process.env.CLICKHOUSE_HOST,
-      username: process.env.CLICKHOUSE_USER,
-      password: process.env.CLICKHOUSE_PASSWORD,
-    });
+    // Create ClickHouse client using centralized config
+    const clickhouseConfig = getClickhouseConnection();
+    client = createClient(clickhouseConfig);
 
     // Combined query for aggregate data (combines 4 queries into 1)
     const aggregateQuery = `

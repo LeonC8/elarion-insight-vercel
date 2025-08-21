@@ -1,1 +1,0 @@
-- when displaying lead time and length of stay in categories details dialog on the booking channel page (and others)  the "others" category is summed, not averaged so the data is wrong coming from the backend

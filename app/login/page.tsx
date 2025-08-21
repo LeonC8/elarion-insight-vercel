@@ -1,40 +1,35 @@
 'use client'
 
 import { LoginScreen } from '@/components/LoginScreen';
+import { useAuth } from '@/context/AuthContext';
+import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAuth } from '@/app/context/AuthContext';
-import { useEffect, useState } from 'react';
 
 export default function LoginPage() {
+  const { user, isLoading } = useAuth();
   const router = useRouter();
-  const { isLoggedIn, login } = useAuth();
-  const [clientReady, setClientReady] = useState(false);
-
-  // This effect ensures we only render after hydration
-  useEffect(() => {
-    setClientReady(true);
-  }, []);
 
   // Redirect to overview if already logged in
   useEffect(() => {
-    if (clientReady && isLoggedIn) {
+    if (!isLoading && user) {
       router.push('/overview');
     }
-  }, [clientReady, isLoggedIn, router]);
+  }, [user, isLoading, router]);
 
-  const handleLogin = (email: string, password: string) => {
-    // Set logged in state to true
-    login();
-    
-    // Redirect to overview page after login
-    router.push('/overview');
-  };
-
-  if (!clientReady) {
-    return <div className="flex items-center justify-center h-screen">
-      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-slate-900"></div>
-    </div>;
+  // Show loading spinner while checking auth state
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-slate-900"></div>
+      </div>
+    );
   }
 
-  return <LoginScreen onLogin={handleLogin} />;
+  // Show login screen if not logged in
+  if (!user) {
+    return <LoginScreen />;
+  }
+
+  // This should not be reached, but just in case
+  return null;
 } 

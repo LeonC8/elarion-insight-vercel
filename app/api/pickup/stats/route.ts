@@ -1,5 +1,6 @@
-import { NextResponse } from "next/server";
-import { ClickHouseClient, createClient } from "@clickhouse/client";
+import { NextRequest, NextResponse } from 'next/server';
+import { createClient, ClickHouseClient } from '@clickhouse/client';
+import { getClickhouseConnection } from '@/lib/clickhouse';
 
 // Type definition for our response data
 export interface PickupStats {
@@ -51,7 +52,7 @@ function ensureNumber(value: any): number {
   return isNaN(num) ? 0 : num;
 }
 
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
   // Parse query parameters
   const { searchParams } = new URL(request.url);
   const businessDateParam = searchParams.get("businessDate");
@@ -78,12 +79,9 @@ export async function GET(request: Request) {
   let client: ClickHouseClient | undefined;
 
   try {
-    // Create ClickHouse client
-    client = createClient({
-      host: process.env.CLICKHOUSE_HOST,
-      username: process.env.CLICKHOUSE_USER,
-      password: process.env.CLICKHOUSE_PASSWORD,
-    });
+    // Create ClickHouse client using centralized config
+    const clickhouseConfig = getClickhouseConnection();
+    client = createClient(clickhouseConfig);
 
     // Parse dates for processing
     // Convert date strings to proper date objects for querying

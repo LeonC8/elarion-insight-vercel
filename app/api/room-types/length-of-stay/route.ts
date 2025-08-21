@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { ClickHouseClient, createClient } from "@clickhouse/client";
+import { ClickHouseClient, createClient } from "@clickhouse/client"
+import { getClickhouseConnection } from '@/lib/clickhouse';;
 import {
   calculateDateRanges,
   calculateComparisonDateRanges,
@@ -53,11 +54,7 @@ export async function GET(request: Request) {
 
   try {
     // Create ClickHouse client
-    client = createClient({
-      host: process.env.CLICKHOUSE_HOST,
-      username: process.env.CLICKHOUSE_USER,
-      password: process.env.CLICKHOUSE_PASSWORD,
-    });
+    client = createClient(getClickhouseConnection());
 
     // Build the query for current period - now with room_type grouping
     const currentQuery = `
