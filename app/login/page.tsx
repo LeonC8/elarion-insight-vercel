@@ -15,7 +15,7 @@ export default function LoginPage() {
       router.push("/overview");
     }
   }, [user, isLoading, router]);
-  c;
+
   // Show loading spinner while checking auth state
   if (isLoading) {
     return (
