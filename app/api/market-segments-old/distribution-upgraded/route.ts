@@ -5,12 +5,138 @@ import {
   ResultSet,
   DataFormat,
 } from "@clickhouse/client";
-import { getClickhouseConnection } from "@/lib/clickhouse";
 import {
   calculateDateRanges,
   calculateComparisonDateRanges,
 } from "@/lib/dateUtils";
 import { getFullNameFromCode, getCodeFromFullName } from "@/lib/countryUtils";
+import * as fs from "fs";
+import * as path from "path";
+
+// --- START CACHING LOGIC ---
+
+interface CacheEntryData {
+  body: any; // Store the parsed JSON body
+  status: number;
+  headers: Record<string, string>;
+}
+
+interface CacheEntry {
+  data: CacheEntryData;
+  expiresAt: number;
+}
+
+// File-based cache configuration
+const CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
+const CACHE_DIR = path.join(process.cwd(), ".cache");
+
+// Ensure cache directory exists
+try {
+  if (!fs.existsSync(CACHE_DIR)) {
+    fs.mkdirSync(CACHE_DIR, { recursive: true });
+  }
+} catch (error) {
+  console.error("Error creating cache directory:", error);
+}
+
+// File-based cache functions
+function getCacheFilePath(key: string): string {
+  // Create a safe filename from the key
+  const safeKey = Buffer.from(key)
+    .toString("base64")
+    .replace(/[/\\?%*:|"<>]/g, "_");
+  return path.join(CACHE_DIR, `${safeKey}.json`);
+}
+
+async function getCacheEntry(key: string): Promise<CacheEntry | null> {
+  try {
+    const filePath = getCacheFilePath(key);
+    if (fs.existsSync(filePath)) {
+      const data = fs.readFileSync(filePath, "utf8");
+      return JSON.parse(data);
+    }
+    return null;
+  } catch (error) {
+    console.error(`Cache read error:`, error);
+    return null;
+  }
+}
+
+async function setCacheEntry(key: string, entry: CacheEntry): Promise<void> {
+  try {
+    const filePath = getCacheFilePath(key);
+    fs.writeFileSync(filePath, JSON.stringify(entry), "utf8");
+  } catch (error) {
+    console.error(`Cache write error:`, error);
+  }
+}
+
+async function deleteCacheEntry(key: string): Promise<void> {
+  try {
+    const filePath = getCacheFilePath(key);
+    if (fs.existsSync(filePath)) {
+      fs.unlinkSync(filePath);
+    }
+  } catch (error) {
+    console.error(`Cache delete error:`, error);
+  }
+}
+
+/**
+ * Generates a cache key based on relevant query parameters.
+ * Ensures the key is consistent regardless of parameter order.
+ */
+function generateCacheKey(params: URLSearchParams): string {
+  const relevantParams = [
+    "businessDate",
+    "periodType",
+    "viewType",
+    "comparison",
+    "primaryField",
+    "secondaryField",
+    "limit",
+  ];
+  const keyParts: string[] = [];
+
+  relevantParams.forEach((key) => {
+    // Use default values if parameter is missing, mirroring the route's logic
+    let value: string | null = null;
+    switch (key) {
+      case "businessDate":
+        value = params.get(key) || new Date().toISOString().split("T")[0];
+        break;
+      case "periodType":
+        value = params.get(key) || "Month";
+        break;
+      case "viewType":
+        value = params.get(key) || "Actual";
+        break;
+      case "comparison":
+        value = params.get(key) || "Last year - OTB";
+        break;
+      case "primaryField":
+        value = params.get(key) || "booking_channel";
+        break;
+      case "secondaryField":
+        value = params.get(key) || "producer";
+        break;
+      case "limit":
+        value = params.get(key) || "10";
+        break;
+      default:
+        value = params.get(key); // Should not happen with current relevantParams
+    }
+    if (value !== null) {
+      keyParts.push(`${key}=${value}`);
+    }
+  });
+
+  // Sort parts to ensure consistent key regardless of parameter order
+  keyParts.sort();
+  return keyParts.join("&");
+}
+
+// --- END CACHING LOGIC ---
 
 // --- START CLICKHOUSE HELPERS ---
 
@@ -138,7 +264,41 @@ interface ConsolidatedTimeSeriesItem {
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
-  const property = searchParams.get("property");
+
+  // --- CHECK CACHE ---
+  const cacheKey = `distribution-upgraded:${generateCacheKey(searchParams)}`;
+  const cachedEntry = await getCacheEntry(cacheKey);
+
+  if (cachedEntry && cachedEntry.expiresAt > Date.now()) {
+    console.log(
+      `[Cache HIT] Returning cached response for key: ${cacheKey.substring(
+        0,
+        100
+      )}...`
+    );
+    // Reconstruct the response from cached data
+    return new NextResponse(JSON.stringify(cachedEntry.data.body), {
+      status: cachedEntry.data.status,
+      headers: cachedEntry.data.headers,
+    });
+  } else if (cachedEntry) {
+    // Entry exists but is expired
+    console.log(
+      `[Cache EXPIRED] Removing expired entry for key: ${cacheKey.substring(
+        0,
+        100
+      )}...`
+    );
+    await deleteCacheEntry(cacheKey);
+  } else {
+    console.log(
+      `[Cache MISS] No valid cache entry for key: ${cacheKey.substring(
+        0,
+        100
+      )}...`
+    );
+  }
+  // --- END CACHE CHECK ---
 
   // Parse query parameters
   const businessDateParam =
@@ -221,8 +381,6 @@ export async function GET(request: Request) {
       }
     }
 
-    const propertyFilter = property ? `AND property = '${property}'` : "";
-
     // Rewrite the primary field query using a CTE to avoid the subquery scope issue
     const primaryFieldQuery = `
       WITH PrimaryFieldRevenue AS (
@@ -235,7 +393,6 @@ export async function GET(request: Request) {
               AND date(scd_valid_from) <= DATE('${businessDateParam}')
               AND DATE('${businessDateParam}') < date(scd_valid_to)
               ${primaryFieldSpecificFilters} // Use specific filters
-              ${propertyFilter}
           GROUP BY field_value
       )
       SELECT field_value
@@ -308,7 +465,6 @@ export async function GET(request: Request) {
           AND DATE('${businessDateParam}') < date(scd_valid_to)
           ${primaryFieldSpecificFilters} // Use specific filters
           ${secondaryFieldSpecificFilters} // Use specific filters
-          ${propertyFilter}
           -- Filter only for the top primary fields fetched earlier
           AND ${primaryField} IN (${primaryFieldValues
       .map((v) => (typeof v === "string" ? `'${v}'` : v))
@@ -326,7 +482,6 @@ export async function GET(request: Request) {
           AND DATE('${prevBusinessDateParam}') < date(scd_valid_to)
           ${primaryFieldSpecificFilters} // Use specific filters
           ${secondaryFieldSpecificFilters} // Use specific filters
-          ${propertyFilter}
           -- Filter only for the top primary fields fetched earlier
           AND ${primaryField} IN (${primaryFieldValues
       .map((v) => (typeof v === "string" ? `'${v}'` : v))
@@ -373,7 +528,6 @@ export async function GET(request: Request) {
         )
         ${primaryFieldSpecificFilters} // Use specific filters
         ${secondaryFieldSpecificFilters} // Use specific filters
-        ${propertyFilter}
         -- Filter only for the top primary fields fetched earlier
         AND ${primaryField} IN (${primaryFieldValues
       .map((v) => (typeof v === "string" ? `'${v}'` : v))
@@ -622,6 +776,25 @@ export async function GET(request: Request) {
         timeSeriesData: processedTimeSeriesData,
       };
     }
+
+    // --- STORE IN CACHE ---
+    const cacheEntry: CacheEntry = {
+      data: {
+        body: groupedData,
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      },
+      expiresAt: Date.now() + CACHE_DURATION,
+    };
+
+    await setCacheEntry(cacheKey, cacheEntry);
+    console.log(
+      `[Cache SET] Stored response data for key: ${cacheKey.substring(
+        0,
+        100
+      )}...`
+    );
+    // --- END STORE IN CACHE ---
 
     // Return the actual response for this request
     return NextResponse.json(groupedData);

@@ -7,9 +7,9 @@ import {
 } from "@/lib/dateUtils";
 
 // Interface for the response
-export interface LeadTimesByBookingChannelResponse {
+export interface LeadTimesByRoomTypeResponse {
   data: {
-    [bookingChannel: string]: {
+    [roomType: string]: {
       datasets: {
         [datasetKey: string]: {
           title: string;
@@ -32,7 +32,6 @@ export async function GET(request: Request) {
   const periodType = searchParams.get("periodType") || "Month"; // Month, Year, Day
   const viewType = searchParams.get("viewType") || "Actual"; // Actual, OTB, Projected
   const comparisonType = searchParams.get("comparison") || "Last year - OTB";
-  const property = searchParams.get("property");
 
   // Calculate date ranges
   const { startDate, endDate } = calculateDateRanges(
@@ -58,12 +57,10 @@ export async function GET(request: Request) {
     const clickhouseConfig = getClickhouseConnection();
     client = createClient(clickhouseConfig);
 
-    const propertyFilter = property ? `AND property = '${property}'` : "";
-
     // 1. First query for booking lead time data (current period)
     const bookingLeadTimeCurrentQuery = `
       SELECT 
-        booking_channel,
+        room_type,
         bucket AS time_range,
         SUM(booking_lead_num) AS count
       FROM JADRANKA.booking_lead_time
@@ -71,15 +68,14 @@ export async function GET(request: Request) {
         toDate(occupancy_date) BETWEEN '${startDate}' AND '${endDate}'
         AND date(scd_valid_from) <= DATE('${businessDateParam}') 
         AND DATE('${businessDateParam}') < date(scd_valid_to)
-        ${propertyFilter}
-      GROUP BY booking_channel, bucket
-      ORDER BY booking_channel, bucket ASC
+      GROUP BY room_type, bucket
+      ORDER BY room_type, bucket ASC
     `;
 
     // 2. Second query for booking lead time data (previous period)
     const bookingLeadTimePreviousQuery = `
       SELECT 
-        booking_channel,
+        room_type,
         bucket AS time_range,
         SUM(booking_lead_num) AS count
       FROM JADRANKA.booking_lead_time
@@ -87,15 +83,14 @@ export async function GET(request: Request) {
         toDate(occupancy_date) BETWEEN '${prevStartDate}' AND '${prevEndDate}'
         AND date(scd_valid_from) <= DATE('${prevBusinessDateParam}') 
         AND DATE('${prevBusinessDateParam}') < date(scd_valid_to)
-        ${propertyFilter}
-      GROUP BY booking_channel, bucket
-      ORDER BY booking_channel, bucket ASC
+      GROUP BY room_type, bucket
+      ORDER BY room_type, bucket ASC
     `;
 
     // 3. Third query for cancellation lead time data (current period)
     const cancellationLeadTimeCurrentQuery = `
       SELECT 
-        booking_channel,
+        room_type,
         bucket AS time_range,
         SUM(cancellation_lead_num) AS count
       FROM JADRANKA.cancellation_lead_time
@@ -103,15 +98,14 @@ export async function GET(request: Request) {
         toDate(occupancy_date) BETWEEN '${startDate}' AND '${endDate}'
         AND date(scd_valid_from) <= DATE('${businessDateParam}') 
         AND DATE('${businessDateParam}') < date(scd_valid_to)
-        ${propertyFilter}
-      GROUP BY booking_channel, bucket
-      ORDER BY booking_channel, bucket ASC
+      GROUP BY room_type, bucket
+      ORDER BY room_type, bucket ASC
     `;
 
     // 4. Fourth query for cancellation lead time data (previous period)
     const cancellationLeadTimePreviousQuery = `
       SELECT 
-        booking_channel,
+        room_type,
         bucket AS time_range,
         SUM(cancellation_lead_num) AS count
       FROM JADRANKA.cancellation_lead_time
@@ -119,9 +113,8 @@ export async function GET(request: Request) {
         toDate(occupancy_date) BETWEEN '${prevStartDate}' AND '${prevEndDate}'
         AND date(scd_valid_from) <= DATE('${prevBusinessDateParam}') 
         AND DATE('${prevBusinessDateParam}') < date(scd_valid_to)
-        ${propertyFilter}
-      GROUP BY booking_channel, bucket
-      ORDER BY booking_channel, bucket ASC
+      GROUP BY room_type, bucket
+      ORDER BY room_type, bucket ASC
     `;
 
     // Execute all four queries
@@ -162,18 +155,18 @@ export async function GET(request: Request) {
     // Create maps for previous data for easier lookup
     const bookingLeadTimePreviousMap = new Map();
     bookingLeadTimePreviousData.forEach((item) => {
-      const key = `${item.booking_channel}|${item.time_range}`;
+      const key = `${item.room_type}|${item.time_range}`;
       bookingLeadTimePreviousMap.set(key, item);
     });
 
     const cancellationLeadTimePreviousMap = new Map();
     cancellationLeadTimePreviousData.forEach((item) => {
-      const key = `${item.booking_channel}|${item.time_range}`;
+      const key = `${item.room_type}|${item.time_range}`;
       cancellationLeadTimePreviousMap.set(key, item);
     });
 
-    // Process data to organize by booking channel
-    const dataByBookingChannel: LeadTimesByBookingChannelResponse["data"] = {};
+    // Process data to organize by room type
+    const dataByRoomType: LeadTimesByRoomTypeResponse["data"] = {};
 
     // First pass: collect all data and identify all unique buckets for both datasets
     const bookingLeadTimeBuckets = new Set<string>();
@@ -181,143 +174,94 @@ export async function GET(request: Request) {
 
     // Process booking lead time current data
     bookingLeadTimeCurrentData.forEach((item) => {
-      const bookingChannel = item.booking_channel;
+      const roomType = item.room_type;
       const timeRange = item.time_range;
       bookingLeadTimeBuckets.add(timeRange);
 
-      const key = `${bookingChannel}|${timeRange}`;
+      const key = `${roomType}|${timeRange}`;
       const prevItem = bookingLeadTimePreviousMap.get(key) || { count: 0 };
 
-      if (!dataByBookingChannel[bookingChannel]) {
-        dataByBookingChannel[bookingChannel] = {
+      if (!dataByRoomType[roomType]) {
+        dataByRoomType[roomType] = {
           datasets: {},
         };
       }
 
       // Make sure the booking_lead_time dataset exists
-      if (!dataByBookingChannel[bookingChannel].datasets.booking_lead_time) {
-        dataByBookingChannel[bookingChannel].datasets.booking_lead_time = {
-          title: "Booking lead time",
+      if (!dataByRoomType[roomType].datasets.booking_lead_time) {
+        dataByRoomType[roomType].datasets.booking_lead_time = {
+          title: "Lead Time",
           data: [],
         };
       }
 
-      dataByBookingChannel[bookingChannel].datasets.booking_lead_time.data.push(
-        {
-          range: timeRange,
-          current: parseInt(item.count || "0", 10),
-          previous: parseInt(prevItem.count || "0", 10),
-        }
-      );
-    });
-
-    // Process cancellation lead time current data
-    cancellationLeadTimeCurrentData.forEach((item) => {
-      const bookingChannel = item.booking_channel;
-      const timeRange = item.time_range;
-      cancellationLeadTimeBuckets.add(timeRange);
-
-      const key = `${bookingChannel}|${timeRange}`;
-      const prevItem = cancellationLeadTimePreviousMap.get(key) || { count: 0 };
-
-      if (!dataByBookingChannel[bookingChannel]) {
-        dataByBookingChannel[bookingChannel] = {
-          datasets: {},
-        };
-      }
-
-      // Make sure the cancellation_lead_time dataset exists
-      if (
-        !dataByBookingChannel[bookingChannel].datasets.cancellation_lead_time
-      ) {
-        dataByBookingChannel[bookingChannel].datasets.cancellation_lead_time = {
-          title: "Cancellation lead time",
-          data: [],
-        };
-      }
-
-      dataByBookingChannel[
-        bookingChannel
-      ].datasets.cancellation_lead_time.data.push({
+      dataByRoomType[roomType].datasets.booking_lead_time.data.push({
         range: timeRange,
         current: parseInt(item.count || "0", 10),
         previous: parseInt(prevItem.count || "0", 10),
       });
     });
 
-    // Add any booking channels and buckets from previous data that might not be in current data
-    bookingLeadTimePreviousData.forEach((prevItem) => {
-      const bookingChannel = prevItem.booking_channel;
-      const timeRange = prevItem.time_range;
-      bookingLeadTimeBuckets.add(timeRange);
-
-      // Check if this booking channel exists in our result
-      if (!dataByBookingChannel[bookingChannel]) {
-        dataByBookingChannel[bookingChannel] = {
-          datasets: {},
-        };
-      }
-
-      // Make sure the booking_lead_time dataset exists
-      if (!dataByBookingChannel[bookingChannel].datasets.booking_lead_time) {
-        dataByBookingChannel[bookingChannel].datasets.booking_lead_time = {
-          title: "Booking lead time",
-          data: [],
-        };
-      }
-
-      // Check if this time range exists for this booking channel
-      const existingEntry = dataByBookingChannel[
-        bookingChannel
-      ].datasets.booking_lead_time.data.find(
-        (item) => item.range === timeRange
-      );
-
-      if (!existingEntry) {
-        dataByBookingChannel[
-          bookingChannel
-        ].datasets.booking_lead_time.data.push({
-          range: timeRange,
-          current: 0,
-          previous: parseInt(prevItem.count || "0", 10),
-        });
-      }
-    });
-
-    // Add any booking channels and buckets from cancellation previous data that might not be in current data
-    cancellationLeadTimePreviousData.forEach((prevItem) => {
-      const bookingChannel = prevItem.booking_channel;
-      const timeRange = prevItem.time_range;
+    // Process cancellation lead time current data
+    cancellationLeadTimeCurrentData.forEach((item) => {
+      const roomType = item.room_type;
+      const timeRange = item.time_range;
       cancellationLeadTimeBuckets.add(timeRange);
 
-      // Check if this booking channel exists in our result
-      if (!dataByBookingChannel[bookingChannel]) {
-        dataByBookingChannel[bookingChannel] = {
+      const key = `${roomType}|${timeRange}`;
+      const prevItem = cancellationLeadTimePreviousMap.get(key) || { count: 0 };
+
+      if (!dataByRoomType[roomType]) {
+        dataByRoomType[roomType] = {
           datasets: {},
         };
       }
 
       // Make sure the cancellation_lead_time dataset exists
-      if (
-        !dataByBookingChannel[bookingChannel].datasets.cancellation_lead_time
-      ) {
-        dataByBookingChannel[bookingChannel].datasets.cancellation_lead_time = {
-          title: "Cancellation lead time",
+      if (!dataByRoomType[roomType].datasets.cancellation_lead_time) {
+        dataByRoomType[roomType].datasets.cancellation_lead_time = {
+          title: "Cancellation Lead Time",
           data: [],
         };
       }
 
-      // Check if this time range exists for this booking channel
-      const existingEntry = dataByBookingChannel[
-        bookingChannel
-      ].datasets.cancellation_lead_time.data.find(
+      dataByRoomType[roomType].datasets.cancellation_lead_time.data.push({
+        range: timeRange,
+        current: parseInt(item.count || "0", 10),
+        previous: parseInt(prevItem.count || "0", 10),
+      });
+    });
+
+    // Add any room types and buckets from previous data that might not be in current data
+    bookingLeadTimePreviousData.forEach((prevItem) => {
+      const roomType = prevItem.room_type;
+      const timeRange = prevItem.time_range;
+      bookingLeadTimeBuckets.add(timeRange);
+
+      // Check if this room type exists in our result
+      if (!dataByRoomType[roomType]) {
+        dataByRoomType[roomType] = {
+          datasets: {},
+        };
+      }
+
+      // Make sure the booking_lead_time dataset exists
+      if (!dataByRoomType[roomType].datasets.booking_lead_time) {
+        dataByRoomType[roomType].datasets.booking_lead_time = {
+          title: "Lead Time",
+          data: [],
+        };
+      }
+
+      // Check if this time range exists for this room type
+      const existingEntry = dataByRoomType[
+        roomType
+      ].datasets.booking_lead_time.data.find(
         (item) => item.range === timeRange
       );
 
       if (!existingEntry) {
-        dataByBookingChannel[
-          bookingChannel
-        ].datasets.cancellation_lead_time.data.push({
+        dataByRoomType[roomType].datasets.booking_lead_time.data.push({
           range: timeRange,
           current: 0,
           previous: parseInt(prevItem.count || "0", 10),
@@ -325,12 +269,49 @@ export async function GET(request: Request) {
       }
     });
 
-    // Second pass: ensure all booking channels have entries for all buckets
-    Object.keys(dataByBookingChannel).forEach((channel) => {
+    // Add any room types and buckets from cancellation previous data that might not be in current data
+    cancellationLeadTimePreviousData.forEach((prevItem) => {
+      const roomType = prevItem.room_type;
+      const timeRange = prevItem.time_range;
+      cancellationLeadTimeBuckets.add(timeRange);
+
+      // Check if this room type exists in our result
+      if (!dataByRoomType[roomType]) {
+        dataByRoomType[roomType] = {
+          datasets: {},
+        };
+      }
+
+      // Make sure the cancellation_lead_time dataset exists
+      if (!dataByRoomType[roomType].datasets.cancellation_lead_time) {
+        dataByRoomType[roomType].datasets.cancellation_lead_time = {
+          title: "Cancellation Lead Time",
+          data: [],
+        };
+      }
+
+      // Check if this time range exists for this room type
+      const existingEntry = dataByRoomType[
+        roomType
+      ].datasets.cancellation_lead_time.data.find(
+        (item) => item.range === timeRange
+      );
+
+      if (!existingEntry) {
+        dataByRoomType[roomType].datasets.cancellation_lead_time.data.push({
+          range: timeRange,
+          current: 0,
+          previous: parseInt(prevItem.count || "0", 10),
+        });
+      }
+    });
+
+    // Second pass: ensure all room types have entries for all buckets
+    Object.keys(dataByRoomType).forEach((roomType) => {
       // Handle booking lead time dataset
-      if (dataByBookingChannel[channel].datasets.booking_lead_time) {
+      if (dataByRoomType[roomType].datasets.booking_lead_time) {
         const existingBuckets = new Set(
-          dataByBookingChannel[channel].datasets.booking_lead_time.data.map(
+          dataByRoomType[roomType].datasets.booking_lead_time.data.map(
             (item) => item.range
           )
         );
@@ -338,7 +319,7 @@ export async function GET(request: Request) {
         // Add any missing buckets with zero values
         bookingLeadTimeBuckets.forEach((bucket) => {
           if (!existingBuckets.has(bucket)) {
-            dataByBookingChannel[channel].datasets.booking_lead_time.data.push({
+            dataByRoomType[roomType].datasets.booking_lead_time.data.push({
               range: bucket,
               current: 0,
               previous: 0,
@@ -347,8 +328,8 @@ export async function GET(request: Request) {
         });
       } else {
         // Create the dataset if it doesn't exist
-        dataByBookingChannel[channel].datasets.booking_lead_time = {
-          title: "Booking lead time",
+        dataByRoomType[roomType].datasets.booking_lead_time = {
+          title: "Lead Time",
           data: Array.from(bookingLeadTimeBuckets).map((bucket) => ({
             range: bucket,
             current: 0,
@@ -358,19 +339,17 @@ export async function GET(request: Request) {
       }
 
       // Handle cancellation lead time dataset
-      if (dataByBookingChannel[channel].datasets.cancellation_lead_time) {
+      if (dataByRoomType[roomType].datasets.cancellation_lead_time) {
         const existingBuckets = new Set(
-          dataByBookingChannel[
-            channel
-          ].datasets.cancellation_lead_time.data.map((item) => item.range)
+          dataByRoomType[roomType].datasets.cancellation_lead_time.data.map(
+            (item) => item.range
+          )
         );
 
         // Add any missing buckets with zero values
         cancellationLeadTimeBuckets.forEach((bucket) => {
           if (!existingBuckets.has(bucket)) {
-            dataByBookingChannel[
-              channel
-            ].datasets.cancellation_lead_time.data.push({
+            dataByRoomType[roomType].datasets.cancellation_lead_time.data.push({
               range: bucket,
               current: 0,
               previous: 0,
@@ -379,8 +358,8 @@ export async function GET(request: Request) {
         });
       } else {
         // Create the dataset if it doesn't exist
-        dataByBookingChannel[channel].datasets.cancellation_lead_time = {
-          title: "Cancellation lead time",
+        dataByRoomType[roomType].datasets.cancellation_lead_time = {
+          title: "Cancellation Lead Time",
           data: Array.from(cancellationLeadTimeBuckets).map((bucket) => ({
             range: bucket,
             current: 0,
@@ -434,11 +413,11 @@ export async function GET(request: Request) {
       return a.localeCompare(b);
     };
 
-    // Sort data for each booking channel by the correct order of time ranges
-    Object.keys(dataByBookingChannel).forEach((channel) => {
+    // Sort data for each room type by the correct order of time ranges
+    Object.keys(dataByRoomType).forEach((roomType) => {
       // Sort booking lead time data
-      if (dataByBookingChannel[channel].datasets.booking_lead_time) {
-        dataByBookingChannel[channel].datasets.booking_lead_time.data.sort(
+      if (dataByRoomType[roomType].datasets.booking_lead_time) {
+        dataByRoomType[roomType].datasets.booking_lead_time.data.sort(
           (a, b) => {
             return sortTimeRanges(a.range, b.range);
           }
@@ -446,8 +425,8 @@ export async function GET(request: Request) {
       }
 
       // Sort cancellation lead time data
-      if (dataByBookingChannel[channel].datasets.cancellation_lead_time) {
-        dataByBookingChannel[channel].datasets.cancellation_lead_time.data.sort(
+      if (dataByRoomType[roomType].datasets.cancellation_lead_time) {
+        dataByRoomType[roomType].datasets.cancellation_lead_time.data.sort(
           (a, b) => {
             return sortTimeRanges(a.range, b.range);
           }
@@ -455,47 +434,34 @@ export async function GET(request: Request) {
       }
     });
 
-    // Format pretty channel names
-    const channelNameMap: Record<string, string> = {
-      direct: "Direct Bookings",
-      booking_com: "Booking.com",
-      expedia: "Expedia",
-      gds: "GDS",
-      wholesalers: "Wholesalers",
-    };
-
-    // Filter out booking channels with all zeros
-    const filteredDataByBookingChannel: LeadTimesByBookingChannelResponse["data"] =
-      {};
-    Object.entries(dataByBookingChannel).forEach(([channel, channelData]) => {
+    // Filter out room types with all zeros
+    const filteredDataByRoomType: LeadTimesByRoomTypeResponse["data"] = {};
+    Object.entries(dataByRoomType).forEach(([roomType, roomTypeData]) => {
       const hasNonZeroBookingLeadTime =
-        channelData.datasets.booking_lead_time?.data.some(
+        roomTypeData.datasets.booking_lead_time?.data.some(
           (item) => item.current > 0 || item.previous > 0
         ) || false;
 
       const hasNonZeroCancellationLeadTime =
-        channelData.datasets.cancellation_lead_time?.data.some(
+        roomTypeData.datasets.cancellation_lead_time?.data.some(
           (item) => item.current > 0 || item.previous > 0
         ) || false;
 
       if (hasNonZeroBookingLeadTime || hasNonZeroCancellationLeadTime) {
-        filteredDataByBookingChannel[channel] = channelData;
+        filteredDataByRoomType[roomType] = roomTypeData;
       }
     });
 
     // Construct response
-    const response: LeadTimesByBookingChannelResponse = {
-      data: filteredDataByBookingChannel,
+    const response: LeadTimesByRoomTypeResponse = {
+      data: filteredDataByRoomType,
     };
 
     return NextResponse.json(response);
   } catch (error) {
     console.error("Error querying ClickHouse:", error);
     return NextResponse.json(
-      {
-        error:
-          "Failed to fetch lead times data by booking channel from ClickHouse",
-      },
+      { error: "Failed to fetch lead times data by room type from ClickHouse" },
       { status: 500 }
     );
   } finally {

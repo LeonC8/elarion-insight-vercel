@@ -7,9 +7,9 @@ import {
 } from "@/lib/dateUtils";
 
 // Interface for the response
-export interface LeadTimesByBookingChannelResponse {
+export interface LeadTimesByMarketSegmentResponse {
   data: {
-    [bookingChannel: string]: {
+    [marketSegment: string]: {
       datasets: {
         [datasetKey: string]: {
           title: string;
@@ -32,7 +32,6 @@ export async function GET(request: Request) {
   const periodType = searchParams.get("periodType") || "Month"; // Month, Year, Day
   const viewType = searchParams.get("viewType") || "Actual"; // Actual, OTB, Projected
   const comparisonType = searchParams.get("comparison") || "Last year - OTB";
-  const property = searchParams.get("property");
 
   // Calculate date ranges
   const { startDate, endDate } = calculateDateRanges(
@@ -58,12 +57,10 @@ export async function GET(request: Request) {
     const clickhouseConfig = getClickhouseConnection();
     client = createClient(clickhouseConfig);
 
-    const propertyFilter = property ? `AND property = '${property}'` : "";
-
     // 1. First query for booking lead time data (current period)
     const bookingLeadTimeCurrentQuery = `
       SELECT 
-        booking_channel,
+        market_group_code,
         bucket AS time_range,
         SUM(booking_lead_num) AS count
       FROM JADRANKA.booking_lead_time
@@ -71,15 +68,14 @@ export async function GET(request: Request) {
         toDate(occupancy_date) BETWEEN '${startDate}' AND '${endDate}'
         AND date(scd_valid_from) <= DATE('${businessDateParam}') 
         AND DATE('${businessDateParam}') < date(scd_valid_to)
-        ${propertyFilter}
-      GROUP BY booking_channel, bucket
-      ORDER BY booking_channel, bucket ASC
+      GROUP BY market_group_code, bucket
+      ORDER BY market_group_code, bucket ASC
     `;
 
     // 2. Second query for booking lead time data (previous period)
     const bookingLeadTimePreviousQuery = `
       SELECT 
-        booking_channel,
+        market_group_code,
         bucket AS time_range,
         SUM(booking_lead_num) AS count
       FROM JADRANKA.booking_lead_time
@@ -87,15 +83,14 @@ export async function GET(request: Request) {
         toDate(occupancy_date) BETWEEN '${prevStartDate}' AND '${prevEndDate}'
         AND date(scd_valid_from) <= DATE('${prevBusinessDateParam}') 
         AND DATE('${prevBusinessDateParam}') < date(scd_valid_to)
-        ${propertyFilter}
-      GROUP BY booking_channel, bucket
-      ORDER BY booking_channel, bucket ASC
+      GROUP BY market_group_code, bucket
+      ORDER BY market_group_code, bucket ASC
     `;
 
     // 3. Third query for cancellation lead time data (current period)
     const cancellationLeadTimeCurrentQuery = `
       SELECT 
-        booking_channel,
+        market_group_code,
         bucket AS time_range,
         SUM(cancellation_lead_num) AS count
       FROM JADRANKA.cancellation_lead_time
@@ -103,15 +98,14 @@ export async function GET(request: Request) {
         toDate(occupancy_date) BETWEEN '${startDate}' AND '${endDate}'
         AND date(scd_valid_from) <= DATE('${businessDateParam}') 
         AND DATE('${businessDateParam}') < date(scd_valid_to)
-        ${propertyFilter}
-      GROUP BY booking_channel, bucket
-      ORDER BY booking_channel, bucket ASC
+      GROUP BY market_group_code, bucket
+      ORDER BY market_group_code, bucket ASC
     `;
 
     // 4. Fourth query for cancellation lead time data (previous period)
     const cancellationLeadTimePreviousQuery = `
       SELECT 
-        booking_channel,
+        market_group_code,
         bucket AS time_range,
         SUM(cancellation_lead_num) AS count
       FROM JADRANKA.cancellation_lead_time
@@ -119,9 +113,8 @@ export async function GET(request: Request) {
         toDate(occupancy_date) BETWEEN '${prevStartDate}' AND '${prevEndDate}'
         AND date(scd_valid_from) <= DATE('${prevBusinessDateParam}') 
         AND DATE('${prevBusinessDateParam}') < date(scd_valid_to)
-        ${propertyFilter}
-      GROUP BY booking_channel, bucket
-      ORDER BY booking_channel, bucket ASC
+      GROUP BY market_group_code, bucket
+      ORDER BY market_group_code, bucket ASC
     `;
 
     // Execute all four queries
@@ -162,18 +155,18 @@ export async function GET(request: Request) {
     // Create maps for previous data for easier lookup
     const bookingLeadTimePreviousMap = new Map();
     bookingLeadTimePreviousData.forEach((item) => {
-      const key = `${item.booking_channel}|${item.time_range}`;
+      const key = `${item.market_group_code}|${item.time_range}`;
       bookingLeadTimePreviousMap.set(key, item);
     });
 
     const cancellationLeadTimePreviousMap = new Map();
     cancellationLeadTimePreviousData.forEach((item) => {
-      const key = `${item.booking_channel}|${item.time_range}`;
+      const key = `${item.market_group_code}|${item.time_range}`;
       cancellationLeadTimePreviousMap.set(key, item);
     });
 
-    // Process data to organize by booking channel
-    const dataByBookingChannel: LeadTimesByBookingChannelResponse["data"] = {};
+    // Process data to organize by market segment
+    const dataByMarketSegment: LeadTimesByMarketSegmentResponse["data"] = {};
 
     // First pass: collect all data and identify all unique buckets for both datasets
     const bookingLeadTimeBuckets = new Set<string>();
@@ -181,63 +174,59 @@ export async function GET(request: Request) {
 
     // Process booking lead time current data
     bookingLeadTimeCurrentData.forEach((item) => {
-      const bookingChannel = item.booking_channel;
+      const marketSegment = item.market_group_code;
       const timeRange = item.time_range;
       bookingLeadTimeBuckets.add(timeRange);
 
-      const key = `${bookingChannel}|${timeRange}`;
+      const key = `${marketSegment}|${timeRange}`;
       const prevItem = bookingLeadTimePreviousMap.get(key) || { count: 0 };
 
-      if (!dataByBookingChannel[bookingChannel]) {
-        dataByBookingChannel[bookingChannel] = {
+      if (!dataByMarketSegment[marketSegment]) {
+        dataByMarketSegment[marketSegment] = {
           datasets: {},
         };
       }
 
       // Make sure the booking_lead_time dataset exists
-      if (!dataByBookingChannel[bookingChannel].datasets.booking_lead_time) {
-        dataByBookingChannel[bookingChannel].datasets.booking_lead_time = {
-          title: "Booking lead time",
+      if (!dataByMarketSegment[marketSegment].datasets.booking_lead_time) {
+        dataByMarketSegment[marketSegment].datasets.booking_lead_time = {
+          title: "Booking Lead Time",
           data: [],
         };
       }
 
-      dataByBookingChannel[bookingChannel].datasets.booking_lead_time.data.push(
-        {
-          range: timeRange,
-          current: parseInt(item.count || "0", 10),
-          previous: parseInt(prevItem.count || "0", 10),
-        }
-      );
+      dataByMarketSegment[marketSegment].datasets.booking_lead_time.data.push({
+        range: timeRange,
+        current: parseInt(item.count || "0", 10),
+        previous: parseInt(prevItem.count || "0", 10),
+      });
     });
 
     // Process cancellation lead time current data
     cancellationLeadTimeCurrentData.forEach((item) => {
-      const bookingChannel = item.booking_channel;
+      const marketSegment = item.market_group_code;
       const timeRange = item.time_range;
       cancellationLeadTimeBuckets.add(timeRange);
 
-      const key = `${bookingChannel}|${timeRange}`;
+      const key = `${marketSegment}|${timeRange}`;
       const prevItem = cancellationLeadTimePreviousMap.get(key) || { count: 0 };
 
-      if (!dataByBookingChannel[bookingChannel]) {
-        dataByBookingChannel[bookingChannel] = {
+      if (!dataByMarketSegment[marketSegment]) {
+        dataByMarketSegment[marketSegment] = {
           datasets: {},
         };
       }
 
       // Make sure the cancellation_lead_time dataset exists
-      if (
-        !dataByBookingChannel[bookingChannel].datasets.cancellation_lead_time
-      ) {
-        dataByBookingChannel[bookingChannel].datasets.cancellation_lead_time = {
-          title: "Cancellation lead time",
+      if (!dataByMarketSegment[marketSegment].datasets.cancellation_lead_time) {
+        dataByMarketSegment[marketSegment].datasets.cancellation_lead_time = {
+          title: "Cancellation Lead Time",
           data: [],
         };
       }
 
-      dataByBookingChannel[
-        bookingChannel
+      dataByMarketSegment[
+        marketSegment
       ].datasets.cancellation_lead_time.data.push({
         range: timeRange,
         current: parseInt(item.count || "0", 10),
@@ -245,78 +234,76 @@ export async function GET(request: Request) {
       });
     });
 
-    // Add any booking channels and buckets from previous data that might not be in current data
+    // Add any market segments and buckets from previous data that might not be in current data
     bookingLeadTimePreviousData.forEach((prevItem) => {
-      const bookingChannel = prevItem.booking_channel;
+      const marketSegment = prevItem.market_group_code;
       const timeRange = prevItem.time_range;
       bookingLeadTimeBuckets.add(timeRange);
 
-      // Check if this booking channel exists in our result
-      if (!dataByBookingChannel[bookingChannel]) {
-        dataByBookingChannel[bookingChannel] = {
+      // Check if this market segment exists in our result
+      if (!dataByMarketSegment[marketSegment]) {
+        dataByMarketSegment[marketSegment] = {
           datasets: {},
         };
       }
 
       // Make sure the booking_lead_time dataset exists
-      if (!dataByBookingChannel[bookingChannel].datasets.booking_lead_time) {
-        dataByBookingChannel[bookingChannel].datasets.booking_lead_time = {
-          title: "Booking lead time",
+      if (!dataByMarketSegment[marketSegment].datasets.booking_lead_time) {
+        dataByMarketSegment[marketSegment].datasets.booking_lead_time = {
+          title: "Booking Lead Time",
           data: [],
         };
       }
 
-      // Check if this time range exists for this booking channel
-      const existingEntry = dataByBookingChannel[
-        bookingChannel
+      // Check if this time range exists for this market segment
+      const existingEntry = dataByMarketSegment[
+        marketSegment
       ].datasets.booking_lead_time.data.find(
         (item) => item.range === timeRange
       );
 
       if (!existingEntry) {
-        dataByBookingChannel[
-          bookingChannel
-        ].datasets.booking_lead_time.data.push({
-          range: timeRange,
-          current: 0,
-          previous: parseInt(prevItem.count || "0", 10),
-        });
+        dataByMarketSegment[marketSegment].datasets.booking_lead_time.data.push(
+          {
+            range: timeRange,
+            current: 0,
+            previous: parseInt(prevItem.count || "0", 10),
+          }
+        );
       }
     });
 
-    // Add any booking channels and buckets from cancellation previous data that might not be in current data
+    // Add any market segments and buckets from cancellation previous data that might not be in current data
     cancellationLeadTimePreviousData.forEach((prevItem) => {
-      const bookingChannel = prevItem.booking_channel;
+      const marketSegment = prevItem.market_group_code;
       const timeRange = prevItem.time_range;
       cancellationLeadTimeBuckets.add(timeRange);
 
-      // Check if this booking channel exists in our result
-      if (!dataByBookingChannel[bookingChannel]) {
-        dataByBookingChannel[bookingChannel] = {
+      // Check if this market segment exists in our result
+      if (!dataByMarketSegment[marketSegment]) {
+        dataByMarketSegment[marketSegment] = {
           datasets: {},
         };
       }
 
       // Make sure the cancellation_lead_time dataset exists
-      if (
-        !dataByBookingChannel[bookingChannel].datasets.cancellation_lead_time
-      ) {
-        dataByBookingChannel[bookingChannel].datasets.cancellation_lead_time = {
-          title: "Cancellation lead time",
+      if (!dataByMarketSegment[marketSegment].datasets.cancellation_lead_time) {
+        dataByMarketSegment[marketSegment].datasets.cancellation_lead_time = {
+          title: "Cancellation Lead Time",
           data: [],
         };
       }
 
-      // Check if this time range exists for this booking channel
-      const existingEntry = dataByBookingChannel[
-        bookingChannel
+      // Check if this time range exists for this market segment
+      const existingEntry = dataByMarketSegment[
+        marketSegment
       ].datasets.cancellation_lead_time.data.find(
         (item) => item.range === timeRange
       );
 
       if (!existingEntry) {
-        dataByBookingChannel[
-          bookingChannel
+        dataByMarketSegment[
+          marketSegment
         ].datasets.cancellation_lead_time.data.push({
           range: timeRange,
           current: 0,
@@ -325,12 +312,12 @@ export async function GET(request: Request) {
       }
     });
 
-    // Second pass: ensure all booking channels have entries for all buckets
-    Object.keys(dataByBookingChannel).forEach((channel) => {
+    // Second pass: ensure all market segments have entries for all buckets
+    Object.keys(dataByMarketSegment).forEach((segment) => {
       // Handle booking lead time dataset
-      if (dataByBookingChannel[channel].datasets.booking_lead_time) {
+      if (dataByMarketSegment[segment].datasets.booking_lead_time) {
         const existingBuckets = new Set(
-          dataByBookingChannel[channel].datasets.booking_lead_time.data.map(
+          dataByMarketSegment[segment].datasets.booking_lead_time.data.map(
             (item) => item.range
           )
         );
@@ -338,7 +325,7 @@ export async function GET(request: Request) {
         // Add any missing buckets with zero values
         bookingLeadTimeBuckets.forEach((bucket) => {
           if (!existingBuckets.has(bucket)) {
-            dataByBookingChannel[channel].datasets.booking_lead_time.data.push({
+            dataByMarketSegment[segment].datasets.booking_lead_time.data.push({
               range: bucket,
               current: 0,
               previous: 0,
@@ -347,8 +334,8 @@ export async function GET(request: Request) {
         });
       } else {
         // Create the dataset if it doesn't exist
-        dataByBookingChannel[channel].datasets.booking_lead_time = {
-          title: "Booking lead time",
+        dataByMarketSegment[segment].datasets.booking_lead_time = {
+          title: "Booking Lead Time",
           data: Array.from(bookingLeadTimeBuckets).map((bucket) => ({
             range: bucket,
             current: 0,
@@ -358,18 +345,18 @@ export async function GET(request: Request) {
       }
 
       // Handle cancellation lead time dataset
-      if (dataByBookingChannel[channel].datasets.cancellation_lead_time) {
+      if (dataByMarketSegment[segment].datasets.cancellation_lead_time) {
         const existingBuckets = new Set(
-          dataByBookingChannel[
-            channel
-          ].datasets.cancellation_lead_time.data.map((item) => item.range)
+          dataByMarketSegment[segment].datasets.cancellation_lead_time.data.map(
+            (item) => item.range
+          )
         );
 
         // Add any missing buckets with zero values
         cancellationLeadTimeBuckets.forEach((bucket) => {
           if (!existingBuckets.has(bucket)) {
-            dataByBookingChannel[
-              channel
+            dataByMarketSegment[
+              segment
             ].datasets.cancellation_lead_time.data.push({
               range: bucket,
               current: 0,
@@ -379,8 +366,8 @@ export async function GET(request: Request) {
         });
       } else {
         // Create the dataset if it doesn't exist
-        dataByBookingChannel[channel].datasets.cancellation_lead_time = {
-          title: "Cancellation lead time",
+        dataByMarketSegment[segment].datasets.cancellation_lead_time = {
+          title: "Cancellation Lead Time",
           data: Array.from(cancellationLeadTimeBuckets).map((bucket) => ({
             range: bucket,
             current: 0,
@@ -434,11 +421,11 @@ export async function GET(request: Request) {
       return a.localeCompare(b);
     };
 
-    // Sort data for each booking channel by the correct order of time ranges
-    Object.keys(dataByBookingChannel).forEach((channel) => {
+    // Sort data for each market segment by the correct order of time ranges
+    Object.keys(dataByMarketSegment).forEach((segment) => {
       // Sort booking lead time data
-      if (dataByBookingChannel[channel].datasets.booking_lead_time) {
-        dataByBookingChannel[channel].datasets.booking_lead_time.data.sort(
+      if (dataByMarketSegment[segment].datasets.booking_lead_time) {
+        dataByMarketSegment[segment].datasets.booking_lead_time.data.sort(
           (a, b) => {
             return sortTimeRanges(a.range, b.range);
           }
@@ -446,8 +433,8 @@ export async function GET(request: Request) {
       }
 
       // Sort cancellation lead time data
-      if (dataByBookingChannel[channel].datasets.cancellation_lead_time) {
-        dataByBookingChannel[channel].datasets.cancellation_lead_time.data.sort(
+      if (dataByMarketSegment[segment].datasets.cancellation_lead_time) {
+        dataByMarketSegment[segment].datasets.cancellation_lead_time.data.sort(
           (a, b) => {
             return sortTimeRanges(a.range, b.range);
           }
@@ -455,37 +442,37 @@ export async function GET(request: Request) {
       }
     });
 
-    // Format pretty channel names
-    const channelNameMap: Record<string, string> = {
-      direct: "Direct Bookings",
-      booking_com: "Booking.com",
-      expedia: "Expedia",
-      gds: "GDS",
-      wholesalers: "Wholesalers",
+    // Format pretty segment names
+    const segmentNameMap: Record<string, string> = {
+      business: "Business",
+      leisure: "Leisure",
+      group: "Group",
+      corporate: "Corporate",
+      wholesale: "Wholesale",
     };
 
-    // Filter out booking channels with all zeros
-    const filteredDataByBookingChannel: LeadTimesByBookingChannelResponse["data"] =
+    // Filter out market segments with all zeros
+    const filteredDataByMarketSegment: LeadTimesByMarketSegmentResponse["data"] =
       {};
-    Object.entries(dataByBookingChannel).forEach(([channel, channelData]) => {
+    Object.entries(dataByMarketSegment).forEach(([segment, segmentData]) => {
       const hasNonZeroBookingLeadTime =
-        channelData.datasets.booking_lead_time?.data.some(
+        segmentData.datasets.booking_lead_time?.data.some(
           (item) => item.current > 0 || item.previous > 0
         ) || false;
 
       const hasNonZeroCancellationLeadTime =
-        channelData.datasets.cancellation_lead_time?.data.some(
+        segmentData.datasets.cancellation_lead_time?.data.some(
           (item) => item.current > 0 || item.previous > 0
         ) || false;
 
       if (hasNonZeroBookingLeadTime || hasNonZeroCancellationLeadTime) {
-        filteredDataByBookingChannel[channel] = channelData;
+        filteredDataByMarketSegment[segment] = segmentData;
       }
     });
 
     // Construct response
-    const response: LeadTimesByBookingChannelResponse = {
-      data: filteredDataByBookingChannel,
+    const response: LeadTimesByMarketSegmentResponse = {
+      data: filteredDataByMarketSegment,
     };
 
     return NextResponse.json(response);
@@ -494,7 +481,7 @@ export async function GET(request: Request) {
     return NextResponse.json(
       {
         error:
-          "Failed to fetch lead times data by booking channel from ClickHouse",
+          "Failed to fetch lead times data by market segment from ClickHouse",
       },
       { status: 500 }
     );

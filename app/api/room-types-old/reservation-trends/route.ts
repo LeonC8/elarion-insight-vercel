@@ -7,9 +7,9 @@ import {
 } from "@/lib/dateUtils";
 
 // Interface for the response with the correct structure
-export interface ReservationTrendsByBookingChannelResponse {
+export interface ReservationTrendsByRoomTypeResponse {
   data: {
-    [bookingChannel: string]: {
+    [roomType: string]: {
       datasets: {
         [datasetKey: string]: {
           title: string;
@@ -47,7 +47,6 @@ export async function GET(request: Request) {
   const periodType = searchParams.get("periodType") || "Month"; // Month, Year, Day
   const viewType = searchParams.get("viewType") || "Actual"; // Actual, OTB, Projected
   const comparisonType = searchParams.get("comparison") || "Last year - OTB";
-  const property = searchParams.get("property");
 
   // Calculate date ranges
   const { startDate, endDate } = calculateDateRanges(
@@ -73,12 +72,10 @@ export async function GET(request: Request) {
     const clickhouseConfig = getClickhouseConnection();
     client = createClient(clickhouseConfig);
 
-    const propertyFilter = property ? `AND property = '${property}'` : "";
-
     // 1. Query for occupancy (stays) by day of week - current period
     const occupancyCurrentQuery = `
       SELECT 
-        booking_channel,
+        room_type,
         toDayOfWeek(occupancy_date) AS day_of_week,
         SUM(sold_rooms) AS rooms_sold
       FROM JADRANKA.insights
@@ -86,15 +83,14 @@ export async function GET(request: Request) {
         toDate(occupancy_date) BETWEEN '${startDate}' AND '${endDate}'
         AND date(scd_valid_from) <= DATE('${businessDateParam}') 
         AND DATE('${businessDateParam}') < date(scd_valid_to)
-        ${propertyFilter}
-      GROUP BY booking_channel, day_of_week
-      ORDER BY booking_channel, day_of_week ASC
+      GROUP BY room_type, day_of_week
+      ORDER BY room_type, day_of_week ASC
     `;
 
     // 2. Query for occupancy (stays) by day of week - previous period
     const occupancyPreviousQuery = `
       SELECT 
-        booking_channel,
+        room_type,
         toDayOfWeek(occupancy_date) AS day_of_week,
         SUM(sold_rooms) AS rooms_sold
       FROM JADRANKA.insights
@@ -102,15 +98,14 @@ export async function GET(request: Request) {
         toDate(occupancy_date) BETWEEN '${prevStartDate}' AND '${prevEndDate}'
         AND date(scd_valid_from) <= DATE('${prevBusinessDateParam}') 
         AND DATE('${prevBusinessDateParam}') < date(scd_valid_to)
-        ${propertyFilter}
-      GROUP BY booking_channel, day_of_week
-      ORDER BY booking_channel, day_of_week ASC
+      GROUP BY room_type, day_of_week
+      ORDER BY room_type, day_of_week ASC
     `;
 
     // 3. Query for bookings by day of week - current period
     const bookingsCurrentQuery = `
       SELECT 
-        booking_channel,
+        room_type,
         toDayOfWeek(booking_date) AS day_of_week,
         SUM(sold_rooms) AS rooms_sold
       FROM JADRANKA.insights
@@ -118,15 +113,14 @@ export async function GET(request: Request) {
         toDate(occupancy_date) BETWEEN '${startDate}' AND '${endDate}'
         AND date(scd_valid_from) <= DATE('${businessDateParam}') 
         AND DATE('${businessDateParam}') < date(scd_valid_to)
-        ${propertyFilter}
-      GROUP BY booking_channel, day_of_week
-      ORDER BY booking_channel, day_of_week ASC
+      GROUP BY room_type, day_of_week
+      ORDER BY room_type, day_of_week ASC
     `;
 
     // 4. Query for bookings by day of week - previous period
     const bookingsPreviousQuery = `
       SELECT 
-        booking_channel,
+        room_type,
         toDayOfWeek(booking_date) AS day_of_week,
         SUM(sold_rooms) AS rooms_sold
       FROM JADRANKA.insights
@@ -134,9 +128,8 @@ export async function GET(request: Request) {
         toDate(occupancy_date) BETWEEN '${prevStartDate}' AND '${prevEndDate}'
         AND date(scd_valid_from) <= DATE('${prevBusinessDateParam}') 
         AND DATE('${prevBusinessDateParam}') < date(scd_valid_to)
-        ${propertyFilter}
-      GROUP BY booking_channel, day_of_week
-      ORDER BY booking_channel, day_of_week ASC
+      GROUP BY room_type, day_of_week
+      ORDER BY room_type, day_of_week ASC
     `;
 
     // Execute all four queries in parallel
@@ -177,44 +170,43 @@ export async function GET(request: Request) {
     // Create maps for previous data for easier lookup
     const occupancyPreviousMap = new Map();
     occupancyPreviousData.forEach((item) => {
-      const key = `${item.booking_channel}|${item.day_of_week}`;
+      const key = `${item.room_type}|${item.day_of_week}`;
       occupancyPreviousMap.set(key, parseInt(item.rooms_sold || "0", 10));
     });
 
     const bookingsPreviousMap = new Map();
     bookingsPreviousData.forEach((item) => {
-      const key = `${item.booking_channel}|${item.day_of_week}`;
+      const key = `${item.room_type}|${item.day_of_week}`;
       bookingsPreviousMap.set(key, parseInt(item.rooms_sold || "0", 10));
     });
 
-    // Process data to organize by booking channel with the CORRECT structure
-    const dataByBookingChannel: ReservationTrendsByBookingChannelResponse["data"] =
-      {};
+    // Process data to organize by room type with the CORRECT structure
+    const dataByRoomType: ReservationTrendsByRoomTypeResponse["data"] = {};
 
     // Process occupancy (stays) data
     occupancyCurrentData.forEach((item) => {
-      const bookingChannel = item.booking_channel;
+      const roomType = item.room_type;
       const dayOfWeek = parseInt(item.day_of_week, 10);
       const dayName = getDayName(dayOfWeek);
 
-      if (!dataByBookingChannel[bookingChannel]) {
-        dataByBookingChannel[bookingChannel] = {
+      if (!dataByRoomType[roomType]) {
+        dataByRoomType[roomType] = {
           datasets: {},
         };
       }
 
       // Initialize stay_date dataset if it doesn't exist
-      if (!dataByBookingChannel[bookingChannel].datasets.stay_date) {
-        dataByBookingChannel[bookingChannel].datasets.stay_date = {
+      if (!dataByRoomType[roomType].datasets.stay_date) {
+        dataByRoomType[roomType].datasets.stay_date = {
           title: "Stay Date",
           data: [],
         };
       }
 
-      const key = `${bookingChannel}|${dayOfWeek}`;
+      const key = `${roomType}|${dayOfWeek}`;
       const previousCount = occupancyPreviousMap.get(key) || 0;
 
-      dataByBookingChannel[bookingChannel].datasets.stay_date.data.push({
+      dataByRoomType[roomType].datasets.stay_date.data.push({
         range: dayName,
         current: parseInt(item.rooms_sold || "0", 10),
         previous: previousCount,
@@ -223,61 +215,61 @@ export async function GET(request: Request) {
 
     // Process bookings data
     bookingsCurrentData.forEach((item) => {
-      const bookingChannel = item.booking_channel;
+      const roomType = item.room_type;
       const dayOfWeek = parseInt(item.day_of_week, 10);
       const dayName = getDayName(dayOfWeek);
 
-      if (!dataByBookingChannel[bookingChannel]) {
-        dataByBookingChannel[bookingChannel] = {
+      if (!dataByRoomType[roomType]) {
+        dataByRoomType[roomType] = {
           datasets: {},
         };
       }
 
       // Initialize booking_date dataset if it doesn't exist
-      if (!dataByBookingChannel[bookingChannel].datasets.booking_date) {
-        dataByBookingChannel[bookingChannel].datasets.booking_date = {
+      if (!dataByRoomType[roomType].datasets.booking_date) {
+        dataByRoomType[roomType].datasets.booking_date = {
           title: "Booking Date",
           data: [],
         };
       }
 
-      const key = `${bookingChannel}|${dayOfWeek}`;
+      const key = `${roomType}|${dayOfWeek}`;
       const previousCount = bookingsPreviousMap.get(key) || 0;
 
-      dataByBookingChannel[bookingChannel].datasets.booking_date.data.push({
+      dataByRoomType[roomType].datasets.booking_date.data.push({
         range: dayName,
         current: parseInt(item.rooms_sold || "0", 10),
         previous: previousCount,
       });
     });
 
-    // Add any booking channels and days from previous data that might not be in current data
+    // Add any room types and days from previous data that might not be in current data
     // First for occupancy
     occupancyPreviousData.forEach((prevItem) => {
-      const bookingChannel = prevItem.booking_channel;
+      const roomType = prevItem.room_type;
       const dayOfWeek = parseInt(prevItem.day_of_week, 10);
       const dayName = getDayName(dayOfWeek);
 
-      if (!dataByBookingChannel[bookingChannel]) {
-        dataByBookingChannel[bookingChannel] = {
+      if (!dataByRoomType[roomType]) {
+        dataByRoomType[roomType] = {
           datasets: {},
         };
       }
 
       // Initialize stay_date dataset if it doesn't exist
-      if (!dataByBookingChannel[bookingChannel].datasets.stay_date) {
-        dataByBookingChannel[bookingChannel].datasets.stay_date = {
+      if (!dataByRoomType[roomType].datasets.stay_date) {
+        dataByRoomType[roomType].datasets.stay_date = {
           title: "Stay Date",
           data: [],
         };
       }
 
-      const existingEntry = dataByBookingChannel[
-        bookingChannel
+      const existingEntry = dataByRoomType[
+        roomType
       ].datasets.stay_date.data.find((item) => item.range === dayName);
 
       if (!existingEntry) {
-        dataByBookingChannel[bookingChannel].datasets.stay_date.data.push({
+        dataByRoomType[roomType].datasets.stay_date.data.push({
           range: dayName,
           current: 0,
           previous: parseInt(prevItem.rooms_sold || "0", 10),
@@ -287,30 +279,30 @@ export async function GET(request: Request) {
 
     // Then for bookings
     bookingsPreviousData.forEach((prevItem) => {
-      const bookingChannel = prevItem.booking_channel;
+      const roomType = prevItem.room_type;
       const dayOfWeek = parseInt(prevItem.day_of_week, 10);
       const dayName = getDayName(dayOfWeek);
 
-      if (!dataByBookingChannel[bookingChannel]) {
-        dataByBookingChannel[bookingChannel] = {
+      if (!dataByRoomType[roomType]) {
+        dataByRoomType[roomType] = {
           datasets: {},
         };
       }
 
       // Initialize booking_date dataset if it doesn't exist
-      if (!dataByBookingChannel[bookingChannel].datasets.booking_date) {
-        dataByBookingChannel[bookingChannel].datasets.booking_date = {
+      if (!dataByRoomType[roomType].datasets.booking_date) {
+        dataByRoomType[roomType].datasets.booking_date = {
           title: "Booking Date",
           data: [],
         };
       }
 
-      const existingEntry = dataByBookingChannel[
-        bookingChannel
+      const existingEntry = dataByRoomType[
+        roomType
       ].datasets.booking_date.data.find((item) => item.range === dayName);
 
       if (!existingEntry) {
-        dataByBookingChannel[bookingChannel].datasets.booking_date.data.push({
+        dataByRoomType[roomType].datasets.booking_date.data.push({
           range: dayName,
           current: 0,
           previous: parseInt(prevItem.rooms_sold || "0", 10),
@@ -318,8 +310,8 @@ export async function GET(request: Request) {
       }
     });
 
-    // Ensure all booking channels have all days of the week
-    Object.keys(dataByBookingChannel).forEach((channel) => {
+    // Ensure all room types have all days of the week
+    Object.keys(dataByRoomType).forEach((roomType) => {
       // Define all days of week
       const allDays = [
         "Monday",
@@ -332,16 +324,16 @@ export async function GET(request: Request) {
       ];
 
       // Handle stay_date dataset
-      if (dataByBookingChannel[channel].datasets.stay_date) {
+      if (dataByRoomType[roomType].datasets.stay_date) {
         const existingDays = new Set(
-          dataByBookingChannel[channel].datasets.stay_date.data.map(
+          dataByRoomType[roomType].datasets.stay_date.data.map(
             (item) => item.range
           )
         );
 
         allDays.forEach((day) => {
           if (!existingDays.has(day)) {
-            dataByBookingChannel[channel].datasets.stay_date.data.push({
+            dataByRoomType[roomType].datasets.stay_date.data.push({
               range: day,
               current: 0,
               previous: 0,
@@ -350,7 +342,7 @@ export async function GET(request: Request) {
         });
       } else {
         // Create dataset with all days if it doesn't exist
-        dataByBookingChannel[channel].datasets.stay_date = {
+        dataByRoomType[roomType].datasets.stay_date = {
           title: "Stay Date",
           data: allDays.map((day) => ({
             range: day,
@@ -361,16 +353,16 @@ export async function GET(request: Request) {
       }
 
       // Handle booking_date dataset
-      if (dataByBookingChannel[channel].datasets.booking_date) {
+      if (dataByRoomType[roomType].datasets.booking_date) {
         const existingDays = new Set(
-          dataByBookingChannel[channel].datasets.booking_date.data.map(
+          dataByRoomType[roomType].datasets.booking_date.data.map(
             (item) => item.range
           )
         );
 
         allDays.forEach((day) => {
           if (!existingDays.has(day)) {
-            dataByBookingChannel[channel].datasets.booking_date.data.push({
+            dataByRoomType[roomType].datasets.booking_date.data.push({
               range: day,
               current: 0,
               previous: 0,
@@ -379,7 +371,7 @@ export async function GET(request: Request) {
         });
       } else {
         // Create dataset with all days if it doesn't exist
-        dataByBookingChannel[channel].datasets.booking_date = {
+        dataByRoomType[roomType].datasets.booking_date = {
           title: "Booking Date",
           data: allDays.map((day) => ({
             range: day,
@@ -390,7 +382,7 @@ export async function GET(request: Request) {
       }
     });
 
-    // Sort data for each booking channel by day of week
+    // Sort data for each room type by day of week
     const dayOrder = {
       Monday: 1,
       Tuesday: 2,
@@ -401,9 +393,9 @@ export async function GET(request: Request) {
       Sunday: 7,
     };
 
-    Object.keys(dataByBookingChannel).forEach((channel) => {
+    Object.keys(dataByRoomType).forEach((roomType) => {
       // Sort stay_date data
-      dataByBookingChannel[channel].datasets.stay_date.data.sort((a, b) => {
+      dataByRoomType[roomType].datasets.stay_date.data.sort((a, b) => {
         return (
           dayOrder[a.range as keyof typeof dayOrder] -
           dayOrder[b.range as keyof typeof dayOrder]
@@ -411,7 +403,7 @@ export async function GET(request: Request) {
       });
 
       // Sort booking_date data
-      dataByBookingChannel[channel].datasets.booking_date.data.sort((a, b) => {
+      dataByRoomType[roomType].datasets.booking_date.data.sort((a, b) => {
         return (
           dayOrder[a.range as keyof typeof dayOrder] -
           dayOrder[b.range as keyof typeof dayOrder]
@@ -419,26 +411,27 @@ export async function GET(request: Request) {
       });
     });
 
-    // Filter out booking channels with all zeros
-    const filteredDataByBookingChannel: ReservationTrendsByBookingChannelResponse["data"] =
+    // Filter out room types with all zeros
+    const filteredDataByRoomType: ReservationTrendsByRoomTypeResponse["data"] =
       {};
-    Object.entries(dataByBookingChannel).forEach(([channel, channelData]) => {
-      const hasNonZeroStayDate = channelData.datasets.stay_date.data.some(
+    Object.entries(dataByRoomType).forEach(([roomType, roomTypeData]) => {
+      const hasNonZeroStayDate = roomTypeData.datasets.stay_date.data.some(
         (item) => item.current > 0 || item.previous > 0
       );
 
-      const hasNonZeroBookingDate = channelData.datasets.booking_date.data.some(
-        (item) => item.current > 0 || item.previous > 0
-      );
+      const hasNonZeroBookingDate =
+        roomTypeData.datasets.booking_date.data.some(
+          (item) => item.current > 0 || item.previous > 0
+        );
 
       if (hasNonZeroStayDate || hasNonZeroBookingDate) {
-        filteredDataByBookingChannel[channel] = channelData;
+        filteredDataByRoomType[roomType] = roomTypeData;
       }
     });
 
     // Construct response
-    const response: ReservationTrendsByBookingChannelResponse = {
-      data: filteredDataByBookingChannel,
+    const response: ReservationTrendsByRoomTypeResponse = {
+      data: filteredDataByRoomType,
     };
 
     return NextResponse.json(response);
@@ -447,7 +440,7 @@ export async function GET(request: Request) {
     return NextResponse.json(
       {
         error:
-          "Failed to fetch reservation trends data by booking channel from ClickHouse",
+          "Failed to fetch reservation trends data by room type from ClickHouse",
       },
       { status: 500 }
     );

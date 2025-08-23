@@ -90,9 +90,6 @@ function generateCode(name: string, field: string): string {
 export async function GET(request: Request) {
   // Parse query parameters
   const { searchParams } = new URL(request.url);
-  const property = searchParams.get("property");
-  console.log("🏨 Booking Channels Distribution - Property:", property);
-
   const businessDateParam =
     searchParams.get("businessDate") || new Date().toISOString().split("T")[0];
   const periodType = searchParams.get("periodType") || "Month"; // Month, Year, Day
@@ -176,9 +173,6 @@ export async function GET(request: Request) {
       });
     }
 
-    const propertyFilter = property ? `AND property = '${property}'` : "";
-    console.log("🔍 Property Filter:", propertyFilter);
-
     // Build the query for current period by the specified field
     const currentQuery = `
       SELECT 
@@ -194,7 +188,6 @@ export async function GET(request: Request) {
         AND date(scd_valid_from) <= DATE('${businessDateParam}') 
         AND DATE('${businessDateParam}') < date(scd_valid_to)
         ${fieldFilters}
-        ${propertyFilter}
       GROUP BY ${field}
       ORDER BY total_revenue DESC
     `;
@@ -214,7 +207,6 @@ export async function GET(request: Request) {
         AND date(scd_valid_from) <= DATE('${prevBusinessDateParam}') 
         AND DATE('${prevBusinessDateParam}') < date(scd_valid_to)
         ${fieldFilters}
-        ${propertyFilter}
       GROUP BY ${field}
       ORDER BY total_revenue DESC
     `;
@@ -248,7 +240,6 @@ export async function GET(request: Request) {
           )
         )
         ${fieldFilters}
-        ${propertyFilter}
         ${
           isProducerRoute
             ? ""
@@ -260,7 +251,6 @@ export async function GET(request: Request) {
             AND date(scd_valid_from) <= DATE('${businessDateParam}') 
             AND DATE('${businessDateParam}') < date(scd_valid_to)
             ${fieldFilters}
-            ${propertyFilter}
           GROUP BY ${field}
           ORDER BY SUM(totalRevenue) DESC
           LIMIT ${limit}
@@ -465,11 +455,10 @@ export async function GET(request: Request) {
     return NextResponse.json(response);
   } catch (error) {
     console.error("Error querying ClickHouse:", error);
-    // Do not cache errors
-    const errorBody = {
-      error: `Failed to fetch ${field} data from ClickHouse`,
-    };
-    return NextResponse.json(errorBody, { status: 500 });
+    return NextResponse.json(
+      { error: `Failed to fetch ${field} data from ClickHouse` },
+      { status: 500 }
+    );
   } finally {
     // Close client connection if it exists
     if (client) {

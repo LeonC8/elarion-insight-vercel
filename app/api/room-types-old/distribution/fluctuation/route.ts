@@ -5,6 +5,129 @@ import {
   calculateDateRanges,
   calculateComparisonDateRanges,
 } from "@/lib/dateUtils";
+import * as fs from "fs";
+import * as path from "path";
+
+// --- START CACHING LOGIC ---
+
+interface CacheEntryData {
+  body: any; // Store the parsed JSON body
+  status: number;
+  headers: Record<string, string>;
+}
+
+interface CacheEntry {
+  data: CacheEntryData;
+  expiresAt: number;
+}
+
+// File-based cache configuration
+const CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
+const CACHE_DIR = path.join(process.cwd(), ".cache");
+
+// Ensure cache directory exists
+try {
+  if (!fs.existsSync(CACHE_DIR)) {
+    fs.mkdirSync(CACHE_DIR, { recursive: true });
+  }
+} catch (error) {
+  console.error("Error creating cache directory:", error);
+}
+
+// File-based cache functions
+function getCacheFilePath(key: string): string {
+  // Create a safe filename from the key
+  const safeKey = Buffer.from(key)
+    .toString("base64")
+    .replace(/[/\\?%*:|"<>]/g, "_");
+  return path.join(CACHE_DIR, `${safeKey}.json`);
+}
+
+async function getCacheEntry(key: string): Promise<CacheEntry | null> {
+  try {
+    const filePath = getCacheFilePath(key);
+    if (fs.existsSync(filePath)) {
+      const data = fs.readFileSync(filePath, "utf8");
+      return JSON.parse(data);
+    }
+    return null;
+  } catch (error) {
+    console.error(`Cache read error:`, error);
+    return null;
+  }
+}
+
+async function setCacheEntry(key: string, entry: CacheEntry): Promise<void> {
+  try {
+    const filePath = getCacheFilePath(key);
+    fs.writeFileSync(filePath, JSON.stringify(entry), "utf8");
+  } catch (error) {
+    console.error(`Cache write error:`, error);
+  }
+}
+
+async function deleteCacheEntry(key: string): Promise<void> {
+  try {
+    const filePath = getCacheFilePath(key);
+    if (fs.existsSync(filePath)) {
+      fs.unlinkSync(filePath);
+    }
+  } catch (error) {
+    console.error(`Cache delete error:`, error);
+  }
+}
+
+/**
+ * Generates a cache key based on relevant query parameters for fluctuation route.
+ * Ensures the key is consistent regardless of parameter order.
+ */
+function generateCacheKey(params: URLSearchParams): string {
+  const relevantParams = [
+    "businessDate",
+    "periodType",
+    "viewType",
+    "comparison",
+    "field",
+    "limit",
+  ];
+  const keyParts: string[] = [];
+
+  relevantParams.forEach((key) => {
+    // Use default values if parameter is missing, mirroring the route's logic
+    let value: string | null = null;
+    switch (key) {
+      case "businessDate":
+        value = params.get(key) || new Date().toISOString().split("T")[0];
+        break;
+      case "periodType":
+        value = params.get(key) || "Month";
+        break;
+      case "viewType":
+        value = params.get(key) || "Actual";
+        break;
+      case "comparison":
+        value = params.get(key) || "Last year - OTB";
+        break;
+      case "field":
+        value = params.get(key) || "guest_country";
+        break;
+      case "limit":
+        value = params.get(key) || "5";
+        break; // Fluctuation route specific limit
+      default:
+        value = params.get(key);
+    }
+    if (value !== null) {
+      keyParts.push(`${key}=${value}`);
+    }
+  });
+
+  // Sort parts to ensure consistent key regardless of parameter order
+  keyParts.sort();
+  return keyParts.join("&");
+}
+
+// --- END CACHING LOGIC ---
 
 // Interface for top categories in each KPI
 interface CategorySummary {
@@ -124,8 +247,41 @@ const datesToIndex = (
 export async function GET(request: Request) {
   // Parse query parameters
   const { searchParams } = new URL(request.url);
-  const property = searchParams.get("property");
-  console.log("🏨 Booking Channels Fluctuation - Property:", property);
+
+  // --- CHECK CACHE ---
+  const cacheKey = `fluctuation:${generateCacheKey(searchParams)}`;
+  const cachedEntry = await getCacheEntry(cacheKey);
+
+  if (cachedEntry && cachedEntry.expiresAt > Date.now()) {
+    console.log(
+      `[Cache HIT] Returning cached response for key: ${cacheKey.substring(
+        0,
+        100
+      )}...`
+    );
+    // Reconstruct the response from cached data
+    return new NextResponse(JSON.stringify(cachedEntry.data.body), {
+      status: cachedEntry.data.status,
+      headers: cachedEntry.data.headers,
+    });
+  } else if (cachedEntry) {
+    // Entry exists but is expired
+    console.log(
+      `[Cache EXPIRED] Removing expired entry for key: ${cacheKey.substring(
+        0,
+        100
+      )}...`
+    );
+    await deleteCacheEntry(cacheKey);
+  } else {
+    console.log(
+      `[Cache MISS] No valid cache entry for key: ${cacheKey.substring(
+        0,
+        100
+      )}...`
+    );
+  }
+  // --- END CACHE CHECK ---
 
   const businessDateParam =
     searchParams.get("businessDate") || new Date().toISOString().split("T")[0];
@@ -165,9 +321,6 @@ export async function GET(request: Request) {
   try {
     // Create ClickHouse client
     client = createClient(getClickhouseConnection());
-
-    const propertyFilter = property ? `AND property = '${property}'` : "";
-    console.log("🔍 Fluctuation Property Filter:", propertyFilter);
 
     // Determine if we're handling producer data
     const isProducerRoute =
@@ -240,7 +393,6 @@ export async function GET(request: Request) {
         AND date(scd_valid_from) <= DATE('${businessDateParam}') 
         AND DATE('${businessDateParam}') < date(scd_valid_to)
         ${fieldFilters}
-        ${propertyFilter}
       GROUP BY ${field}
       ORDER BY total_revenue DESC
     `;
@@ -260,7 +412,6 @@ export async function GET(request: Request) {
         AND date(scd_valid_from) <= DATE('${prevBusinessDateParam}') 
         AND DATE('${prevBusinessDateParam}') < date(scd_valid_to)
         ${fieldFilters}
-        ${propertyFilter}
       GROUP BY ${field}
       ORDER BY total_revenue DESC
     `;
@@ -296,7 +447,6 @@ export async function GET(request: Request) {
         AND date(scd_valid_from) <= DATE('${businessDateParam}') 
         AND DATE('${businessDateParam}') < date(scd_valid_to)
         ${fieldFilters}
-        ${propertyFilter}
       GROUP BY ${field}
       ORDER BY total_revenue DESC
       LIMIT ${fluctuationLimit}
@@ -332,7 +482,6 @@ export async function GET(request: Request) {
         AND date(scd_valid_from) <= DATE('${businessDateParam}') 
         AND DATE('${businessDateParam}') < date(scd_valid_to)
         ${fieldFilters}
-        ${propertyFilter}
         AND ${field} IN (${topCategoryNames
       .map((name) => `'${name}'`)
       .join(",")})
@@ -356,7 +505,6 @@ export async function GET(request: Request) {
         AND date(scd_valid_from) <= DATE('${prevBusinessDateParam}') 
         AND DATE('${prevBusinessDateParam}') < date(scd_valid_to)
         ${fieldFilters}
-        ${propertyFilter}
         AND ${field} IN (${topCategoryNames
       .map((name) => `'${name}'`)
       .join(",")})
@@ -835,10 +983,10 @@ export async function GET(request: Request) {
       };
     });
 
-    // Query to fetch booking lead time data
+    // Query to fetch booking lead time data - update field
     const bookingLeadTimeQuery = `
       SELECT 
-        booking_channel,
+        room_type,
         SUM(toFloat64(date_diff)) as total_date_diff,
         SUM(toFloat64(booking_lead_num)) as total_buckets
       FROM JADRANKA.booking_lead_time
@@ -846,10 +994,10 @@ export async function GET(request: Request) {
         toDate(occupancy_date) BETWEEN '${startDate}' AND '${endDate}'
         AND date(scd_valid_from) <= DATE('${businessDateParam}') 
         AND DATE('${businessDateParam}') < date(scd_valid_to)
-        AND booking_channel != 'UNDEFINED'
-        AND booking_channel != ''
-        AND booking_channel IS NOT NULL
-      GROUP BY booking_channel
+        AND room_type != 'UNDEFINED'
+        AND room_type != ''
+        AND room_type IS NOT NULL
+      GROUP BY room_type
       ORDER BY total_date_diff DESC
     `;
 
@@ -866,29 +1014,26 @@ export async function GET(request: Request) {
     const bookingLeadTimeTopCategories: CategorySummary[] = [];
 
     bookingLeadTimeData.forEach((item) => {
-      const channel = item.booking_channel;
+      const roomType = item.room_type;
       const totalDateDiff = parseFloat(item.total_date_diff || "0");
       const totalBuckets = parseFloat(item.total_buckets || "0");
 
-      // Calculate lead time - average days per booking
       const leadTime = totalBuckets > 0 ? totalDateDiff / totalBuckets : 0;
 
-      // Store calculated lead time by channel
-      bookingLeadTimeByChannel[channel] = roundValue(leadTime);
+      bookingLeadTimeByChannel[roomType] = roundValue(leadTime);
 
-      // Create categories summary for KPIs
       bookingLeadTimeTopCategories.push({
-        name: channel,
+        name: roomType,
         value: roundValue(leadTime),
-        change: 0, // We don't have comparison data yet for lead time
-        code: generateCode(channel, "booking_channel"),
+        change: 0,
+        code: generateCode(roomType, "room_type"),
       });
     });
 
-    // Create similar query for previous period to get change values
+    // Update previous period query for lead time
     const prevBookingLeadTimeQuery = `
       SELECT 
-        booking_channel,
+        room_type,
         SUM(toFloat64(date_diff)) as total_date_diff,
         SUM(toFloat64(booking_lead_num)) as total_buckets
       FROM JADRANKA.booking_lead_time
@@ -896,10 +1041,10 @@ export async function GET(request: Request) {
         toDate(occupancy_date) BETWEEN '${prevStartDate}' AND '${prevEndDate}'
         AND date(scd_valid_from) <= DATE('${prevBusinessDateParam}') 
         AND DATE('${prevBusinessDateParam}') < date(scd_valid_to)
-        AND booking_channel != 'UNDEFINED'
-        AND booking_channel != ''
-        AND booking_channel IS NOT NULL
-      GROUP BY booking_channel
+        AND room_type != 'UNDEFINED'
+        AND room_type != ''
+        AND room_type IS NOT NULL
+      GROUP BY room_type
       ORDER BY total_date_diff DESC
     `;
 
@@ -915,15 +1060,13 @@ export async function GET(request: Request) {
     const prevBookingLeadTimeByChannel: { [key: string]: number } = {};
 
     prevBookingLeadTimeData.forEach((item) => {
-      const channel = item.booking_channel;
+      const roomType = item.room_type;
       const totalDateDiff = parseFloat(item.total_date_diff || "0");
       const totalBuckets = parseFloat(item.total_buckets || "0");
 
-      // Calculate lead time
       const leadTime = totalBuckets > 0 ? totalDateDiff / totalBuckets : 0;
 
-      // Store calculated lead time
-      prevBookingLeadTimeByChannel[channel] = roundValue(leadTime);
+      prevBookingLeadTimeByChannel[roomType] = roundValue(leadTime);
     });
 
     // Update the lead time KPIs with change values
@@ -935,12 +1078,11 @@ export async function GET(request: Request) {
     // Sort by value descending
     bookingLeadTimeTopCategories.sort((a, b) => b.value - a.value);
 
-    // Create daily fluctuation data for lead time
-    // Since lead time is typically calculated over a period, we'll query for daily data
+    // Update lead time fluctuation query
     const leadTimeFluctuationQuery = `
       SELECT 
         toString(toDate(occupancy_date)) AS date_period,
-        booking_channel,
+        room_type,
         SUM(toFloat64(date_diff)) as total_date_diff,
         SUM(toFloat64(booking_lead_num)) as total_buckets
       FROM JADRANKA.booking_lead_time
@@ -948,14 +1090,14 @@ export async function GET(request: Request) {
         toDate(occupancy_date) BETWEEN '${startDate}' AND '${endDate}'
         AND date(scd_valid_from) <= DATE('${businessDateParam}') 
         AND DATE('${businessDateParam}') < date(scd_valid_to)
-        AND booking_channel != 'UNDEFINED'
-        AND booking_channel != ''
-        AND booking_channel IS NOT NULL
-        AND booking_channel IN (${topCategoryNames
+        AND room_type != 'UNDEFINED'
+        AND room_type != ''
+        AND room_type IS NOT NULL
+        AND room_type IN (${topCategoryNames
           .map((name) => `'${name}'`)
           .join(",")})
-      GROUP BY date_period, booking_channel
-      ORDER BY date_period, booking_channel
+      GROUP BY date_period, room_type
+      ORDER BY date_period, room_type
     `;
 
     const leadTimeFluctuationResultSet = await client.query({
@@ -969,7 +1111,7 @@ export async function GET(request: Request) {
     const prevLeadTimeFluctuationQuery = `
       SELECT 
         toString(toDate(occupancy_date)) AS date_period,
-        booking_channel,
+        room_type,
         SUM(toFloat64(date_diff)) as total_date_diff,
         SUM(toFloat64(booking_lead_num)) as total_buckets
       FROM JADRANKA.booking_lead_time
@@ -977,14 +1119,14 @@ export async function GET(request: Request) {
         toDate(occupancy_date) BETWEEN '${prevStartDate}' AND '${prevEndDate}'
         AND date(scd_valid_from) <= DATE('${prevBusinessDateParam}') 
         AND DATE('${prevBusinessDateParam}') < date(scd_valid_to)
-        AND booking_channel != 'UNDEFINED'
-        AND booking_channel != ''
-        AND booking_channel IS NOT NULL
-        AND booking_channel IN (${topCategoryNames
+        AND room_type != 'UNDEFINED'
+        AND room_type != ''
+        AND room_type IS NOT NULL
+        AND room_type IN (${topCategoryNames
           .map((name) => `'${name}'`)
           .join(",")})
-      GROUP BY date_period, booking_channel
-      ORDER BY date_period, booking_channel
+      GROUP BY date_period, room_type
+      ORDER BY date_period, room_type
     `;
 
     const prevLeadTimeFluctuationResultSet = await client.query({
@@ -1001,9 +1143,9 @@ export async function GET(request: Request) {
 
     // Organize current period data
     leadTimeFluctuationData.forEach((item) => {
-      const category = item.booking_channel;
+      const roomType = item.room_type;
       const datePeriod = item.date_period;
-      const key = `${category}|${datePeriod}`;
+      const key = `${roomType}|${datePeriod}`;
 
       const totalDateDiff = parseFloat(item.total_date_diff || "0");
       const totalBuckets = parseFloat(item.total_buckets || "0");
@@ -1014,7 +1156,7 @@ export async function GET(request: Request) {
 
     // Organize previous period data
     prevLeadTimeFluctuationData.forEach((item) => {
-      const category = item.booking_channel;
+      const roomType = item.room_type;
       const datePeriod = item.date_period;
 
       // Map previous period date to current period for comparison
@@ -1072,7 +1214,7 @@ export async function GET(request: Request) {
       const totalBuckets = parseFloat(item.total_buckets || "0");
       const leadTime = totalBuckets > 0 ? totalDateDiff / totalBuckets : 0;
 
-      const key = `${category}|${mappedDate}`;
+      const key = `${roomType}|${mappedDate}`;
       prevLeadTimeMap.set(key, leadTime);
     });
 
@@ -1081,12 +1223,12 @@ export async function GET(request: Request) {
       {};
 
     // For each top category, create a time series with all dates
-    topCategoryNames.forEach((category) => {
-      const displayName = getDisplayName(category);
+    topCategoryNames.forEach((roomType) => {
+      const displayName = getDisplayName(roomType);
       const leadTimeSeries: FluctuationDataPoint[] = [];
 
       allDates.forEach((date) => {
-        const key = `${category}|${date}`;
+        const key = `${roomType}|${date}`;
         const currentValue = currentLeadTimeMap.get(key) || 0;
         const prevValue = prevLeadTimeMap.get(key) || 0;
 
@@ -1107,10 +1249,10 @@ export async function GET(request: Request) {
       leadTimeFluctuationSeries[displayName] = leadTimeSeries;
     });
 
-    // Query to fetch length of stay data
+    // Query to fetch length of stay data - update field
     const lengthOfStayQuery = `
       SELECT 
-        booking_channel,
+        room_type,
         SUM(toFloat64(date_diff)) as total_date_diff,
         SUM(toFloat64(num)) as total_num
       FROM JADRANKA.lenght_of_stay_distribution
@@ -1118,10 +1260,10 @@ export async function GET(request: Request) {
         toDate(occupancy_date) BETWEEN '${startDate}' AND '${endDate}'
         AND date(scd_valid_from) <= DATE('${businessDateParam}') 
         AND DATE('${businessDateParam}') < date(scd_valid_to)
-        AND booking_channel != 'UNDEFINED'
-        AND booking_channel != ''
-        AND booking_channel IS NOT NULL
-      GROUP BY booking_channel
+        AND room_type != 'UNDEFINED'
+        AND room_type != ''
+        AND room_type IS NOT NULL
+      GROUP BY room_type
       ORDER BY total_date_diff DESC
     `;
 
@@ -1137,29 +1279,26 @@ export async function GET(request: Request) {
     const lengthOfStayTopCategories: CategorySummary[] = [];
 
     lengthOfStayData.forEach((item) => {
-      const channel = item.booking_channel;
+      const roomType = item.room_type;
       const totalDateDiff = parseFloat(item.total_date_diff || "0");
       const totalNum = parseFloat(item.total_num || "0");
 
-      // Calculate length of stay - average days per booking
       const los = totalNum > 0 ? totalDateDiff / totalNum : 0;
 
-      // Store calculated length of stay by channel
-      lengthOfStayByChannel[channel] = roundValue(los);
+      lengthOfStayByChannel[roomType] = roundValue(los);
 
-      // Create categories summary for KPIs
       lengthOfStayTopCategories.push({
-        name: channel,
+        name: roomType,
         value: roundValue(los),
-        change: 0, // Will update with comparison data later
-        code: generateCode(channel, "booking_channel"),
+        change: 0,
+        code: generateCode(roomType, "room_type"),
       });
     });
 
-    // Create similar query for previous period to get change values
+    // Update previous period length of stay query
     const prevLengthOfStayQuery = `
       SELECT 
-        booking_channel,
+        room_type,
         SUM(toFloat64(date_diff)) as total_date_diff,
         SUM(toFloat64(num)) as total_num
       FROM JADRANKA.lenght_of_stay_distribution
@@ -1167,10 +1306,10 @@ export async function GET(request: Request) {
         toDate(occupancy_date) BETWEEN '${prevStartDate}' AND '${prevEndDate}'
         AND date(scd_valid_from) <= DATE('${prevBusinessDateParam}') 
         AND DATE('${prevBusinessDateParam}') < date(scd_valid_to)
-        AND booking_channel != 'UNDEFINED'
-        AND booking_channel != ''
-        AND booking_channel IS NOT NULL
-      GROUP BY booking_channel
+        AND room_type != 'UNDEFINED'
+        AND room_type != ''
+        AND room_type IS NOT NULL
+      GROUP BY room_type
       ORDER BY total_date_diff DESC
     `;
 
@@ -1186,15 +1325,13 @@ export async function GET(request: Request) {
     const prevLengthOfStayByChannel: { [key: string]: number } = {};
 
     prevLengthOfStayData.forEach((item) => {
-      const channel = item.booking_channel;
+      const roomType = item.room_type;
       const totalDateDiff = parseFloat(item.total_date_diff || "0");
       const totalNum = parseFloat(item.total_num || "0");
 
-      // Calculate length of stay
       const los = totalNum > 0 ? totalDateDiff / totalNum : 0;
 
-      // Store calculated length of stay
-      prevLengthOfStayByChannel[channel] = roundValue(los);
+      prevLengthOfStayByChannel[roomType] = roundValue(los);
     });
 
     // Update the length of stay KPIs with change values
@@ -1206,11 +1343,11 @@ export async function GET(request: Request) {
     // Sort by value descending
     lengthOfStayTopCategories.sort((a, b) => b.value - a.value);
 
-    // Create daily fluctuation data for length of stay
+    // Update length of stay fluctuation query
     const losFluctuationQuery = `
       SELECT 
         toString(toDate(occupancy_date)) AS date_period,
-        booking_channel,
+        room_type,
         SUM(toFloat64(date_diff)) as total_date_diff,
         SUM(toFloat64(num)) as total_num
       FROM JADRANKA.lenght_of_stay_distribution
@@ -1218,14 +1355,14 @@ export async function GET(request: Request) {
         toDate(occupancy_date) BETWEEN '${startDate}' AND '${endDate}'
         AND date(scd_valid_from) <= DATE('${businessDateParam}') 
         AND DATE('${businessDateParam}') < date(scd_valid_to)
-        AND booking_channel != 'UNDEFINED'
-        AND booking_channel != ''
-        AND booking_channel IS NOT NULL
-        AND booking_channel IN (${topCategoryNames
+        AND room_type != 'UNDEFINED'
+        AND room_type != ''
+        AND room_type IS NOT NULL
+        AND room_type IN (${topCategoryNames
           .map((name) => `'${name}'`)
           .join(",")})
-      GROUP BY date_period, booking_channel
-      ORDER BY date_period, booking_channel
+      GROUP BY date_period, room_type
+      ORDER BY date_period, room_type
     `;
 
     const losFluctuationResultSet = await client.query({
@@ -1238,7 +1375,7 @@ export async function GET(request: Request) {
     const prevLosFluctuationQuery = `
       SELECT 
         toString(toDate(occupancy_date)) AS date_period,
-        booking_channel,
+        room_type,
         SUM(toFloat64(date_diff)) as total_date_diff,
         SUM(toFloat64(num)) as total_num
       FROM JADRANKA.lenght_of_stay_distribution
@@ -1246,14 +1383,14 @@ export async function GET(request: Request) {
         toDate(occupancy_date) BETWEEN '${prevStartDate}' AND '${prevEndDate}'
         AND date(scd_valid_from) <= DATE('${prevBusinessDateParam}') 
         AND DATE('${prevBusinessDateParam}') < date(scd_valid_to)
-        AND booking_channel != 'UNDEFINED'
-        AND booking_channel != ''
-        AND booking_channel IS NOT NULL
-        AND booking_channel IN (${topCategoryNames
+        AND room_type != 'UNDEFINED'
+        AND room_type != ''
+        AND room_type IS NOT NULL
+        AND room_type IN (${topCategoryNames
           .map((name) => `'${name}'`)
           .join(",")})
-      GROUP BY date_period, booking_channel
-      ORDER BY date_period, booking_channel
+      GROUP BY date_period, room_type
+      ORDER BY date_period, room_type
     `;
 
     const prevLosFluctuationResultSet = await client.query({
@@ -1270,9 +1407,9 @@ export async function GET(request: Request) {
 
     // Organize current period data
     losFluctuationData.forEach((item) => {
-      const category = item.booking_channel;
+      const roomType = item.room_type;
       const datePeriod = item.date_period;
-      const key = `${category}|${datePeriod}`;
+      const key = `${roomType}|${datePeriod}`;
 
       const totalDateDiff = parseFloat(item.total_date_diff || "0");
       const totalNum = parseFloat(item.total_num || "0");
@@ -1283,7 +1420,7 @@ export async function GET(request: Request) {
 
     // Organize previous period data using the same date mapping logic
     prevLosFluctuationData.forEach((item) => {
-      const category = item.booking_channel;
+      const roomType = item.room_type;
       const datePeriod = item.date_period;
 
       // Map previous period date to current period for comparison - same logic as lead time
@@ -1339,7 +1476,7 @@ export async function GET(request: Request) {
       const totalNum = parseFloat(item.total_num || "0");
       const los = totalNum > 0 ? totalDateDiff / totalNum : 0;
 
-      const key = `${category}|${mappedDate}`;
+      const key = `${roomType}|${mappedDate}`;
       prevLosMap.set(key, los);
     });
 
@@ -1347,12 +1484,12 @@ export async function GET(request: Request) {
     const losFluctuationSeries: Record<string, FluctuationDataPoint[]> = {};
 
     // For each top category, create a time series with all dates
-    topCategoryNames.forEach((category) => {
-      const displayName = getDisplayName(category);
+    topCategoryNames.forEach((roomType) => {
+      const displayName = getDisplayName(roomType);
       const losSeries: FluctuationDataPoint[] = [];
 
       allDates.forEach((date) => {
-        const key = `${category}|${date}`;
+        const key = `${roomType}|${date}`;
         const currentValue = currentLosMap.get(key) || 0;
         const prevValue = prevLosMap.get(key) || 0;
 
@@ -1401,6 +1538,25 @@ export async function GET(request: Request) {
       bookingLeadTime: bookingLeadTimeByChannel,
       lengthOfStay: lengthOfStayByChannel,
     };
+
+    // --- STORE IN CACHE ---
+    const cacheEntry: CacheEntry = {
+      data: {
+        body: response, // The JSON response body
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      },
+      expiresAt: Date.now() + CACHE_DURATION,
+    };
+
+    await setCacheEntry(cacheKey, cacheEntry);
+    console.log(
+      `[Cache SET] Stored response data for key: ${cacheKey.substring(
+        0,
+        100
+      )}...`
+    );
+    // --- END STORE IN CACHE ---
 
     return NextResponse.json(response);
   } catch (error) {
