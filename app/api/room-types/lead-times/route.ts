@@ -63,7 +63,7 @@ export async function GET(request: Request) {
     // 1. First query for booking lead time data (current period)
     const bookingLeadTimeCurrentQuery = `
       SELECT 
-        booking_channel,
+        room_type,
         bucket AS time_range,
         SUM(booking_lead_num) AS count
       FROM JADRANKA.booking_lead_time
@@ -72,14 +72,14 @@ export async function GET(request: Request) {
         AND date(scd_valid_from) <= DATE('${businessDateParam}') 
         AND DATE('${businessDateParam}') < date(scd_valid_to)
         ${propertyFilter}
-      GROUP BY booking_channel, bucket
-      ORDER BY booking_channel, bucket ASC
+      GROUP BY room_type, bucket
+      ORDER BY room_type, bucket ASC
     `;
 
     // 2. Second query for booking lead time data (previous period)
     const bookingLeadTimePreviousQuery = `
       SELECT 
-        booking_channel,
+        room_type,
         bucket AS time_range,
         SUM(booking_lead_num) AS count
       FROM JADRANKA.booking_lead_time
@@ -88,14 +88,14 @@ export async function GET(request: Request) {
         AND date(scd_valid_from) <= DATE('${prevBusinessDateParam}') 
         AND DATE('${prevBusinessDateParam}') < date(scd_valid_to)
         ${propertyFilter}
-      GROUP BY booking_channel, bucket
-      ORDER BY booking_channel, bucket ASC
+      GROUP BY room_type, bucket
+      ORDER BY room_type, bucket ASC
     `;
 
     // 3. Third query for cancellation lead time data (current period)
     const cancellationLeadTimeCurrentQuery = `
       SELECT 
-        booking_channel,
+        room_type,
         bucket AS time_range,
         SUM(cancellation_lead_num) AS count
       FROM JADRANKA.cancellation_lead_time
@@ -104,14 +104,14 @@ export async function GET(request: Request) {
         AND date(scd_valid_from) <= DATE('${businessDateParam}') 
         AND DATE('${businessDateParam}') < date(scd_valid_to)
         ${propertyFilter}
-      GROUP BY booking_channel, bucket
-      ORDER BY booking_channel, bucket ASC
+      GROUP BY room_type, bucket
+      ORDER BY room_type, bucket ASC
     `;
 
     // 4. Fourth query for cancellation lead time data (previous period)
     const cancellationLeadTimePreviousQuery = `
       SELECT 
-        booking_channel,
+        room_type,
         bucket AS time_range,
         SUM(cancellation_lead_num) AS count
       FROM JADRANKA.cancellation_lead_time
@@ -120,8 +120,8 @@ export async function GET(request: Request) {
         AND date(scd_valid_from) <= DATE('${prevBusinessDateParam}') 
         AND DATE('${prevBusinessDateParam}') < date(scd_valid_to)
         ${propertyFilter}
-      GROUP BY booking_channel, bucket
-      ORDER BY booking_channel, bucket ASC
+      GROUP BY room_type, bucket
+      ORDER BY room_type, bucket ASC
     `;
 
     // Execute all four queries
@@ -162,13 +162,13 @@ export async function GET(request: Request) {
     // Create maps for previous data for easier lookup
     const bookingLeadTimePreviousMap = new Map();
     bookingLeadTimePreviousData.forEach((item) => {
-      const key = `${item.booking_channel}|${item.time_range}`;
+      const key = `${item.room_type}|${item.time_range}`;
       bookingLeadTimePreviousMap.set(key, item);
     });
 
     const cancellationLeadTimePreviousMap = new Map();
     cancellationLeadTimePreviousData.forEach((item) => {
-      const key = `${item.booking_channel}|${item.time_range}`;
+      const key = `${item.room_type}|${item.time_range}`;
       cancellationLeadTimePreviousMap.set(key, item);
     });
 
@@ -181,7 +181,7 @@ export async function GET(request: Request) {
 
     // Process booking lead time current data
     bookingLeadTimeCurrentData.forEach((item) => {
-      const bookingChannel = item.booking_channel;
+      const bookingChannel = item.room_type;
       const timeRange = item.time_range;
       bookingLeadTimeBuckets.add(timeRange);
 
@@ -213,7 +213,7 @@ export async function GET(request: Request) {
 
     // Process cancellation lead time current data
     cancellationLeadTimeCurrentData.forEach((item) => {
-      const bookingChannel = item.booking_channel;
+      const bookingChannel = item.room_type;
       const timeRange = item.time_range;
       cancellationLeadTimeBuckets.add(timeRange);
 
@@ -247,7 +247,7 @@ export async function GET(request: Request) {
 
     // Add any booking channels and buckets from previous data that might not be in current data
     bookingLeadTimePreviousData.forEach((prevItem) => {
-      const bookingChannel = prevItem.booking_channel;
+      const bookingChannel = prevItem.room_type;
       const timeRange = prevItem.time_range;
       bookingLeadTimeBuckets.add(timeRange);
 
@@ -286,7 +286,7 @@ export async function GET(request: Request) {
 
     // Add any booking channels and buckets from cancellation previous data that might not be in current data
     cancellationLeadTimePreviousData.forEach((prevItem) => {
-      const bookingChannel = prevItem.booking_channel;
+      const bookingChannel = prevItem.room_type;
       const timeRange = prevItem.time_range;
       cancellationLeadTimeBuckets.add(timeRange);
 

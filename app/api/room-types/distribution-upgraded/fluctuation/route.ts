@@ -138,7 +138,7 @@ export async function GET(request: Request) {
   // New parameters for filtering on a specific value
   const primaryValue = searchParams.get("primaryValue"); // E.g., "WEB"
   const primaryFilterField =
-    searchParams.get("primaryFilterField") || "booking_channel"; // Field to filter on
+    searchParams.get("primaryFilterField") || "room_type"; // Field to filter on
 
   // Limit for number of items for fluctuation data only
   const fluctuationLimit = parseInt(searchParams.get("limit") || "5", 10);

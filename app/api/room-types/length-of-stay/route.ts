@@ -59,10 +59,10 @@ export async function GET(request: Request) {
 
     const propertyFilter = property ? `AND property = '${property}'` : "";
 
-    // Build the query for current period - now with booking_channel grouping
+    // Build the query for current period - now with room_type grouping
     const currentQuery = `
       SELECT 
-        booking_channel,
+        room_type,
         bucket AS stay_range,
         SUM(num) AS count
       FROM JADRANKA.lenght_of_stay_distribution
@@ -71,9 +71,9 @@ export async function GET(request: Request) {
         AND date(scd_valid_from) <= DATE('${businessDateParam}') 
         AND DATE('${businessDateParam}') < date(scd_valid_to)
         ${propertyFilter}
-      GROUP BY booking_channel, bucket
+      GROUP BY room_type, bucket
       ORDER BY 
-        booking_channel,
+        room_type,
         CASE 
           WHEN bucket = '1 night' THEN 1
           WHEN bucket = '2 nights' THEN 2
@@ -86,10 +86,10 @@ export async function GET(request: Request) {
         END ASC
     `;
 
-    // Build the query for previous period - now with booking_channel grouping
+    // Build the query for previous period - now with room_type grouping
     const previousQuery = `
       SELECT 
-        booking_channel,
+        room_type,
         bucket AS stay_range,
         SUM(num) AS count
       FROM JADRANKA.lenght_of_stay_distribution
@@ -98,9 +98,9 @@ export async function GET(request: Request) {
         AND date(scd_valid_from) <= DATE('${prevBusinessDateParam}') 
         AND DATE('${prevBusinessDateParam}') < date(scd_valid_to)
         ${propertyFilter}
-      GROUP BY booking_channel, bucket
+      GROUP BY room_type, bucket
       ORDER BY 
-        booking_channel,
+        room_type,
         CASE 
           WHEN bucket = '1 night' THEN 1
           WHEN bucket = '2 nights' THEN 2
@@ -130,7 +130,7 @@ export async function GET(request: Request) {
     // Create a map for previous data for easier lookup
     const previousDataMap = new Map();
     previousData.forEach((item) => {
-      const key = `${item.booking_channel}|${item.stay_range}`;
+      const key = `${item.room_type}|${item.stay_range}`;
       previousDataMap.set(key, item);
     });
 
@@ -143,7 +143,7 @@ export async function GET(request: Request) {
 
     // Process current data
     currentData.forEach((item) => {
-      const bookingChannel = item.booking_channel;
+      const bookingChannel = item.room_type;
       const stayRange = item.stay_range;
       allBuckets.add(stayRange);
 
@@ -178,7 +178,7 @@ export async function GET(request: Request) {
 
     // Add any booking channels and buckets from previous data that might not be in current data
     previousData.forEach((prevItem) => {
-      const bookingChannel = prevItem.booking_channel;
+      const bookingChannel = prevItem.room_type;
       const stayRange = prevItem.stay_range;
       allBuckets.add(stayRange);
 
