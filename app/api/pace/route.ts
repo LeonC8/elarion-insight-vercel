@@ -70,7 +70,7 @@ async function deleteCacheEntry(key: string): Promise<void> {
 }
 
 function generateCacheKey(params: URLSearchParams): string {
-  const relevantParams = ["viewType"];
+  const relevantParams = ["viewType", "property"];
   const keyParts: string[] = [];
   relevantParams.forEach((key) => {
     let value: string | null = null;
@@ -78,6 +78,9 @@ function generateCacheKey(params: URLSearchParams): string {
       case "viewType":
         value = params.get(key) || "Month";
         break; // Default to Month
+      case "property":
+        value = params.get(key) || ""; // Include property in cache key
+        break;
       default:
         value = params.get(key);
     }
@@ -147,6 +150,7 @@ export async function GET(request: Request) {
   const viewType = searchParams.get("viewType") || "Month"; // 'Month' or 'Year'
   const businessDate = new Date(); // Use today's date as the business date
   const businessDateParam = businessDate.toISOString().split("T")[0];
+  const property = searchParams.get("property"); // Add property parameter
 
   let startDate: string, endDate: string;
   let prevStartDate: string, prevEndDate: string;
@@ -186,6 +190,9 @@ export async function GET(request: Request) {
       password: getClickhouseConnection().password,
     });
 
+    // Add property filter
+    const propertyFilter = property ? `AND property = '${property}'` : "";
+
     const query = `
         WITH CurrentData AS (
             SELECT
@@ -197,6 +204,7 @@ export async function GET(request: Request) {
                 toDate(occupancy_date) BETWEEN '${startDate}' AND '${endDate}'
                 AND date(scd_valid_from) <= DATE('${businessDateParam}')
                 AND DATE('${businessDateParam}') < date(scd_valid_to)
+                ${propertyFilter}
             GROUP BY ${dateGroupFormat}
         ),
         PreviousData AS (
@@ -210,6 +218,7 @@ export async function GET(request: Request) {
                 -- Use the same business date for validity check, as per user request
                 AND date(scd_valid_from) <= DATE('${businessDateParam}')
                 AND DATE('${businessDateParam}') < date(scd_valid_to)
+                ${propertyFilter}
             GROUP BY ${dateGroupFormat}
         )
         SELECT

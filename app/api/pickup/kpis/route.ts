@@ -118,6 +118,7 @@ export async function GET(request: Request) {
     | "Last 7 days"
     | "Last 15 days"
     | "Last 30 days";
+  const property = searchParams.get("property");
 
   let client: ClickHouseClient | undefined;
 
@@ -166,6 +167,8 @@ export async function GET(request: Request) {
 
     // --- Build Queries ---
 
+    const propertyFilter = property ? `AND property = '${property}'` : "";
+
     // Query for Current Period - Removed SCD filtering
     const currentQuery = `
             SELECT
@@ -177,6 +180,7 @@ export async function GET(request: Request) {
             WHERE
                 toDate(booking_date) = {currentBookingDate:Date}
             AND toDate(occupancy_date) BETWEEN {occStartDate:Date} AND {occEndDate:Date}
+            ${propertyFilter}
         `;
 
     // Query for Current Period Daily Data
@@ -191,6 +195,7 @@ export async function GET(request: Request) {
             WHERE
                 toDate(booking_date) = {currentBookingDate:Date}
             AND toDate(occupancy_date) BETWEEN {occStartDate:Date} AND {occEndDate:Date}
+            ${propertyFilter}
             GROUP BY occupancy_date
             ORDER BY occupancy_date
         `;
@@ -211,6 +216,7 @@ export async function GET(request: Request) {
                 WHERE
                     toDate(booking_date) = {comparisonBookingDate:Date}
                 AND toDate(occupancy_date) BETWEEN {occStartDate:Date} AND {occEndDate:Date}
+                ${propertyFilter}
             `;
       // Daily Query
       comparisonQueryParams = {
@@ -232,6 +238,7 @@ export async function GET(request: Request) {
                 WHERE
                     toDate(booking_date) BETWEEN {comparisonBookingStartDate:Date} AND {comparisonBookingEndDate:Date}
                 AND toDate(occupancy_date) BETWEEN {occStartDate:Date} AND {occEndDate:Date}
+                ${propertyFilter}
             `;
       // Daily Query - Calculate average daily values per occupancy date
       comparisonQueryParams = {

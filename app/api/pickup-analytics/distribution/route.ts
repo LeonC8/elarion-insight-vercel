@@ -71,7 +71,13 @@ async function deleteCacheEntry(key: string): Promise<void> {
 }
 
 function generateCacheKey(params: URLSearchParams): string {
-  const relevantParams = ["reportDate", "viewType", "comparison", "field"];
+  const relevantParams = [
+    "reportDate",
+    "viewType",
+    "comparison",
+    "field",
+    "property",
+  ];
   const keyParts: string[] = [];
   relevantParams.forEach((key) => {
     let value: string | null = null;
@@ -87,6 +93,9 @@ function generateCacheKey(params: URLSearchParams): string {
         break;
       case "field":
         value = params.get(key) || "guest_country";
+        break;
+      case "property":
+        value = params.get(key) || ""; // Include property in cache key
         break;
       default:
         value = params.get(key);
@@ -277,6 +286,7 @@ export async function GET(request: Request) {
     | "Last 30 days";
   const field = searchParams.get("field") || "guest_country";
   const isProducerRoute = field === "producer"; // Check if field is producer
+  const property = searchParams.get("property"); // Add property parameter
 
   // --- Date Calculations (Pickup Style) ---
   const reportDate = new Date(reportDateParam + "T00:00:00Z");
@@ -324,6 +334,9 @@ export async function GET(request: Request) {
       fieldFilters = `AND ${field} != -1 AND ${field} IS NOT NULL`; // Assuming -1 is undefined producer ID
     } // Add more filters for other fields if needed
 
+    // Add property filter (critical for getting data!)
+    const propertyFilter = property ? `AND property = '${property}'` : "";
+
     // Fetch producer names if needed (copied from overview)
     let producerMap = new Map<number, string>();
     if (isProducerRoute) {
@@ -337,9 +350,10 @@ export async function GET(request: Request) {
       });
 
       // Fix: parse as an array of objects
-      const producerData = await producerResultSet.json<
-        Array<{ producer: number; producer_name: string }>
-      >();
+      const producerData = (await producerResultSet.json()) as Array<{
+        producer: number;
+        producer_name: string;
+      }>;
 
       // Now iterate over the array properly
       producerData.forEach((row) => {
@@ -360,6 +374,7 @@ export async function GET(request: Request) {
         WHERE
             toDate(booking_date) = {currentBookingDate:Date}
         AND toDate(occupancy_date) BETWEEN {occStartDate:Date} AND {occEndDate:Date}
+        ${propertyFilter}
         ${fieldFilters}
         GROUP BY field_name
         ORDER BY total_revenue DESC
@@ -384,6 +399,7 @@ export async function GET(request: Request) {
             WHERE
                 toDate(booking_date) = {comparisonBookingDate:Date}
             AND toDate(occupancy_date) BETWEEN {occStartDate:Date} AND {occEndDate:Date}
+            ${propertyFilter}
             ${fieldFilters}
             GROUP BY field_name
         `;
@@ -405,6 +421,7 @@ export async function GET(request: Request) {
             WHERE
                 toDate(booking_date) BETWEEN {comparisonBookingStartDate:Date} AND {comparisonBookingEndDate:Date}
             AND toDate(occupancy_date) BETWEEN {occStartDate:Date} AND {occEndDate:Date}
+            ${propertyFilter}
             ${fieldFilters}
             GROUP BY field_name
         `;
@@ -428,6 +445,7 @@ export async function GET(request: Request) {
              FROM insights
              WHERE toDate(booking_date) = {currentBookingDate:Date}
                AND toDate(occupancy_date) BETWEEN {occStartDate:Date} AND {occEndDate:Date}
+               ${propertyFilter}
                ${fieldFilters}
              GROUP BY field_name
              ORDER BY SUM(totalRevenue) DESC
@@ -450,6 +468,8 @@ export async function GET(request: Request) {
             )
             AND -- Occupancy window
                 toDate(occupancy_date) BETWEEN {occStartDate:Date} AND {occEndDate:Date}
+            AND -- Property filter
+                1=1 ${propertyFilter}
             AND -- Field filters and only include fields present in the current period
                 ${field} IN (SELECT field_name FROM AllFields) -- Changed TopFields to AllFields
                 ${fieldFilters}
@@ -485,13 +505,11 @@ export async function GET(request: Request) {
       ]);
 
     // Fix: parse JSON results as arrays of their respective types
-    const currentData = await currentResultSet.json<RawQueryResult[]>();
-    const comparisonDataRaw = await comparisonResultSet.json<
-      RawQueryResult[]
-    >();
-    const timeSeriesDataRaw = await timeSeriesResultSet.json<
-      RawTimeSeriesResult[]
-    >();
+    const currentData = (await currentResultSet.json()) as RawQueryResult[];
+    const comparisonDataRaw =
+      (await comparisonResultSet.json()) as RawQueryResult[];
+    const timeSeriesDataRaw =
+      (await timeSeriesResultSet.json()) as RawTimeSeriesResult[];
 
     // --- Process Data ---
 
@@ -533,6 +551,7 @@ export async function GET(request: Request) {
       topFieldNames.add(name); // Add to the set of top fields
       const code = generateCode(name, field);
       const prevItem = comparisonDataMap.get(name) || {
+        field_name: row.field_name,
         rooms_sold: 0,
         room_revenue: 0,
         total_revenue: 0,

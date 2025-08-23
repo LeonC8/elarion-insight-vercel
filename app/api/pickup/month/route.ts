@@ -37,6 +37,7 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   // const dateParam = searchParams.get('date'); // No longer the primary source for month context
   const businessDateParam = searchParams.get("businessDate");
+  const property = searchParams.get("property");
 
   if (!businessDateParam) {
     return NextResponse.json(
@@ -65,6 +66,7 @@ export async function GET(request: Request) {
     // Create ClickHouse client
     client = createClient(getClickhouseConnection());
 
+    const propertyFilter = property ? `AND property = '${property}'` : "";
     const query = `
       SELECT
         toDate(booking_date) AS booking_date,
@@ -75,6 +77,7 @@ export async function GET(request: Request) {
       WHERE
         toDate(booking_date) BETWEEN '${monthStart}' AND '${businessDateStr}'
         AND toDate(occupancy_date) BETWEEN '${monthStart}' AND '${monthEnd}'
+        ${propertyFilter}
       GROUP BY booking_date, occupancy_date
       ORDER BY booking_date, occupancy_date
     `;

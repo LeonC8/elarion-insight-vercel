@@ -59,6 +59,7 @@ export async function GET(request: NextRequest) {
   const bookingDateParam = searchParams.get("bookingDate");
   const occupancyDateParam = searchParams.get("occupancyDate");
   const occupancyMonthParam = searchParams.get("occupancyMonth"); // For year view
+  const property = searchParams.get("property");
 
   // Validate required parameters
   if (
@@ -144,6 +145,8 @@ export async function GET(request: NextRequest) {
       )
     );
 
+    const propertyFilter = property ? `AND property = '${property}'` : "";
+
     // Query for current year data
     const currentYearQuery = `
       SELECT
@@ -160,6 +163,7 @@ export async function GET(request: NextRequest) {
         ${occupancyClause}
         AND scd_valid_from <= toDateTime('${bookingDate}')
         AND scd_valid_to > toDateTime('${bookingDate}')
+        ${propertyFilter}
     `;
 
     // Query for previous year data
@@ -180,6 +184,7 @@ export async function GET(request: NextRequest) {
         )}
         AND scd_valid_from <= toDateTime('${bookingDate}')
         AND scd_valid_to > toDateTime('${bookingDate}')
+        ${propertyFilter}
     `;
 
     console.log("Current Year Query:", currentYearQuery);

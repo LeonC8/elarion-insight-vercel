@@ -36,6 +36,7 @@ export async function GET(request: Request) {
   // Parse query parameters
   const { searchParams } = new URL(request.url);
   const businessDateParam = searchParams.get("businessDate");
+  const property = searchParams.get("property");
 
   if (!businessDateParam) {
     return NextResponse.json(
@@ -70,6 +71,7 @@ export async function GET(request: Request) {
 
     // Modified query to match the month view's calculation logic
     // This ensures consistency between monthly and yearly views
+    const propertyFilter = property ? `AND property = '${property}'` : "";
     const query = `
       WITH 
         -- First get the data at the daily level (same as month view)
@@ -84,6 +86,7 @@ export async function GET(request: Request) {
           WHERE
             toDate(booking_date) BETWEEN '${monthStart}' AND '${businessDateStr}'
             AND toDate(occupancy_date) BETWEEN '${monthStart}' AND '${yearEnd}'
+            ${propertyFilter}
         )
       -- Then aggregate by month (ensuring we use the same base data as the month view)
       SELECT

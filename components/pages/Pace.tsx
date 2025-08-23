@@ -1,42 +1,56 @@
-"use client"
+"use client";
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect } from "react";
 import {
   DropdownMenu,
-  DropdownMenuContent,  
+  DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { 
-  CalendarIcon, 
-  ChevronDownIcon, 
-  DollarSignIcon, 
-  UtensilsIcon, 
-  TrendingUpIcon, 
-  PercentIcon, 
-  BarChartIcon, 
+} from "@/components/ui/dropdown-menu";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  CalendarIcon,
+  ChevronDownIcon,
+  DollarSignIcon,
+  UtensilsIcon,
+  TrendingUpIcon,
+  PercentIcon,
+  BarChartIcon,
   LineChartIcon,
   PieChartIcon,
   Check,
   DownloadIcon,
   BedDoubleIcon,
-} from 'lucide-react'
-import { CustomDialog } from '../NumericalCardDetails'
-import { DetailedDialog } from '../GraphCardDetails'
-import { Calendar } from "@/components/ui/calendar"
-import { format } from "date-fns"
-import * as XLSX from 'xlsx'
-import { ResponsivePie } from '@nivo/pie'
-import { ResponsiveBar } from '@nivo/bar'
-import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts'
-import { PacingChart } from '@/components/PacingChart'
-import { HotelSelector } from '../new/HotelSelector'
-import { PacingChartData } from '@/app/api/pace/route'
+} from "lucide-react";
+import { CustomDialog } from "../NumericalCardDetails";
+import { DetailedDialog } from "../GraphCardDetails";
+import { Calendar } from "@/components/ui/calendar";
+import { format } from "date-fns";
+import * as XLSX from "xlsx";
+import { ResponsivePie } from "@nivo/pie";
+import { ResponsiveBar } from "@nivo/bar";
+import {
+  ResponsiveContainer,
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+} from "recharts";
+import { PacingChart } from "@/components/PacingChart";
+import { HotelSelector } from "../new/HotelSelector";
+import { PacingChartData } from "@/app/api/pace/route";
+import { DEFAULT_PROPERTY, type PropertyCode } from "@/lib/property";
 
 // Add the COLORS constant
-const COLORS = ['rgba(59, 130, 246, 0.5)', 'rgba(34, 197, 94, 0.5)', 'rgba(234, 179, 8, 0.5)', 'rgba(239, 68, 68, 0.5)']
+const COLORS = [
+  "rgba(59, 130, 246, 0.5)",
+  "rgba(34, 197, 94, 0.5)",
+  "rgba(234, 179, 8, 0.5)",
+  "rgba(239, 68, 68, 0.5)",
+];
 
 // Add the graph data constants
 const marketSegments = [
@@ -45,7 +59,7 @@ const marketSegments = [
   { id: "Corporate", value: 280000 },
   { id: "Government", value: 150000 },
   { id: "Other", value: 70000 },
-]
+];
 
 const roomTypes = [
   { id: "Standard", value: 300000 },
@@ -53,7 +67,7 @@ const roomTypes = [
   { id: "Suite", value: 180000 },
   { id: "Executive", value: 120000 },
   { id: "Family", value: 90000 },
-]
+];
 
 const bookingChannels = [
   { id: "Direct", value: 280000 },
@@ -61,7 +75,7 @@ const bookingChannels = [
   { id: "Travel Agent", value: 180000 },
   { id: "Corporate", value: 90000 },
   { id: "Wholesaler", value: 60000 },
-]
+];
 
 const geoSources = [
   { id: "Domestic", value: 520000 },
@@ -69,7 +83,7 @@ const geoSources = [
   { id: "Asia", value: 130000 },
   { id: "North America", value: 100000 },
   { id: "Other", value: 70000 },
-]
+];
 
 // Add the theme constant
 const modernTheme = {
@@ -80,7 +94,7 @@ const modernTheme = {
     fontSize: 11,
     fontWeight: 500,
     letterSpacing: 0.15,
-    fill: '#7d8694'
+    fill: "#7d8694",
   },
   labels: {
     text: {
@@ -88,8 +102,8 @@ const modernTheme = {
       fontSize: 11,
       fontWeight: 500,
       letterSpacing: 0.15,
-      fill: '#7d8694'
-    }
+      fill: "#7d8694",
+    },
   },
   axis: {
     legend: {
@@ -98,49 +112,51 @@ const modernTheme = {
         fontSize: 11,
         fontWeight: 500,
         letterSpacing: 0.15,
-        fill: '#7d8694'
-      }
+        fill: "#7d8694",
+      },
     },
     ticks: {
       text: {
         fontFamily: "'Geist Sans', sans-serif",
         fontSize: 11,
         fontWeight: 500,
-        fill: '#7d8694'
-      }
-    }
+        fill: "#7d8694",
+      },
+    },
   },
   legends: {
     text: {
       fontFamily: "'Geist Sans', sans-serif",
       fontSize: 11,
       fontWeight: 400,
-      fill: '#7d8694'
-    }
-  }
-}
+      fill: "#7d8694",
+    },
+  },
+};
 
 // Add helper functions
-function generateComparisonData(originalData: Array<{ id: string; value: number }>) {
-  return originalData.map(item => {
-    const changePercentage = (Math.random() * 0.4) - 0.2;
+function generateComparisonData(
+  originalData: Array<{ id: string; value: number }>
+) {
+  return originalData.map((item) => {
+    const changePercentage = Math.random() * 0.4 - 0.2;
     const newValue = Math.round(item.value * (1 + changePercentage));
     return {
       id: item.id,
-      value: Math.max(0, newValue)
+      value: Math.max(0, newValue),
     };
   });
 }
 
 const getYAxisTickValues = (data: Array<{ id: string; value: number }>) => {
-  const maxValue = Math.max(...data.map(d => d.value));
+  const maxValue = Math.max(...data.map((d) => d.value));
   const roundedMax = Math.ceil(maxValue / 100000) * 100000;
   const step = roundedMax / 5;
   return Array.from({ length: 6 }, (_, i) => i * step);
 };
 
 const getDisplayTimeframe = (timeframe: string, forExcel: boolean = false) => {
-  if (timeframe.includes('-')) {
+  if (timeframe.includes("-")) {
     if (forExcel) {
       return timeframe;
     }
@@ -152,7 +168,7 @@ const getDisplayTimeframe = (timeframe: string, forExcel: boolean = false) => {
 // Types
 type TimeframeOption = {
   label: string;
-  type: 'dropdown' | 'calendar';
+  type: "dropdown" | "calendar";
   options?: {
     value: string;
     label: string;
@@ -175,14 +191,62 @@ type DateRange = {
 
 // Data
 const numericalData: NumericalDataItem[] = [
-  { title: "Sold Rooms", value: 150, change: 5.2, comparisonValue: 142, icon: BedDoubleIcon },
-  { title: "Total Revenue", value: "$35,000", change: 3.8, comparisonValue: "$33,700", icon: DollarSignIcon },
-  { title: "Rooms Revenue", value: "$25,000", change: 4.5, comparisonValue: "$23,900", icon: DollarSignIcon },
-  { title: "F&B Revenue", value: "$10,000", change: 2.1, comparisonValue: "$9,800", icon: UtensilsIcon },
-  { title: "ADR", value: "$166.67", change: 3.8, comparisonValue: "$160.56", icon: TrendingUpIcon },
-  { title: "Occupancy", value: "75%", change: 1.5, comparisonValue: "73.8%", icon: PercentIcon },
-  { title: "RevPAR", value: "$125.00", change: 2.3, comparisonValue: "$122.19", icon: BarChartIcon },
-  { title: "TrevPAR", value: "$180.00", change: 1.8, comparisonValue: "$176.82", icon: LineChartIcon },
+  {
+    title: "Sold Rooms",
+    value: 150,
+    change: 5.2,
+    comparisonValue: 142,
+    icon: BedDoubleIcon,
+  },
+  {
+    title: "Total Revenue",
+    value: "$35,000",
+    change: 3.8,
+    comparisonValue: "$33,700",
+    icon: DollarSignIcon,
+  },
+  {
+    title: "Rooms Revenue",
+    value: "$25,000",
+    change: 4.5,
+    comparisonValue: "$23,900",
+    icon: DollarSignIcon,
+  },
+  {
+    title: "F&B Revenue",
+    value: "$10,000",
+    change: 2.1,
+    comparisonValue: "$9,800",
+    icon: UtensilsIcon,
+  },
+  {
+    title: "ADR",
+    value: "$166.67",
+    change: 3.8,
+    comparisonValue: "$160.56",
+    icon: TrendingUpIcon,
+  },
+  {
+    title: "Occupancy",
+    value: "75%",
+    change: 1.5,
+    comparisonValue: "73.8%",
+    icon: PercentIcon,
+  },
+  {
+    title: "RevPAR",
+    value: "$125.00",
+    change: 2.3,
+    comparisonValue: "$122.19",
+    icon: BarChartIcon,
+  },
+  {
+    title: "TrevPAR",
+    value: "$180.00",
+    change: 1.8,
+    comparisonValue: "$176.82",
+    icon: LineChartIcon,
+  },
 ];
 
 // Add after imports
@@ -209,63 +273,59 @@ interface ChartData {
 
 // Keep this helper function if needed elsewhere, otherwise remove it too
 const formatCurrency = (value: number): string => {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'EUR',
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "EUR",
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
   }).format(value);
-}
+};
 
 // Add this helper function
 function TriangleDown({ className }: { className?: string }) {
   return (
-    <svg 
-      width="8" 
-      height="6" 
-      viewBox="0 0 8 6" 
-      fill="currentColor" 
+    <svg
+      width="8"
+      height="6"
+      viewBox="0 0 8 6"
+      fill="currentColor"
       className={className}
     >
       <path d="M4 6L0 0L8 0L4 6Z" />
     </svg>
-  )
+  );
 }
 
 export function PaceDashboard() {
-  const [selectedHotels, setSelectedHotels] = useState<string[]>(["Hotel 1"])
-  const allHotels = ["Hotel 1", "Hotel 2", "Hotel 3"]
-  const [selectedCard, setSelectedCard] = useState<string | null>(null)
-  const [selectedTimeframe, setSelectedTimeframe] = useState("Month")
-  const [comparisonType, setComparisonType] = useState<'Last year' | 'Budget' | 'No comparison'>('Last year')
-  const [pieChartData, setPieChartData] = useState<Array<{ id: string; value: number }> | undefined>(undefined)
-  const [comparisonPieChartData, setComparisonPieChartData] = useState<Array<{ id: string; value: number }> | undefined>(undefined)
+  const [selectedProperty, setSelectedProperty] =
+    useState<PropertyCode>(DEFAULT_PROPERTY);
+  const [selectedCard, setSelectedCard] = useState<string | null>(null);
+  const [selectedTimeframe, setSelectedTimeframe] = useState("Month");
+  const [comparisonType, setComparisonType] = useState<
+    "Last year" | "Budget" | "No comparison"
+  >("Last year");
+  const [pieChartData, setPieChartData] = useState<
+    Array<{ id: string; value: number }> | undefined
+  >(undefined);
+  const [comparisonPieChartData, setComparisonPieChartData] = useState<
+    Array<{ id: string; value: number }> | undefined
+  >(undefined);
 
-  const toggleHotel = (hotel: string) => {
-    setSelectedHotels(prev => 
-      prev.includes(hotel) 
-        ? prev.filter(h => h !== hotel) 
-        : [...prev, hotel]
-    )
-  }
-
-  const toggleAllHotels = () => {
-    setSelectedHotels(prev => 
-      prev.length === allHotels.length ? [] : [...allHotels]
-    )
-  }
+  // Remove old hotel selection functions - now handled by HotelSelector component
 
   const closeDialog = () => {
-    setSelectedCard(null)
-    setPieChartData(undefined)
-    setComparisonPieChartData(undefined)
-  }
+    setSelectedCard(null);
+    setPieChartData(undefined);
+    setComparisonPieChartData(undefined);
+  };
 
   // Add this state to control calendar visibility
   const [isCalendarVisible, setIsCalendarVisible] = useState(false);
 
   // Add this state to control the temporary date range
-  const [tempDateRange, setTempDateRange] = useState<DateRange | undefined>(undefined);
+  const [tempDateRange, setTempDateRange] = useState<DateRange | undefined>(
+    undefined
+  );
 
   // Replace the timeframeOptions with a simpler version
   const timeframeOptions = [
@@ -289,7 +349,10 @@ export function PaceDashboard() {
   const applyDateRange = () => {
     if (tempDateRange?.from && tempDateRange?.to) {
       setDateRange(tempDateRange);
-      const formattedRange = `${format(tempDateRange.from, 'dd MMM yyyy')} - ${format(tempDateRange.to, 'dd MMM yyyy')}`;
+      const formattedRange = `${format(
+        tempDateRange.from,
+        "dd MMM yyyy"
+      )} - ${format(tempDateRange.to, "dd MMM yyyy")}`;
       setSelectedTimeframe(formattedRange);
       setIsCalendarVisible(true);
       if (dropdownRef.current) {
@@ -303,19 +366,23 @@ export function PaceDashboard() {
   };
 
   // Add new state variables for graph displays
-  const [chartTypes, setChartTypes] = useState<Record<string, 'pie' | 'bar'>>({
-    marketSegments: 'bar',
-    roomTypes: 'bar',
-    bookingChannels: 'bar',
-    geoSources: 'bar',
-  })
-  const [selectedDetailedChart, setSelectedDetailedChart] = useState<string | null>(null)
-  const [selectedPieView, setSelectedPieView] = useState<Record<string, 'current' | 'comparison'>>({
-    marketSegments: 'current',
-    roomTypes: 'current',
-    bookingChannels: 'current',
-    geoSources: 'current',
-  })
+  const [chartTypes, setChartTypes] = useState<Record<string, "pie" | "bar">>({
+    marketSegments: "bar",
+    roomTypes: "bar",
+    bookingChannels: "bar",
+    geoSources: "bar",
+  });
+  const [selectedDetailedChart, setSelectedDetailedChart] = useState<
+    string | null
+  >(null);
+  const [selectedPieView, setSelectedPieView] = useState<
+    Record<string, "current" | "comparison">
+  >({
+    marketSegments: "current",
+    roomTypes: "current",
+    bookingChannels: "current",
+    geoSources: "current",
+  });
 
   // Add state for the fetched pacing data
   const [pacingData, setPacingData] = useState<PacingChartData[]>([]);
@@ -323,38 +390,44 @@ export function PaceDashboard() {
   const [errorPacing, setErrorPacing] = useState<string | null>(null);
 
   // Add renderChart function
-  const renderChart = (data: Array<{ id: string; value: number }>, title: string, filterKey: string) => {
-    const chartType = chartTypes[filterKey]
-    const comparisonData = generateComparisonData(data)
-    const pieView = selectedPieView[filterKey]
+  const renderChart = (
+    data: Array<{ id: string; value: number }>,
+    title: string,
+    filterKey: string
+  ) => {
+    const chartType = chartTypes[filterKey];
+    const comparisonData = generateComparisonData(data);
+    const pieView = selectedPieView[filterKey];
 
     const toggleChartType = () => {
-      setChartTypes(prev => ({
+      setChartTypes((prev) => ({
         ...prev,
-        [filterKey]: chartType === 'pie' ? 'bar' : 'pie'
-      }))
-    }
+        [filterKey]: chartType === "pie" ? "bar" : "pie",
+      }));
+    };
 
-    const togglePieView = (view: 'current' | 'comparison') => {
-      setSelectedPieView(prev => ({
+    const togglePieView = (view: "current" | "comparison") => {
+      setSelectedPieView((prev) => ({
         ...prev,
-        [filterKey]: view
-      }))
-    }
+        [filterKey]: view,
+      }));
+    };
 
     return (
       <Card className="bg-white shadow-lg rounded-lg overflow-hidden flex flex-col">
         <CardHeader className="flex flex-col items-start">
           <div className="flex w-full justify-between items-center">
             <div>
-              <CardTitle className="text-lg font-semibold text-gray-800">{title}</CardTitle>
+              <CardTitle className="text-lg font-semibold text-gray-800">
+                {title}
+              </CardTitle>
             </div>
             <div className="flex items-center space-x-2">
               <button
                 className={`text-sm px-3 py-1 rounded-full flex items-center transition-colors ${
-                  chartType === 'bar' 
-                    ? 'bg-blue-100 text-blue-600' 
-                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  chartType === "bar"
+                    ? "bg-blue-100 text-blue-600"
+                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
                 }`}
                 onClick={toggleChartType}
               >
@@ -363,9 +436,9 @@ export function PaceDashboard() {
               </button>
               <button
                 className={`text-sm px-3 py-1 rounded-full flex items-center transition-colors ${
-                  chartType === 'pie' 
-                    ? 'bg-blue-100 text-blue-600' 
-                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  chartType === "pie"
+                    ? "bg-blue-100 text-blue-600"
+                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
                 }`}
                 onClick={toggleChartType}
               >
@@ -374,36 +447,37 @@ export function PaceDashboard() {
               </button>
             </div>
           </div>
-          {chartType === 'pie' && comparisonType !== 'No comparison' && (
+          {chartType === "pie" && comparisonType !== "No comparison" && (
             <div className="flex w-full mt-4 border-b">
-              <button 
+              <button
                 className={`px-4 py-2 ${
-                  pieView === 'current'
-                    ? 'border-b-2 border-blue-500 text-blue-600 text-sm'
-                    : 'text-gray-500 text-sm '
+                  pieView === "current"
+                    ? "border-b-2 border-blue-500 text-blue-600 text-sm"
+                    : "text-gray-500 text-sm "
                 }`}
-                onClick={() => togglePieView('current')}
+                onClick={() => togglePieView("current")}
               >
                 {getDisplayTimeframe(selectedTimeframe)}
               </button>
               <button
                 className={`px-4 py-2 ${
-                  pieView === 'comparison'
-                    ? 'border-b-2 border-blue-500 text-sm text-blue-600'
-                    : 'text-gray-500 text-sm'
+                  pieView === "comparison"
+                    ? "border-b-2 border-blue-500 text-sm text-blue-600"
+                    : "text-gray-500 text-sm"
                 }`}
-                onClick={() => togglePieView('comparison')}
+                onClick={() => togglePieView("comparison")}
               >
-                {getDisplayTimeframe(selectedTimeframe)} {comparisonType === 'Last year' ? 'STLY' : 'Budget'}
+                {getDisplayTimeframe(selectedTimeframe)}{" "}
+                {comparisonType === "Last year" ? "STLY" : "Budget"}
               </button>
             </div>
           )}
         </CardHeader>
         <CardContent className="flex-grow pb-2">
-          <div style={{ height: chartType === 'pie' ? 250 : 300 }}>
-            {chartType === 'pie' ? (
+          <div style={{ height: chartType === "pie" ? 250 : 300 }}>
+            {chartType === "pie" ? (
               <ResponsivePie
-                data={pieView === 'current' ? data : comparisonData}
+                data={pieView === "current" ? data : comparisonData}
                 margin={{ top: 50, right: 80, bottom: 20, left: 80 }}
                 innerRadius={0.5}
                 padAngle={0.7}
@@ -411,14 +485,23 @@ export function PaceDashboard() {
                 activeOuterRadiusOffset={8}
                 colors={COLORS}
                 borderWidth={1}
-                borderColor={{ from: 'color', modifiers: [['darker', 0.2]] }}
+                borderColor={{ from: "color", modifiers: [["darker", 0.2]] }}
                 arcLinkLabelsSkipAngle={10}
                 arcLinkLabelsTextColor="#666666"
                 arcLinkLabelsThickness={2}
-                arcLinkLabelsColor={{ from: 'color' }}
+                arcLinkLabelsColor={{ from: "color" }}
                 arcLabelsSkipAngle={10}
-                arcLabelsTextColor={{ from: 'color', modifiers: [['darker', 2]] }}
-                arcLabel={d => `${Math.round((d.value / data.reduce((sum, item) => sum + item.value, 0)) * 100)}%`}
+                arcLabelsTextColor={{
+                  from: "color",
+                  modifiers: [["darker", 2]],
+                }}
+                arcLabel={(d) =>
+                  `${Math.round(
+                    (d.value /
+                      data.reduce((sum, item) => sum + item.value, 0)) *
+                      100
+                  )}%`
+                }
                 theme={modernTheme}
               />
             ) : (
@@ -427,34 +510,41 @@ export function PaceDashboard() {
                   return {
                     id: item.id,
                     value: item.value,
-                    comparisonValue: comparisonType !== 'No comparison' ? comparisonData[index].value : 0
+                    comparisonValue:
+                      comparisonType !== "No comparison"
+                        ? comparisonData[index].value
+                        : 0,
                   };
                 })}
-                keys={comparisonType !== 'No comparison' ? ['value', 'comparisonValue'] : ['value']}
+                keys={
+                  comparisonType !== "No comparison"
+                    ? ["value", "comparisonValue"]
+                    : ["value"]
+                }
                 indexBy="id"
-                margin={{ 
+                margin={{
                   top: 50,
-                  right: 20, 
-                  bottom: comparisonType !== 'No comparison' ? 80 : 40,
-                  left: 50
+                  right: 20,
+                  bottom: comparisonType !== "No comparison" ? 80 : 40,
+                  left: 50,
                 }}
                 padding={0.2}
-                colors={({ id }) => COLORS[id === 'value' ? 0 : 1]}
-                borderColor={{ from: 'color', modifiers: [['darker', 1.6]] }}
+                colors={({ id }) => COLORS[id === "value" ? 0 : 1]}
+                borderColor={{ from: "color", modifiers: [["darker", 1.6]] }}
                 axisBottom={{
                   tickSize: 5,
                   tickPadding: 10,
                   tickRotation: 0,
                   legend: undefined,
-                  legendPosition: 'middle',
-                  legendOffset: 32
+                  legendPosition: "middle",
+                  legendOffset: 32,
                 }}
                 axisLeft={{
                   tickSize: 5,
                   tickPadding: 10,
                   tickRotation: 0,
-                  legend: '',
-                  legendPosition: 'middle',
+                  legend: "",
+                  legendPosition: "middle",
                   legendOffset: -50,
                   format: (value) => `€${value / 1000}K`,
                   tickValues: getYAxisTickValues(data),
@@ -471,56 +561,78 @@ export function PaceDashboard() {
                           fontSize="11px"
                           fill="#7d8694"
                         >
-                          {tick.value === 0 ? '€0' : `€${tick.value / 1000}K`}
+                          {tick.value === 0 ? "€0" : `€${tick.value / 1000}K`}
                         </text>
                       </g>
                     );
-                  }
+                  },
                 }}
                 gridYValues={getYAxisTickValues(data)}
                 labelSkipWidth={12}
                 labelSkipHeight={12}
-                enableLabel={comparisonType === 'No comparison'}
-                label={d => `€${(d.value || 0).toLocaleString()}`}
-                labelTextColor={{ from: 'color', modifiers: [['darker', 1.6]] }}
+                enableLabel={comparisonType === "No comparison"}
+                label={(d) => `€${(d.value || 0).toLocaleString()}`}
+                labelTextColor={{ from: "color", modifiers: [["darker", 1.6]] }}
                 animate={true}
                 theme={modernTheme}
-                groupMode={comparisonType !== 'No comparison' ? "grouped" : "stacked"}
-                legends={comparisonType !== 'No comparison' ? [
-                  {
-                    dataFrom: 'keys',
-                    anchor: 'bottom',
-                    direction: 'row',
-                    justify: false,
-                    translateX: 0,
-                    translateY: 80,
-                    itemsSpacing: 20,
-                    itemWidth: 80,
-                    itemHeight: 20,
-                    itemDirection: 'left-to-right',
-                    itemOpacity: 1,
-                    symbolSize: 12,
-                    symbolShape: 'circle',
-                    effects: [],
-                    data: [
-                      { id: 'value', label: getDisplayTimeframe(selectedTimeframe), color: COLORS[0] },
-                      { id: 'comparisonValue', label: `${getDisplayTimeframe(selectedTimeframe)} ${comparisonType === 'Last year' ? 'STLY' : 'Budget'}`, color: COLORS[1] }
-                    ]
-                  }
-                ] : []}
+                groupMode={
+                  comparisonType !== "No comparison" ? "grouped" : "stacked"
+                }
+                legends={
+                  comparisonType !== "No comparison"
+                    ? [
+                        {
+                          dataFrom: "keys",
+                          anchor: "bottom",
+                          direction: "row",
+                          justify: false,
+                          translateX: 0,
+                          translateY: 80,
+                          itemsSpacing: 20,
+                          itemWidth: 80,
+                          itemHeight: 20,
+                          itemDirection: "left-to-right",
+                          itemOpacity: 1,
+                          symbolSize: 12,
+                          symbolShape: "circle",
+                          effects: [],
+                          data: [
+                            {
+                              id: "value",
+                              label: getDisplayTimeframe(selectedTimeframe),
+                              color: COLORS[0],
+                            },
+                            {
+                              id: "comparisonValue",
+                              label: `${getDisplayTimeframe(
+                                selectedTimeframe
+                              )} ${
+                                comparisonType === "Last year"
+                                  ? "STLY"
+                                  : "Budget"
+                              }`,
+                              color: COLORS[1],
+                            },
+                          ],
+                        },
+                      ]
+                    : []
+                }
                 tooltip={({ id, value, color }) => (
                   <div
                     style={{
                       padding: 12,
-                      background: '#ffffff',
-                      color: '#333333',
-                      border: '1px solid #ccc',
-                      borderRadius: '4px',
+                      background: "#ffffff",
+                      color: "#333333",
+                      border: "1px solid #ccc",
+                      borderRadius: "4px",
                     }}
                   >
                     <strong>{id}</strong>
                     <br />
-                    <span style={{ color }}>€{(value || 0).toLocaleString()}</span>
+                    <span style={{ color }}>
+                      €{(value || 0).toLocaleString()}
+                    </span>
                   </div>
                 )}
               />
@@ -539,8 +651,8 @@ export function PaceDashboard() {
           </div>
         </div> */}
       </Card>
-    )
-  }
+    );
+  };
 
   // Add useEffect to fetch pacing data from the API
   useEffect(() => {
@@ -550,7 +662,9 @@ export function PaceDashboard() {
       try {
         // Determine viewType based on selectedTimeframe state
         const viewType = selectedTimeframe === "Month" ? "Month" : "Year";
-        const response = await fetch(`/api/pace?viewType=${viewType}`);
+        const response = await fetch(
+          `/api/pace?viewType=${viewType}&property=${selectedProperty}`
+        );
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
@@ -558,7 +672,9 @@ export function PaceDashboard() {
         setPacingData(data);
       } catch (error) {
         console.error("Failed to fetch pacing data:", error);
-        setErrorPacing(error instanceof Error ? error.message : 'An unknown error occurred');
+        setErrorPacing(
+          error instanceof Error ? error.message : "An unknown error occurred"
+        );
         setPacingData([]); // Clear data on error
       } finally {
         setIsLoadingPacing(false);
@@ -566,15 +682,25 @@ export function PaceDashboard() {
     };
 
     fetchPacingData();
-  }, [selectedTimeframe]); // Re-fetch when the view type changes
+  }, [selectedTimeframe, selectedProperty]); // Re-fetch when the view type or property changes
 
   // Add inside OverviewDashboard component, after other render functions
-  const renderAreaChart = (data: ChartData[], title: string, dataKey: string, comparisonDataKey: string, color: string, comparisonColor: string, showSelector: boolean) => (
+  const renderAreaChart = (
+    data: ChartData[],
+    title: string,
+    dataKey: string,
+    comparisonDataKey: string,
+    color: string,
+    comparisonColor: string,
+    showSelector: boolean
+  ) => (
     <Card className="bg-white shadow-lg rounded-lg overflow-hidden">
       <CardHeader className="flex flex-col items-start">
         <div className="flex w-full justify-between items-center">
           <div>
-            <CardTitle className="text-lg font-semibold text-gray-800">{title}</CardTitle>
+            <CardTitle className="text-lg font-semibold text-gray-800">
+              {title}
+            </CardTitle>
           </div>
         </div>
       </CardHeader>
@@ -583,7 +709,12 @@ export function PaceDashboard() {
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart
               data={data}
-              margin={{ top: 20, right: 30, left: 0, bottom: comparisonType !== 'No comparison' ? 40 : 20 }}
+              margin={{
+                top: 20,
+                right: 30,
+                left: 0,
+                bottom: comparisonType !== "No comparison" ? 40 : 20,
+              }}
             >
               <CartesianGrid horizontal={true} vertical={false} />
               <XAxis
@@ -593,27 +724,27 @@ export function PaceDashboard() {
                 tick={{ dy: 15, fontSize: 11, fill: "#999", fontWeight: 500 }}
               />
               <YAxis
-                domain={[0, 'dataMax']}
+                domain={[0, "dataMax"]}
                 axisLine={false}
                 tickLine={false}
                 tick={{ dx: -15, fontSize: 11, fill: "#999", fontWeight: 500 }}
-                tickFormatter={(value) => 
-                  dataKey.includes('revenue') || dataKey.includes('Revenue') 
+                tickFormatter={(value) =>
+                  dataKey.includes("revenue") || dataKey.includes("Revenue")
                     ? `€${value.toLocaleString()}`
                     : value.toString()
                 }
               />
-              <Tooltip 
+              <Tooltip
                 formatter={(value: number, name: string) => {
-                  const isRevenue = name.toLowerCase().includes('revenue');
+                  const isRevenue = name.toLowerCase().includes("revenue");
                   return [
                     isRevenue ? `€${value.toLocaleString()}` : value.toString(),
-                    name.includes('comparison') ? `Comparison ${name}` : name
+                    name.includes("comparison") ? `Comparison ${name}` : name,
                   ];
                 }}
               />
-              {comparisonType === 'No comparison' ? (
-                <Area 
+              {comparisonType === "No comparison" ? (
+                <Area
                   type="monotone"
                   dataKey={dataKey}
                   stroke={color}
@@ -625,7 +756,7 @@ export function PaceDashboard() {
                 />
               ) : (
                 <>
-                  <Area 
+                  <Area
                     type="monotone"
                     dataKey={dataKey}
                     stroke={color}
@@ -634,7 +765,7 @@ export function PaceDashboard() {
                     dot={false}
                     activeDot={{ r: 8 }}
                   />
-                  <Area 
+                  <Area
                     type="monotone"
                     dataKey={comparisonDataKey}
                     stroke={comparisonColor}
@@ -648,30 +779,32 @@ export function PaceDashboard() {
             </AreaChart>
           </ResponsiveContainer>
         </div>
-        {comparisonType !== 'No comparison' && (
+        {comparisonType !== "No comparison" && (
           <div className="flex justify-center mt-4">
             <div className="flex items-center space-x-8">
               <div className="flex items-center">
-                <div className="w-3 h-3 rounded-full mr-2" style={{ backgroundColor: color }}></div>
+                <div
+                  className="w-3 h-3 rounded-full mr-2"
+                  style={{ backgroundColor: color }}
+                ></div>
                 <span className="text-sm text-gray-500">
-                  {selectedTimeframe === "Month" 
-                    ? `March - 2024` 
-                    : '2024'}
+                  {selectedTimeframe === "Month" ? `March - 2024` : "2024"}
                 </span>
               </div>
               <div className="flex items-center">
-                <div className="w-3 h-3 rounded-full mr-2" style={{ backgroundColor: comparisonColor }}></div>
+                <div
+                  className="w-3 h-3 rounded-full mr-2"
+                  style={{ backgroundColor: comparisonColor }}
+                ></div>
                 <span className="text-sm text-gray-500">
-                  {selectedTimeframe === "Month"
-                    ? `March - 2023`
-                    : '2023'}
+                  {selectedTimeframe === "Month" ? `March - 2023` : "2023"}
                 </span>
               </div>
             </div>
           </div>
         )}
       </CardContent>
-        {/* <div className="px-6 py-4">
+      {/* <div className="px-6 py-4">
           <hr className="border-t border-gray-200 mb-4" />
           <div className="flex justify-end">
             <button
@@ -719,10 +852,11 @@ export function PaceDashboard() {
       {/* Header Section - Apply responsive classes */}
       {/* Use xl:fixed for fixed positioning only on extra large screens. */}
       <div className="xl:fixed top-0 left-[256px] right-0 z-30 flex flex-col xl:flex-row xl:items-center xl:justify-between bg-white py-4 xl:py-6 xl:px-12 border-b border-gray-300 shadow-sm">
-        
         {/* Title Block - Hide on small/medium/large screens */}
         {/* Changed lg:block to xl:block */}
-        <div className="hidden xl:block px-4 xl:px-0 mb-2 xl:mb-0"> {/* Adjusted padding/margin */}
+        <div className="hidden xl:block px-4 xl:px-0 mb-2 xl:mb-0">
+          {" "}
+          {/* Adjusted padding/margin */}
           <h2 className="text-xl font-bold text-gray-800 mb-1">Pace</h2>
           {/* Optional: Add subtitle like in BookingChannels if needed */}
           {/* <span className='text-gray-400 font-ligth text-sm'>{`${selectedTimeframe === "Month" ? 'Month View' : 'Year View'}`}</span> */}
@@ -732,7 +866,6 @@ export function PaceDashboard() {
         {/* Changed lg: prefixes to xl: */}
         {/* Added overflow-x-auto, scrollbar styling, responsive padding/width */}
         <div className="flex flex-nowrap items-end gap-x-4 xl:gap-x-8 gap-y-3 overflow-x-auto pb-2 xl:pb-0 w-full xl:w-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100 px-4 md:px-6 xl:px-0">
-          
           {/* View Type Filter - Add flex-shrink-0 */}
           <div className="flex flex-col flex-shrink-0">
             <span className="text-xs text-gray-500 mb-2">View type</span>
@@ -742,14 +875,17 @@ export function PaceDashboard() {
                   variant="ghost"
                   className="bg-[#f2f8ff] hover:bg-[#f2f8ff] text-[#342630] rounded-full px-4"
                 >
-                  {selectedTimeframe === "Month" ? 'Month View' : 'Year View'} <TriangleDown className="ml-2" /> {/* Use TriangleDown */}
+                  {selectedTimeframe === "Month" ? "Month View" : "Year View"}{" "}
+                  <TriangleDown className="ml-2" /> {/* Use TriangleDown */}
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent>
-                <DropdownMenuItem onSelect={() => setSelectedTimeframe('Month')}>
+                <DropdownMenuItem
+                  onSelect={() => setSelectedTimeframe("Month")}
+                >
                   Month View
                 </DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => setSelectedTimeframe('Year')}>
+                <DropdownMenuItem onSelect={() => setSelectedTimeframe("Year")}>
                   Year View
                 </DropdownMenuItem>
               </DropdownMenuContent>
@@ -759,26 +895,30 @@ export function PaceDashboard() {
           {/* Property Filter - Add flex-shrink-0 */}
           <div className="flex flex-col flex-shrink-0">
             <span className="text-xs text-gray-500 mb-2">Property</span>
-            <HotelSelector 
-              selectedHotels={selectedHotels}
-              setSelectedHotels={setSelectedHotels}
+            <HotelSelector
+              mode="property"
+              selectedProperty={selectedProperty}
+              setSelectedProperty={setSelectedProperty}
             />
           </div>
-          
+
           {/* Compare With Filter - Add flex-shrink-0 */}
           <div className="flex flex-col flex-shrink-0">
             <span className="text-xs text-gray-500 mb-2">Compare with</span>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button 
-                  variant="ghost" 
+                <Button
+                  variant="ghost"
                   className="bg-[#f2f8ff] hover:bg-[#f2f8ff] text-[#342630] rounded-full px-4"
                 >
-                  {comparisonType} <TriangleDown className="ml-2" /> {/* Use TriangleDown */}
+                  {comparisonType} <TriangleDown className="ml-2" />{" "}
+                  {/* Use TriangleDown */}
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent>
-                <DropdownMenuItem onSelect={() => setComparisonType('Last year')}>
+                <DropdownMenuItem
+                  onSelect={() => setComparisonType("Last year")}
+                >
                   Last year
                 </DropdownMenuItem>
                 {/* Add other comparison options if needed */}
@@ -799,17 +939,25 @@ export function PaceDashboard() {
         {/* Overview Title - Show ONLY on screens smaller than xl */}
         {/* Added this block */}
         <div className="block xl:hidden mb-6 md:mb-8">
-          <h2 className="text-xl md:text-2xl font-bold text-gray-800 mb-1">Pace</h2>
-           {/* Optional: Add subtitle */}
-          <span className='text-gray-500 font-light text-sm'>{`${selectedTimeframe === "Month" ? 'Month View' : 'Year View'}`}</span>
+          <h2 className="text-xl md:text-2xl font-bold text-gray-800 mb-1">
+            Pace
+          </h2>
+          {/* Optional: Add subtitle */}
+          <span className="text-gray-500 font-light text-sm">{`${
+            selectedTimeframe === "Month" ? "Month View" : "Year View"
+          }`}</span>
         </div>
 
         {/* Pacing Chart Section - Wrap for horizontal scrolling */}
-        <div className="mb-6 md:mb-8 overflow-x-auto"> {/* Add overflow-x-auto here */}
+        <div className="mb-6 md:mb-8 overflow-x-auto">
+          {" "}
+          {/* Add overflow-x-auto here */}
           {/* Inner div to enforce minimum width */}
-          <div className="min-w-[700px]"> {/* Adjust min-width as needed */}
+          <div className="min-w-[700px]">
+            {" "}
+            {/* Adjust min-width as needed */}
             <PacingChart
-              viewType={selectedTimeframe as "Month" | "Year"} 
+              viewType={selectedTimeframe as "Month" | "Year"}
               data={pacingData}
               isLoading={isLoadingPacing}
               error={errorPacing}
@@ -819,7 +967,6 @@ export function PaceDashboard() {
 
         {/* Removed the grid for numerical cards as they are handled by the CustomDialog now? 
             If you still have a grid here or other content, apply similar responsive patterns (e.g., xl:grid-cols-4, gap-6 md:gap-8, mb-6 md:mb-8) */}
-      
       </div>
 
       {/* Dialogs remain unchanged */}
@@ -840,23 +987,36 @@ export function PaceDashboard() {
 
       {selectedDetailedChart && (
         <DetailedDialog
-          title={selectedDetailedChart.replace(/([A-Z])/g, ' $1').trim().replace(/^\w/, c => c.toUpperCase())}
-          subtitle={`${getDisplayTimeframe(selectedTimeframe)} vs ${getDisplayTimeframe(selectedTimeframe)} ${comparisonType === 'Last year' ? 'STLY' : 'Budget'}`}
+          title={selectedDetailedChart
+            .replace(/([A-Z])/g, " $1")
+            .trim()
+            .replace(/^\w/, (c) => c.toUpperCase())}
+          subtitle={`${getDisplayTimeframe(
+            selectedTimeframe
+          )} vs ${getDisplayTimeframe(selectedTimeframe)} ${
+            comparisonType === "Last year" ? "STLY" : "Budget"
+          }`}
           closeDialog={() => setSelectedDetailedChart(null)}
           selectedData={
-            selectedDetailedChart === 'marketSegments' ? marketSegments :
-            selectedDetailedChart === 'roomTypes' ? roomTypes :
-            selectedDetailedChart === 'bookingChannels' ? bookingChannels :
-            geoSources
+            selectedDetailedChart === "marketSegments"
+              ? marketSegments
+              : selectedDetailedChart === "roomTypes"
+              ? roomTypes
+              : selectedDetailedChart === "bookingChannels"
+              ? bookingChannels
+              : geoSources
           }
           comparisonData={generateComparisonData(
-            selectedDetailedChart === 'marketSegments' ? marketSegments :
-            selectedDetailedChart === 'roomTypes' ? roomTypes :
-            selectedDetailedChart === 'bookingChannels' ? bookingChannels :
-            geoSources
+            selectedDetailedChart === "marketSegments"
+              ? marketSegments
+              : selectedDetailedChart === "roomTypes"
+              ? roomTypes
+              : selectedDetailedChart === "bookingChannels"
+              ? bookingChannels
+              : geoSources
           )}
         />
       )}
     </div>
-  )
+  );
 }
