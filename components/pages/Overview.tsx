@@ -32,7 +32,7 @@ import { HotelSelector } from "../new/HotelSelector";
 import { HorizontalBarChartMultipleDatasets } from "../new/HorizontalBarChartMultipleDatasets";
 import { addDays } from "date-fns";
 import { OccupancyAnalysisChart } from "../new/OccupancyAnalysisChart";
-import { KpiResponse } from "@/app/api/overview/general/route";
+type KpiResponse = any;
 import { KpiWithAlignedChart } from "../new/KpiWithAlignedChart";
 import { usePersistentOverviewFilters } from "@/hooks/usePersistentOverviewFilters"; // Import the custom hook
 import { getCodeFromFullName } from "@/lib/countryUtils"; // <-- Import the utility function
@@ -88,11 +88,11 @@ export function Overview() {
     setSelectedComparison,
     date,
     setDate, // Use the setter from the hook
+    selectedProperty,
+    setSelectedProperty,
   } = usePersistentOverviewFilters();
 
-  // Basic state for hotel selection
-  const [selectedHotels, setSelectedHotels] = useState<string[]>(["Hotel 1"]);
-  const allHotels = ["Hotel 1", "Hotel 2", "Hotel 3"]; // Keep this simple example or fetch dynamically later
+  // Remove dummy hotels; using property selector instead
 
   // Add state for API data
   const [kpiData, setKpiData] = useState<KpiResponse | null>(null);
@@ -110,6 +110,7 @@ export function Overview() {
     periodType: selectedTimeFrame,
     viewType: selectedViewType,
     comparison: selectedComparison,
+    property: selectedProperty,
   });
 
   useEffect(() => {
@@ -118,8 +119,15 @@ export function Overview() {
       periodType: selectedTimeFrame, // Uses selectedTimeFrame from the hook
       viewType: selectedViewType, // Uses selectedViewType from the hook
       comparison: selectedComparison, // Uses selectedComparison from the hook
+      property: selectedProperty,
     });
-  }, [date, selectedTimeFrame, selectedViewType, selectedComparison]); // Dependencies are now from the hook
+  }, [
+    date,
+    selectedTimeFrame,
+    selectedViewType,
+    selectedComparison,
+    selectedProperty,
+  ]); // Dependencies are now from the hook
 
   // Modify the fetchKpiData function to mark primary data as loaded
   const fetchKpiData = async () => {
@@ -137,6 +145,7 @@ export function Overview() {
         periodType: selectedTimeFrame,
         viewType: selectedViewType,
         comparison: selectedComparison,
+        property: selectedProperty,
       });
 
       // Fetch data from the API
@@ -167,19 +176,15 @@ export function Overview() {
   useEffect(() => {
     fetchKpiData();
     // Only fetch primary data here
-  }, [date, selectedTimeFrame, selectedViewType, selectedComparison]);
+  }, [
+    date,
+    selectedTimeFrame,
+    selectedViewType,
+    selectedComparison,
+    selectedProperty,
+  ]);
 
-  const toggleHotel = (hotel: string) => {
-    setSelectedHotels((prev) =>
-      prev.includes(hotel) ? prev.filter((h) => h !== hotel) : [...prev, hotel]
-    );
-  };
-
-  const toggleAllHotels = () => {
-    setSelectedHotels((prev) =>
-      prev.length === allHotels.length ? [] : [...allHotels]
-    );
-  };
+  // remove legacy toggleHotel/toggleAllHotels
 
   const toggleRegion = (regionHotels: string[], e: React.MouseEvent) => {
     // Note: This relies on hotelsByRegion which was removed.
@@ -230,6 +235,7 @@ export function Overview() {
         comparison: selectedComparison,
         field: "guest_country",
         limit: "50",
+        property: selectedProperty,
       });
 
       const response = await fetch(`/api/overview/distribution?${params}`);
@@ -269,6 +275,7 @@ export function Overview() {
     selectedViewType,
     selectedComparison,
     selectedMapMetric,
+    selectedProperty,
   ]);
 
   return (
@@ -456,8 +463,9 @@ export function Overview() {
           <div className="flex flex-col flex-shrink-0">
             <span className="text-xs text-gray-500 mb-2">Property</span>
             <HotelSelector
-              selectedHotels={selectedHotels}
-              setSelectedHotels={setSelectedHotels}
+              mode="property"
+              selectedProperty={selectedProperty}
+              setSelectedProperty={setSelectedProperty}
             />
           </div>
 

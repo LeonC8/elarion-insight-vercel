@@ -171,7 +171,7 @@ function generateCode(name: string, field: string): string {
 export async function GET(request: Request) {
   // Parse query parameters
   const { searchParams } = new URL(request.url);
-
+  const property = searchParams.get("property");
   // --- CHECK CACHE ---
   const cacheKey = `distribution:${generateCacheKey(searchParams)}`;
   const cachedEntry = await getCacheEntry(cacheKey);
@@ -267,16 +267,15 @@ export async function GET(request: Request) {
     let producerMap = new Map<number, string>();
 
     if (isProducerRoute) {
+      const propertyFilter = property ? `AND property = '${property}'` : "";
       // Query to fetch producer names
       const producerQuery = `
         SELECT 
           producer,
           producer_name
-        FROM SAND01CN.producers
-        WHERE 
-          date(scd_valid_from) <= DATE('${businessDateParam}') 
-          AND DATE('${businessDateParam}') < date(scd_valid_to)
-          AND producer != -1
+                  FROM JADRANKA.producers
+          WHERE 
+            producer != -1
       `;
 
       const producerResultSet = await client.query({
@@ -291,6 +290,8 @@ export async function GET(request: Request) {
         producerMap.set(parseInt(item.producer), item.producer_name);
       });
     }
+
+    const propertyFilter = property ? `AND property = '${property}'` : "";
 
     // Build the query for current period by the specified field
     const currentQuery = `
@@ -307,6 +308,7 @@ export async function GET(request: Request) {
         AND date(scd_valid_from) <= DATE('${businessDateParam}') 
         AND DATE('${businessDateParam}') < date(scd_valid_to)
         ${fieldFilters}
+        ${propertyFilter}
       GROUP BY ${field}
       ORDER BY total_revenue DESC
     `;
@@ -326,6 +328,7 @@ export async function GET(request: Request) {
         AND date(scd_valid_from) <= DATE('${prevBusinessDateParam}') 
         AND DATE('${prevBusinessDateParam}') < date(scd_valid_to)
         ${fieldFilters}
+        ${propertyFilter}
       GROUP BY ${field}
       ORDER BY total_revenue DESC
     `;
@@ -350,12 +353,14 @@ export async function GET(request: Request) {
             toDate(occupancy_date) BETWEEN '${startDate}' AND '${endDate}'
             AND date(scd_valid_from) <= DATE('${businessDateParam}') 
             AND DATE('${businessDateParam}') < date(scd_valid_to)
+            ${propertyFilter}
           )
           OR
           (
             toDate(occupancy_date) BETWEEN '${prevStartDate}' AND '${prevEndDate}'
             AND date(scd_valid_from) <= DATE('${prevBusinessDateParam}') 
             AND DATE('${prevBusinessDateParam}') < date(scd_valid_to)
+            ${propertyFilter}
           )
         )
         ${fieldFilters}
@@ -369,6 +374,7 @@ export async function GET(request: Request) {
             toDate(occupancy_date) BETWEEN '${startDate}' AND '${endDate}'
             AND date(scd_valid_from) <= DATE('${businessDateParam}') 
             AND DATE('${businessDateParam}') < date(scd_valid_to)
+            ${propertyFilter}
             ${fieldFilters}
           GROUP BY ${field}
           ORDER BY SUM(totalRevenue) DESC

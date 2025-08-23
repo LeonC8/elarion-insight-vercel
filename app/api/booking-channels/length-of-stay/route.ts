@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { ClickHouseClient, createClient } from "@clickhouse/client"
-import { getClickhouseConnection } from '@/lib/clickhouse';;
+import { ClickHouseClient, createClient } from "@clickhouse/client";
+import { getClickhouseConnection } from "@/lib/clickhouse";
 import {
   calculateDateRanges,
   calculateComparisonDateRanges,
@@ -62,7 +62,7 @@ export async function GET(request: Request) {
         booking_channel,
         bucket AS stay_range,
         SUM(num) AS count
-      FROM SAND01CN.lenght_of_stay_distribution
+      FROM JADRANKA.lenght_of_stay_distribution
       WHERE 
         toDate(occupancy_date) BETWEEN '${startDate}' AND '${endDate}'
         AND date(scd_valid_from) <= DATE('${businessDateParam}') 
@@ -88,7 +88,7 @@ export async function GET(request: Request) {
         booking_channel,
         bucket AS stay_range,
         SUM(num) AS count
-      FROM SAND01CN.lenght_of_stay_distribution
+      FROM JADRANKA.lenght_of_stay_distribution
       WHERE 
         toDate(occupancy_date) BETWEEN '${prevStartDate}' AND '${prevEndDate}'
         AND date(scd_valid_from) <= DATE('${prevBusinessDateParam}') 

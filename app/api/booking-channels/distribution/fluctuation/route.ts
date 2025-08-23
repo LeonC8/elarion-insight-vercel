@@ -350,11 +350,9 @@ export async function GET(request: Request) {
         SELECT 
           producer,
           producer_name
-        FROM SAND01CN.producers
+        FROM JADRANKA.producers
         WHERE 
-          date(scd_valid_from) <= DATE('${businessDateParam}') 
-          AND DATE('${businessDateParam}') < date(scd_valid_to)
-          AND producer != -1
+          producer != -1
       `;
 
       const producerResultSet = await client.query({
@@ -991,7 +989,7 @@ export async function GET(request: Request) {
         booking_channel,
         SUM(toFloat64(date_diff)) as total_date_diff,
         SUM(toFloat64(booking_lead_num)) as total_buckets
-      FROM SAND01CN.booking_lead_time
+      FROM JADRANKA.booking_lead_time
       WHERE 
         toDate(occupancy_date) BETWEEN '${startDate}' AND '${endDate}'
         AND date(scd_valid_from) <= DATE('${businessDateParam}') 
@@ -1041,7 +1039,7 @@ export async function GET(request: Request) {
         booking_channel,
         SUM(toFloat64(date_diff)) as total_date_diff,
         SUM(toFloat64(booking_lead_num)) as total_buckets
-      FROM SAND01CN.booking_lead_time
+      FROM JADRANKA.booking_lead_time
       WHERE 
         toDate(occupancy_date) BETWEEN '${prevStartDate}' AND '${prevEndDate}'
         AND date(scd_valid_from) <= DATE('${prevBusinessDateParam}') 
@@ -1093,7 +1091,7 @@ export async function GET(request: Request) {
         booking_channel,
         SUM(toFloat64(date_diff)) as total_date_diff,
         SUM(toFloat64(booking_lead_num)) as total_buckets
-      FROM SAND01CN.booking_lead_time
+      FROM JADRANKA.booking_lead_time
       WHERE 
         toDate(occupancy_date) BETWEEN '${startDate}' AND '${endDate}'
         AND date(scd_valid_from) <= DATE('${businessDateParam}') 
@@ -1122,7 +1120,7 @@ export async function GET(request: Request) {
         booking_channel,
         SUM(toFloat64(date_diff)) as total_date_diff,
         SUM(toFloat64(booking_lead_num)) as total_buckets
-      FROM SAND01CN.booking_lead_time
+      FROM JADRANKA.booking_lead_time
       WHERE 
         toDate(occupancy_date) BETWEEN '${prevStartDate}' AND '${prevEndDate}'
         AND date(scd_valid_from) <= DATE('${prevBusinessDateParam}') 
@@ -1263,7 +1261,7 @@ export async function GET(request: Request) {
         booking_channel,
         SUM(toFloat64(date_diff)) as total_date_diff,
         SUM(toFloat64(num)) as total_num
-      FROM SAND01CN.lenght_of_stay_distribution
+      FROM JADRANKA.lenght_of_stay_distribution
       WHERE 
         toDate(occupancy_date) BETWEEN '${startDate}' AND '${endDate}'
         AND date(scd_valid_from) <= DATE('${businessDateParam}') 
@@ -1312,7 +1310,7 @@ export async function GET(request: Request) {
         booking_channel,
         SUM(toFloat64(date_diff)) as total_date_diff,
         SUM(toFloat64(num)) as total_num
-      FROM SAND01CN.lenght_of_stay_distribution
+      FROM JADRANKA.lenght_of_stay_distribution
       WHERE 
         toDate(occupancy_date) BETWEEN '${prevStartDate}' AND '${prevEndDate}'
         AND date(scd_valid_from) <= DATE('${prevBusinessDateParam}') 
@@ -1363,7 +1361,7 @@ export async function GET(request: Request) {
         booking_channel,
         SUM(toFloat64(date_diff)) as total_date_diff,
         SUM(toFloat64(num)) as total_num
-      FROM SAND01CN.lenght_of_stay_distribution
+      FROM JADRANKA.lenght_of_stay_distribution
       WHERE 
         toDate(occupancy_date) BETWEEN '${startDate}' AND '${endDate}'
         AND date(scd_valid_from) <= DATE('${businessDateParam}') 
@@ -1391,7 +1389,7 @@ export async function GET(request: Request) {
         booking_channel,
         SUM(toFloat64(date_diff)) as total_date_diff,
         SUM(toFloat64(num)) as total_num
-      FROM SAND01CN.lenght_of_stay_distribution
+      FROM JADRANKA.lenght_of_stay_distribution
       WHERE 
         toDate(occupancy_date) BETWEEN '${prevStartDate}' AND '${prevEndDate}'
         AND date(scd_valid_from) <= DATE('${prevBusinessDateParam}') 

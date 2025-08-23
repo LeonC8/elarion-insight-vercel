@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { ClickHouseClient, createClient } from "@clickhouse/client"
-import { getClickhouseConnection } from '@/lib/clickhouse';;
+import { ClickHouseClient, createClient } from "@clickhouse/client";
+import { getClickhouseConnection } from "@/lib/clickhouse";
 import {
   calculateDateRanges,
   calculateComparisonDateRanges,
@@ -27,6 +27,7 @@ export async function GET(request: Request) {
   const periodType = searchParams.get("periodType") || "Month"; // Month, Year, Day
   const viewType = searchParams.get("viewType") || "Actual"; // Actual, OTB, Projected
   const comparisonType = searchParams.get("comparison") || "Last year - OTB";
+  const property = searchParams.get("property");
 
   // Calculate date ranges
   const { startDate, endDate } = calculateDateRanges(
@@ -63,15 +64,18 @@ export async function GET(request: Request) {
     console.log("  Business Date:", prevBusinessDateParam);
 
     // Build the query for current period
+    const propertyFilter = property ? `AND property = '${property}'` : "";
+
     const currentQuery = `
       SELECT 
         bucket AS stay_range,
         SUM(num) AS count
-      FROM SAND01CN.lenght_of_stay_distribution
+      FROM JADRANKA.lenght_of_stay_distribution
       WHERE 
         toDate(occupancy_date) BETWEEN '${startDate}' AND '${endDate}'
         AND date(scd_valid_from) <= DATE('${businessDateParam}') 
         AND DATE('${businessDateParam}') < date(scd_valid_to)
+        ${propertyFilter}
       GROUP BY bucket
       ORDER BY 
         CASE 
@@ -93,11 +97,12 @@ export async function GET(request: Request) {
       SELECT 
         bucket AS stay_range,
         SUM(num) AS count
-      FROM SAND01CN.lenght_of_stay_distribution
+      FROM JADRANKA.lenght_of_stay_distribution
       WHERE 
         toDate(occupancy_date) BETWEEN '${prevStartDate}' AND '${prevEndDate}'
         AND date(scd_valid_from) <= DATE('${prevBusinessDateParam}') 
         AND DATE('${prevBusinessDateParam}') < date(scd_valid_to)
+        ${propertyFilter}
       GROUP BY bucket
       ORDER BY 
         CASE 

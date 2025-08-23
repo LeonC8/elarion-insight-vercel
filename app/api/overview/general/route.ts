@@ -180,6 +180,7 @@ export async function GET(request: NextRequest) {
 
   // Parse query parameters
   const { searchParams } = new URL(request.url);
+  const property = searchParams.get("property");
 
   const businessDateParam =
     searchParams.get("businessDate") || new Date().toISOString().split("T")[0];
@@ -282,17 +283,18 @@ export async function GET(request: NextRequest) {
     const clickhouseConfig = getClickhouseConnection();
     client = createClient(clickhouseConfig);
 
+    const propertyFilter = property ? `AND property = '${property}'` : "";
     // Combined query for aggregate data (combines 4 queries into 1)
     const aggregateQuery = `
     SELECT
       'current' AS period,
       (
         SELECT SUM(physicalRooms)
-        FROM SAND01CN.room_type_details
+        FROM JADRANKA.room_type_details
         WHERE 
-          toDate(occupancy_date) BETWEEN '${startDate}' AND '${endDate}'
-          AND date(scd_valid_from) <= DATE('${businessDateParam}') 
+          date(scd_valid_from) <= DATE('${businessDateParam}') 
           AND DATE('${businessDateParam}') < date(scd_valid_to)
+          ${propertyFilter}
       ) AS available_rooms,
       SUM(sold_rooms) AS rooms_sold,
       SUM(roomRevenue) AS room_revenue,
@@ -304,20 +306,18 @@ export async function GET(request: NextRequest) {
       toDate(occupancy_date) BETWEEN '${startDate}' AND '${endDate}'
       AND date(scd_valid_from) <= DATE('${businessDateParam}') 
       AND DATE('${businessDateParam}') < date(scd_valid_to)
-      
+      ${propertyFilter}
     UNION ALL
     
     SELECT
       'previous' AS period,
       (
         SELECT SUM(physicalRooms)
-        FROM SAND01CN.room_type_details
+        FROM JADRANKA.room_type_details
         WHERE 
-          toDate(occupancy_date) BETWEEN '${
-            prevStartDate.toISOString().split("T")[0]
-          }' AND '${prevEndDate.toISOString().split("T")[0]}'
-          AND date(scd_valid_from) <= DATE('${prevBusinessDateParam}') 
+          date(scd_valid_from) <= DATE('${prevBusinessDateParam}') 
           AND DATE('${prevBusinessDateParam}') < date(scd_valid_to)
+          ${propertyFilter}
       ) AS available_rooms,
       SUM(sold_rooms) AS rooms_sold,
       SUM(roomRevenue) AS room_revenue,
@@ -331,6 +331,7 @@ export async function GET(request: NextRequest) {
       }' AND '${prevEndDate.toISOString().split("T")[0]}'
       AND date(scd_valid_from) <= DATE('${prevBusinessDateParam}') 
       AND DATE('${prevBusinessDateParam}') < date(scd_valid_to)
+      ${propertyFilter}
     `;
 
     console.log("Aggregate Query:");
@@ -340,27 +341,21 @@ export async function GET(request: NextRequest) {
     const dailyQuery = `
     WITH current_rooms AS (
       SELECT 
-        toString(toDate(occupancy_date)) AS occupancy_date,
         SUM(physicalRooms) AS available_rooms
-      FROM SAND01CN.room_type_details
+      FROM JADRANKA.room_type_details
       WHERE 
-        toDate(occupancy_date) BETWEEN '${startDate}' AND '${endDate}'
-        AND date(scd_valid_from) <= DATE('${businessDateParam}') 
+        date(scd_valid_from) <= DATE('${businessDateParam}') 
         AND DATE('${businessDateParam}') < date(scd_valid_to)
-      GROUP BY occupancy_date
+        ${propertyFilter}
     ),
     previous_rooms AS (
       SELECT 
-        toString(toDate(occupancy_date)) AS occupancy_date,
         SUM(physicalRooms) AS available_rooms
-      FROM SAND01CN.room_type_details
+      FROM JADRANKA.room_type_details
       WHERE 
-        toDate(occupancy_date) BETWEEN '${
-          prevStartDate.toISOString().split("T")[0]
-        }' AND '${prevEndDate.toISOString().split("T")[0]}'
-        AND date(scd_valid_from) <= DATE('${prevBusinessDateParam}') 
+        date(scd_valid_from) <= DATE('${prevBusinessDateParam}') 
         AND DATE('${prevBusinessDateParam}') < date(scd_valid_to)
-      GROUP BY occupancy_date
+        ${propertyFilter}
     ),
     current_daily AS (
       SELECT 
@@ -376,6 +371,7 @@ export async function GET(request: NextRequest) {
         toDate(occupancy_date) BETWEEN '${startDate}' AND '${endDate}'
         AND date(scd_valid_from) <= DATE('${businessDateParam}') 
         AND DATE('${businessDateParam}') < date(scd_valid_to)
+        ${propertyFilter}
       GROUP BY occupancy_date
     ),
     previous_daily AS (
@@ -394,6 +390,7 @@ export async function GET(request: NextRequest) {
         }' AND '${prevEndDate.toISOString().split("T")[0]}'
         AND date(scd_valid_from) <= DATE('${prevBusinessDateParam}') 
         AND DATE('${prevBusinessDateParam}') < date(scd_valid_to)
+        ${propertyFilter}
       GROUP BY occupancy_date
     )
     
@@ -407,7 +404,7 @@ export async function GET(request: NextRequest) {
       cd.total_revenue,
       cr.available_rooms
     FROM current_daily cd
-    LEFT JOIN current_rooms cr ON cd.occupancy_date = cr.occupancy_date
+    CROSS JOIN current_rooms cr
     
     UNION ALL
     
@@ -421,7 +418,7 @@ export async function GET(request: NextRequest) {
       pd.total_revenue,
       pr.available_rooms
     FROM previous_daily pd
-    LEFT JOIN previous_rooms pr ON pd.occupancy_date = pr.occupancy_date
+    CROSS JOIN previous_rooms pr
     ORDER BY period, occupancy_date
     `;
 
@@ -504,19 +501,42 @@ export async function GET(request: NextRequest) {
       }));
 
     // Calculate derived metrics
-    const roomsAvailable = parseFloat(current.available_rooms || "0") || 0;
+    const totalRoomsCapacity = parseFloat(current.available_rooms || "0") || 0;
     const roomsSold = parseFloat(current.rooms_sold || "0") || 0;
     const roomRevenue = parseFloat(current.room_revenue || "0") || 0;
     const fbRevenue = parseFloat(current.fb_revenue || "0") || 0;
     const otherRevenue = parseFloat(current.other_revenue || "0") || 0;
     const totalRevenue = parseFloat(current.total_revenue || "0") || 0;
 
-    const prevRoomsAvailable = parseFloat(previous.available_rooms || "0") || 0;
+    const prevTotalRoomsCapacity =
+      parseFloat(previous.available_rooms || "0") || 0;
     const prevRoomsSold = parseFloat(previous.rooms_sold || "0") || 0;
     const prevRoomRevenue = parseFloat(previous.room_revenue || "0") || 0;
     const prevFbRevenue = parseFloat(previous.fb_revenue || "0") || 0;
     const prevOtherRevenue = parseFloat(previous.other_revenue || "0") || 0;
     const prevTotalRevenue = parseFloat(previous.total_revenue || "0") || 0;
+
+    // Calculate the number of days in each period for proper occupancy calculation
+    const currentStartDate = new Date(startDate);
+    const currentEndDate = new Date(endDate);
+    const currentDays =
+      Math.ceil(
+        (currentEndDate.getTime() - currentStartDate.getTime()) /
+          (1000 * 60 * 60 * 24)
+      ) + 1;
+
+    const prevStartDateObj = prevStartDate;
+    const prevEndDateObj = prevEndDate;
+    const prevDays =
+      Math.ceil(
+        (prevEndDateObj.getTime() - prevStartDateObj.getTime()) /
+          (1000 * 60 * 60 * 24)
+      ) + 1;
+
+    // Calculate total room nights available (daily capacity × number of days)
+    // Since we get total rooms capacity from room_type_details, we use it as daily capacity
+    const totalRoomNightsAvailable = totalRoomsCapacity * currentDays;
+    const prevTotalRoomNightsAvailable = prevTotalRoomsCapacity * prevDays;
 
     // Calculate ADR (Average Daily Rate)
     const adr = roomsSold > 0 ? roomRevenue / roomsSold : 0;
@@ -524,19 +544,31 @@ export async function GET(request: NextRequest) {
 
     // Calculate Occupancy Rate
     const occupancyRate =
-      roomsAvailable > 0 ? (roomsSold / roomsAvailable) * 100 : 0;
+      totalRoomNightsAvailable > 0
+        ? (roomsSold / totalRoomNightsAvailable) * 100
+        : 0;
     const prevOccupancyRate =
-      prevRoomsAvailable > 0 ? (prevRoomsSold / prevRoomsAvailable) * 100 : 0;
+      prevTotalRoomNightsAvailable > 0
+        ? (prevRoomsSold / prevTotalRoomNightsAvailable) * 100
+        : 0;
 
-    // Calculate RevPAR (Revenue Per Available Room)
-    const revpar = roomsAvailable > 0 ? roomRevenue / roomsAvailable : 0;
+    // Calculate RevPAR (Revenue Per Available Room) - uses total room nights for period
+    const revpar =
+      totalRoomNightsAvailable > 0 ? roomRevenue / totalRoomNightsAvailable : 0;
     const prevRevpar =
-      prevRoomsAvailable > 0 ? prevRoomRevenue / prevRoomsAvailable : 0;
+      prevTotalRoomNightsAvailable > 0
+        ? prevRoomRevenue / prevTotalRoomNightsAvailable
+        : 0;
 
-    // Calculate TRevPAR (Total Revenue Per Available Room)
-    const trevpar = roomsAvailable > 0 ? totalRevenue / roomsAvailable : 0;
+    // Calculate TRevPAR (Total Revenue Per Available Room) - uses total room nights for period
+    const trevpar =
+      totalRoomNightsAvailable > 0
+        ? totalRevenue / totalRoomNightsAvailable
+        : 0;
     const prevTrevpar =
-      prevRoomsAvailable > 0 ? prevTotalRevenue / prevRoomsAvailable : 0;
+      prevTotalRoomNightsAvailable > 0
+        ? prevTotalRevenue / prevTotalRoomNightsAvailable
+        : 0;
 
     // Calculate percentage changes - UPDATED LOGIC
     const calculatePercentageChange = (
@@ -763,7 +795,7 @@ export async function GET(request: NextRequest) {
         percentageChange: calculatePercentageChange(trevpar, prevTrevpar),
         fluctuation: trevparFluctuation,
       },
-      hotelCapacity: roomsAvailable,
+      hotelCapacity: totalRoomsCapacity,
     };
 
     return NextResponse.json(response);

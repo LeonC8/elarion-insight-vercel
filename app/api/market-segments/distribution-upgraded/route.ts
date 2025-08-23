@@ -423,11 +423,9 @@ export async function GET(request: Request) {
         SELECT 
           toString(producer) as producer_id_str, // Select as string for map key consistency
           producer_name
-        FROM SAND01CN.producers
+        FROM JADRANKA.producers
         WHERE 
-          date(scd_valid_from) <= DATE('${businessDateParam}') 
-          AND DATE('${businessDateParam}') < date(scd_valid_to)
-          AND producer != -1
+          producer != -1
       `;
 
       // Use the retry helper

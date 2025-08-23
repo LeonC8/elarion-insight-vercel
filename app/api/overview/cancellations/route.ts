@@ -55,6 +55,7 @@ export async function GET(request: Request) {
   const periodType = searchParams.get("periodType") || "Month"; // Month, Year, Day
   const viewType = searchParams.get("viewType") || "Actual"; // Actual, OTB, Projected
   const comparisonType = searchParams.get("comparison") || "Last year - OTB";
+  const property = searchParams.get("property");
 
   // Calculate date ranges
   const { startDate, endDate } = calculateDateRanges(
@@ -79,6 +80,8 @@ export async function GET(request: Request) {
     // Create ClickHouse client
     client = createClient(getClickhouseConnection());
 
+    const propertyFilter = property ? `AND property = '${property}'` : "";
+
     // Build the current period query for aggregates
     const currentQuery = `
       SELECT 
@@ -90,6 +93,7 @@ export async function GET(request: Request) {
         toDate(occupancy_date) BETWEEN '${startDate}' AND '${endDate}'
         AND date(scd_valid_from) <= DATE('${businessDateParam}') 
         AND DATE('${businessDateParam}') < date(scd_valid_to)
+        ${propertyFilter}
     `;
 
     // Build the previous period query for aggregates
@@ -103,6 +107,7 @@ export async function GET(request: Request) {
         toDate(occupancy_date) BETWEEN '${prevStartDate}' AND '${prevEndDate}'
         AND date(scd_valid_from) <= DATE('${prevBusinessDateParam}') 
         AND DATE('${prevBusinessDateParam}') < date(scd_valid_to)
+        ${propertyFilter}
     `;
 
     // New query for daily data for current period
@@ -117,6 +122,7 @@ export async function GET(request: Request) {
         toDate(occupancy_date) BETWEEN '${startDate}' AND '${endDate}'
         AND date(scd_valid_from) <= DATE('${businessDateParam}') 
         AND DATE('${businessDateParam}') < date(scd_valid_to)
+        ${propertyFilter}
       GROUP BY occupancy_date
       ORDER BY occupancy_date
     `;
@@ -133,6 +139,7 @@ export async function GET(request: Request) {
         toDate(occupancy_date) BETWEEN '${prevStartDate}' AND '${prevEndDate}'
         AND date(scd_valid_from) <= DATE('${prevBusinessDateParam}') 
         AND DATE('${prevBusinessDateParam}') < date(scd_valid_to)
+        ${propertyFilter}
       GROUP BY occupancy_date
       ORDER BY occupancy_date
     `;

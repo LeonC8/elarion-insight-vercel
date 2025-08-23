@@ -6,8 +6,6 @@ import {
   calculateComparisonDateRanges,
 } from "@/lib/dateUtils";
 import { getFullNameFromCode, getCodeFromFullName } from "@/lib/countryUtils";
-import * as fs from "fs";
-import * as path from "path";
 
 // Interface for top categories in each KPI
 interface CategorySummary {
@@ -124,165 +122,10 @@ const datesToIndex = (
   return Math.floor((target - start) / (24 * 60 * 60 * 1000));
 };
 
-// --- START CACHING LOGIC ---
-
-interface CacheEntryData {
-  body: any; // Store the parsed JSON body
-  status: number;
-  headers: Record<string, string>;
-}
-
-interface CacheEntry {
-  data: CacheEntryData;
-  expiresAt: number;
-}
-
-// File-based cache configuration
-const CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
-const CACHE_DIR = path.join(process.cwd(), ".cache");
-
-// Ensure cache directory exists
-try {
-  if (!fs.existsSync(CACHE_DIR)) {
-    fs.mkdirSync(CACHE_DIR, { recursive: true });
-  }
-} catch (error) {
-  console.error("Error creating cache directory:", error);
-}
-
-// File-based cache functions
-function getCacheFilePath(key: string): string {
-  // Create a safe filename from the key
-  const safeKey = Buffer.from(key)
-    .toString("base64")
-    .replace(/[/\\?%*:|"<>]/g, "_");
-  return path.join(CACHE_DIR, `${safeKey}.json`);
-}
-
-async function getCacheEntry(key: string): Promise<CacheEntry | null> {
-  try {
-    const filePath = getCacheFilePath(key);
-    if (fs.existsSync(filePath)) {
-      const data = fs.readFileSync(filePath, "utf8");
-      return JSON.parse(data);
-    }
-    return null;
-  } catch (error) {
-    console.error(`Cache read error:`, error);
-    return null;
-  }
-}
-
-async function setCacheEntry(key: string, entry: CacheEntry): Promise<void> {
-  try {
-    const filePath = getCacheFilePath(key);
-    fs.writeFileSync(filePath, JSON.stringify(entry), "utf8");
-  } catch (error) {
-    console.error(`Cache write error:`, error);
-  }
-}
-
-async function deleteCacheEntry(key: string): Promise<void> {
-  try {
-    const filePath = getCacheFilePath(key);
-    if (fs.existsSync(filePath)) {
-      fs.unlinkSync(filePath);
-    }
-  } catch (error) {
-    console.error(`Cache delete error:`, error);
-  }
-}
-
-/**
- * Generates a cache key based on relevant query parameters for the fluctuation route.
- * Ensures the key is consistent regardless of parameter order.
- */
-function generateCacheKey(params: URLSearchParams): string {
-  const relevantParams = [
-    "businessDate",
-    "periodType",
-    "viewType",
-    "comparison",
-    "field",
-    "limit", // Fluctuation uses limit differently
-  ];
-  const keyParts: string[] = [];
-
-  relevantParams.forEach((key) => {
-    // Use default values if parameter is missing, mirroring the route's logic
-    let value: string | null = null;
-    switch (key) {
-      case "businessDate":
-        value = params.get(key) || new Date().toISOString().split("T")[0];
-        break;
-      case "periodType":
-        value = params.get(key) || "Month";
-        break;
-      case "viewType":
-        value = params.get(key) || "Actual";
-        break;
-      case "comparison":
-        value = params.get(key) || "Last year - OTB";
-        break;
-      case "field":
-        value = params.get(key) || "guest_country";
-        break;
-      case "limit":
-        value = params.get(key) || "5";
-        break; // Default limit for fluctuation
-      default:
-        value = params.get(key);
-    }
-    if (value !== null) {
-      keyParts.push(`${key}=${value}`);
-    }
-  });
-
-  // Sort parts to ensure consistent key regardless of parameter order
-  keyParts.sort();
-  return keyParts.join("&");
-}
-
-// --- END CACHING LOGIC ---
-
 export async function GET(request: Request) {
   // Parse query parameters
   const { searchParams } = new URL(request.url);
-
-  // --- CHECK CACHE ---
-  const cacheKey = `distribution-fluctuation:${generateCacheKey(searchParams)}`;
-  const cachedEntry = await getCacheEntry(cacheKey);
-
-  if (cachedEntry && cachedEntry.expiresAt > Date.now()) {
-    console.log(
-      `[Cache HIT] Returning cached response for key: ${cacheKey.substring(
-        0,
-        100
-      )}...`
-    );
-    // Reconstruct the response from cached data
-    return new NextResponse(JSON.stringify(cachedEntry.data.body), {
-      status: cachedEntry.data.status,
-      headers: cachedEntry.data.headers,
-    });
-  } else if (cachedEntry) {
-    // Entry exists but is expired
-    console.log(
-      `[Cache EXPIRED] Removing expired entry for key: ${cacheKey.substring(
-        0,
-        100
-      )}...`
-    );
-    await deleteCacheEntry(cacheKey);
-  } else {
-    console.log(
-      `[Cache MISS] No valid cache entry for key: ${cacheKey.substring(
-        0,
-        100
-      )}...`
-    );
-  }
-  // --- END CACHE CHECK ---
+  const property = searchParams.get("property");
 
   const businessDateParam =
     searchParams.get("businessDate") || new Date().toISOString().split("T")[0];
@@ -323,6 +166,8 @@ export async function GET(request: Request) {
     // Create ClickHouse client
     client = createClient(getClickhouseConnection());
 
+    const propertyFilter = property ? `AND property = '${property}'` : "";
+
     // Determine if we're handling producer data
     const isProducerRoute =
       request.url.includes("producer") || field === "producer";
@@ -351,11 +196,9 @@ export async function GET(request: Request) {
         SELECT 
           producer,
           producer_name
-        FROM SAND01CN.producers
-        WHERE 
-          date(scd_valid_from) <= DATE('${businessDateParam}') 
-          AND DATE('${businessDateParam}') < date(scd_valid_to)
-          AND producer != -1
+        FROM JADRANKA.producers
+                  WHERE 
+            producer != -1
       `;
 
       const producerResultSet = await client.query({
@@ -400,6 +243,7 @@ export async function GET(request: Request) {
         AND date(scd_valid_from) <= DATE('${businessDateParam}')
         AND DATE('${businessDateParam}') < date(scd_valid_to)
         ${fieldFilters}
+        ${propertyFilter}
       GROUP BY ${field}
       ORDER BY total_revenue DESC
     `;
@@ -419,6 +263,7 @@ export async function GET(request: Request) {
         AND date(scd_valid_from) <= DATE('${prevBusinessDateParam}')
         AND DATE('${prevBusinessDateParam}') < date(scd_valid_to)
         ${fieldFilters}
+        ${propertyFilter}
       GROUP BY ${field}
       ORDER BY total_revenue DESC
     `;
@@ -454,6 +299,7 @@ export async function GET(request: Request) {
         AND date(scd_valid_from) <= DATE('${businessDateParam}')
         AND DATE('${businessDateParam}') < date(scd_valid_to)
         ${fieldFilters}
+        ${propertyFilter}
       GROUP BY ${field}
       ORDER BY total_revenue DESC
       LIMIT ${fluctuationLimit}
@@ -573,6 +419,7 @@ export async function GET(request: Request) {
         typeof name === "string" ? `'${name.replace(/'/g, "''")}'` : name
       )
       .join(",")})
+      ${propertyFilter}
       GROUP BY date_period, field_name
       ORDER BY date_period, field_name
     `;
@@ -596,6 +443,7 @@ export async function GET(request: Request) {
         typeof name === "string" ? `'${name.replace(/'/g, "''")}'` : name
       )
       .join(",")})
+      ${propertyFilter}
       GROUP BY date_period, field_name
       ORDER BY date_period, field_name
     `;
@@ -863,29 +711,9 @@ export async function GET(request: Request) {
       actualGranularity: "day",
     };
 
-    // --- STORE IN CACHE ---
-    const cacheEntry: CacheEntry = {
-      data: {
-        body: response,
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-      },
-      expiresAt: Date.now() + CACHE_DURATION,
-    };
-
-    await setCacheEntry(cacheKey, cacheEntry);
-    console.log(
-      `[Cache SET] Stored response data for key: ${cacheKey.substring(
-        0,
-        100
-      )}...`
-    );
-    // --- END STORE IN CACHE ---
-
     return NextResponse.json(response);
   } catch (error) {
     console.error("Error querying ClickHouse:", error);
-    // Do not cache errors
     return NextResponse.json(
       { error: `Failed to fetch ${field} fluctuation data from ClickHouse` },
       { status: 500 }

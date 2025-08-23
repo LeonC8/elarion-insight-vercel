@@ -41,6 +41,7 @@ export async function GET(request: Request) {
   const periodType = searchParams.get("periodType") || "Month"; // Month, Year, Day
   const viewType = searchParams.get("viewType") || "Actual"; // Actual, OTB, Projected
   const comparisonType = searchParams.get("comparison") || "Last year - OTB";
+  const property = searchParams.get("property");
 
   // Calculate date ranges using utility functions
   const { startDate, endDate } = calculateDateRanges(
@@ -65,6 +66,8 @@ export async function GET(request: Request) {
     // Create ClickHouse client
     client = createClient(getClickhouseConnection());
 
+    const propertyFilter = property ? `AND property = '${property}'` : "";
+
     // Build the query for occupancy by day of week (current period)
     const currentOccupancyQuery = `
       SELECT 
@@ -75,6 +78,7 @@ export async function GET(request: Request) {
         toDate(occupancy_date) BETWEEN '${startDate}' AND '${endDate}'
         AND date(scd_valid_from) <= DATE('${businessDateParam}') 
         AND DATE('${businessDateParam}') < date(scd_valid_to)
+        ${propertyFilter}
       GROUP BY day_of_week
       ORDER BY day_of_week
     `;
@@ -89,6 +93,7 @@ export async function GET(request: Request) {
         toDate(occupancy_date) BETWEEN '${prevStartDate}' AND '${prevEndDate}'
         AND date(scd_valid_from) <= DATE('${prevBusinessDateParam}') 
         AND DATE('${prevBusinessDateParam}') < date(scd_valid_to)
+        ${propertyFilter}
       GROUP BY day_of_week
       ORDER BY day_of_week
     `;
@@ -103,6 +108,7 @@ export async function GET(request: Request) {
         toDate(occupancy_date) BETWEEN '${startDate}' AND '${endDate}'
         AND date(scd_valid_from) <= DATE('${businessDateParam}') 
         AND DATE('${businessDateParam}') < date(scd_valid_to)
+        ${propertyFilter}
       GROUP BY day_of_week
       ORDER BY day_of_week
     `;
@@ -117,6 +123,7 @@ export async function GET(request: Request) {
         toDate(occupancy_date) BETWEEN '${prevStartDate}' AND '${prevEndDate}'
         AND date(scd_valid_from) <= DATE('${prevBusinessDateParam}') 
         AND DATE('${prevBusinessDateParam}') < date(scd_valid_to)
+        ${propertyFilter}
       GROUP BY day_of_week
       ORDER BY day_of_week
     `;
