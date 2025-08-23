@@ -172,40 +172,9 @@ export async function GET(request: Request) {
   // Parse query parameters
   const { searchParams } = new URL(request.url);
   const property = searchParams.get("property");
-  // --- CHECK CACHE ---
+
   const cacheKey = `distribution:${generateCacheKey(searchParams)}`;
   const cachedEntry = await getCacheEntry(cacheKey);
-
-  if (cachedEntry && cachedEntry.expiresAt > Date.now()) {
-    console.log(
-      `[Cache HIT] Returning cached response for key: ${cacheKey.substring(
-        0,
-        100
-      )}...`
-    );
-    // Reconstruct the response from cached data
-    return new NextResponse(JSON.stringify(cachedEntry.data.body), {
-      status: cachedEntry.data.status,
-      headers: cachedEntry.data.headers,
-    });
-  } else if (cachedEntry) {
-    // Entry exists but is expired
-    console.log(
-      `[Cache EXPIRED] Removing expired entry for key: ${cacheKey.substring(
-        0,
-        100
-      )}...`
-    );
-    await deleteCacheEntry(cacheKey);
-  } else {
-    console.log(
-      `[Cache MISS] No valid cache entry for key: ${cacheKey.substring(
-        0,
-        100
-      )}...`
-    );
-  }
-  // --- END CACHE CHECK ---
 
   const businessDateParam =
     searchParams.get("businessDate") || new Date().toISOString().split("T")[0];
