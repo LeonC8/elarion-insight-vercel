@@ -148,7 +148,7 @@ export async function GET(request: Request) {
   const comparisonType = searchParams.get("comparison") || "Last year - OTB";
 
   // Get the primary and secondary grouping fields
-  const primaryField = searchParams.get("primaryField") || "booking_channel";
+  const primaryField = searchParams.get("primaryField") || "market_group_code";
   const secondaryField = searchParams.get("secondaryField") || "producer";
 
   // Limit for number of items to return

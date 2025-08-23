@@ -78,7 +78,7 @@ export async function GET(request: Request) {
     // 1. Query for occupancy (stays) by day of week - current period
     const occupancyCurrentQuery = `
       SELECT 
-        booking_channel,
+        market_group_code,
         toDayOfWeek(occupancy_date) AS day_of_week,
         SUM(sold_rooms) AS rooms_sold
       FROM JADRANKA.insights
@@ -87,14 +87,14 @@ export async function GET(request: Request) {
         AND date(scd_valid_from) <= DATE('${businessDateParam}') 
         AND DATE('${businessDateParam}') < date(scd_valid_to)
         ${propertyFilter}
-      GROUP BY booking_channel, day_of_week
-      ORDER BY booking_channel, day_of_week ASC
+      GROUP BY market_group_code, day_of_week
+      ORDER BY market_group_code, day_of_week ASC
     `;
 
     // 2. Query for occupancy (stays) by day of week - previous period
     const occupancyPreviousQuery = `
       SELECT 
-        booking_channel,
+        market_group_code,
         toDayOfWeek(occupancy_date) AS day_of_week,
         SUM(sold_rooms) AS rooms_sold
       FROM JADRANKA.insights
@@ -103,14 +103,14 @@ export async function GET(request: Request) {
         AND date(scd_valid_from) <= DATE('${prevBusinessDateParam}') 
         AND DATE('${prevBusinessDateParam}') < date(scd_valid_to)
         ${propertyFilter}
-      GROUP BY booking_channel, day_of_week
-      ORDER BY booking_channel, day_of_week ASC
+      GROUP BY market_group_code, day_of_week
+      ORDER BY market_group_code, day_of_week ASC
     `;
 
     // 3. Query for bookings by day of week - current period
     const bookingsCurrentQuery = `
       SELECT 
-        booking_channel,
+        market_group_code,
         toDayOfWeek(booking_date) AS day_of_week,
         SUM(sold_rooms) AS rooms_sold
       FROM JADRANKA.insights
@@ -119,14 +119,14 @@ export async function GET(request: Request) {
         AND date(scd_valid_from) <= DATE('${businessDateParam}') 
         AND DATE('${businessDateParam}') < date(scd_valid_to)
         ${propertyFilter}
-      GROUP BY booking_channel, day_of_week
-      ORDER BY booking_channel, day_of_week ASC
+      GROUP BY market_group_code, day_of_week
+      ORDER BY market_group_code, day_of_week ASC
     `;
 
     // 4. Query for bookings by day of week - previous period
     const bookingsPreviousQuery = `
       SELECT 
-        booking_channel,
+        market_group_code,
         toDayOfWeek(booking_date) AS day_of_week,
         SUM(sold_rooms) AS rooms_sold
       FROM JADRANKA.insights
@@ -135,8 +135,8 @@ export async function GET(request: Request) {
         AND date(scd_valid_from) <= DATE('${prevBusinessDateParam}') 
         AND DATE('${prevBusinessDateParam}') < date(scd_valid_to)
         ${propertyFilter}
-      GROUP BY booking_channel, day_of_week
-      ORDER BY booking_channel, day_of_week ASC
+      GROUP BY market_group_code, day_of_week
+      ORDER BY market_group_code, day_of_week ASC
     `;
 
     // Execute all four queries in parallel
@@ -177,13 +177,13 @@ export async function GET(request: Request) {
     // Create maps for previous data for easier lookup
     const occupancyPreviousMap = new Map();
     occupancyPreviousData.forEach((item) => {
-      const key = `${item.booking_channel}|${item.day_of_week}`;
+      const key = `${item.market_group_code}|${item.day_of_week}`;
       occupancyPreviousMap.set(key, parseInt(item.rooms_sold || "0", 10));
     });
 
     const bookingsPreviousMap = new Map();
     bookingsPreviousData.forEach((item) => {
-      const key = `${item.booking_channel}|${item.day_of_week}`;
+      const key = `${item.market_group_code}|${item.day_of_week}`;
       bookingsPreviousMap.set(key, parseInt(item.rooms_sold || "0", 10));
     });
 
@@ -193,7 +193,7 @@ export async function GET(request: Request) {
 
     // Process occupancy (stays) data
     occupancyCurrentData.forEach((item) => {
-      const bookingChannel = item.booking_channel;
+      const bookingChannel = item.market_group_code;
       const dayOfWeek = parseInt(item.day_of_week, 10);
       const dayName = getDayName(dayOfWeek);
 
@@ -223,7 +223,7 @@ export async function GET(request: Request) {
 
     // Process bookings data
     bookingsCurrentData.forEach((item) => {
-      const bookingChannel = item.booking_channel;
+      const bookingChannel = item.market_group_code;
       const dayOfWeek = parseInt(item.day_of_week, 10);
       const dayName = getDayName(dayOfWeek);
 
@@ -254,7 +254,7 @@ export async function GET(request: Request) {
     // Add any booking channels and days from previous data that might not be in current data
     // First for occupancy
     occupancyPreviousData.forEach((prevItem) => {
-      const bookingChannel = prevItem.booking_channel;
+      const bookingChannel = prevItem.market_group_code;
       const dayOfWeek = parseInt(prevItem.day_of_week, 10);
       const dayName = getDayName(dayOfWeek);
 
@@ -287,7 +287,7 @@ export async function GET(request: Request) {
 
     // Then for bookings
     bookingsPreviousData.forEach((prevItem) => {
-      const bookingChannel = prevItem.booking_channel;
+      const bookingChannel = prevItem.market_group_code;
       const dayOfWeek = parseInt(prevItem.day_of_week, 10);
       const dayName = getDayName(dayOfWeek);
 
