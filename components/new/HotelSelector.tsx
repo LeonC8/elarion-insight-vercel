@@ -14,7 +14,12 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { PROPERTY_CODES, type PropertyCode } from "@/lib/property";
+import {
+  PROPERTY_CODES,
+  PROPERTY_NAMES,
+  getPropertyName,
+  type PropertyCode,
+} from "@/lib/property";
 
 const hotelsByRegion: Record<string, string[]> = {
   Europe: ["Hotel Paris", "Hotel London", "Hotel Berlin", "Hotel Madrid"],
@@ -156,7 +161,8 @@ export function HotelSelector(props: HotelSelectorProps) {
             size="lg"
             className="bg-[#f2f8ff] hover:bg-[#f2f8ff] text-[#342630] rounded-full px-4 "
           >
-            {selectedProperty} <TriangleDown className="ml-2" />
+            {getPropertyName(selectedProperty)}{" "}
+            <TriangleDown className="ml-2" />
           </Button>
         </DialogTrigger>
         <DialogContent className="sm:max-w-[400px]">
@@ -185,7 +191,7 @@ export function HotelSelector(props: HotelSelectorProps) {
                       <Check className="h-3 w-3 text-primary-foreground" />
                     )}
                   </div>
-                  <span className="font-medium">{code}</span>
+                  <span className="font-medium">{getPropertyName(code)}</span>
                 </div>
               </Button>
             ))}

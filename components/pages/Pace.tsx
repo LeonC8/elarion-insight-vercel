@@ -43,6 +43,7 @@ import { PacingChart } from "@/components/PacingChart";
 import { HotelSelector } from "../new/HotelSelector";
 import { PacingChartData } from "@/app/api/pace/route";
 import { DEFAULT_PROPERTY, type PropertyCode } from "@/lib/property";
+import { usePersistentOverviewFilters } from "@/hooks/usePersistentOverviewFilters";
 
 // Add the COLORS constant
 const COLORS = [
@@ -297,8 +298,10 @@ function TriangleDown({ className }: { className?: string }) {
 }
 
 export function PaceDashboard() {
-  const [selectedProperty, setSelectedProperty] =
-    useState<PropertyCode>(DEFAULT_PROPERTY);
+  // Use the shared persistent filters hook to sync hotel selection with other pages
+  const { selectedProperty, setSelectedProperty } =
+    usePersistentOverviewFilters();
+
   const [selectedCard, setSelectedCard] = useState<string | null>(null);
   const [selectedTimeframe, setSelectedTimeframe] = useState("Month");
   const [comparisonType, setComparisonType] = useState<

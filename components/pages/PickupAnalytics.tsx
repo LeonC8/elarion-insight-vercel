@@ -19,6 +19,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ChartConfig } from "@/components/ui/chart";
 import dynamic from "next/dynamic";
 import { DollarSign, Hotel, Percent, DownloadIcon } from "lucide-react";
+import { usePersistentPickupAnalyticsFilters } from "@/hooks/usePersistentPickupFilters";
 
 // Dynamic import for WorldMap with loading state
 const WorldMap = dynamic(
@@ -162,15 +163,17 @@ interface KpiData {
 type PickupKpiResponse = KpiData[];
 
 export function PickupAnalytics() {
-  // State for filter selections
-  const [selectedView, setSelectedView] = useState<"Day" | "Month" | "Year">(
-    "Day"
-  );
-  const [reportDate, setReportDate] = useState<Date>(new Date());
-  const [selectedComparison, setSelectedComparison] =
-    useState<string>("Yesterday");
-  const [selectedProperty, setSelectedProperty] =
-    useState<PropertyCode>(DEFAULT_PROPERTY);
+  // Use persistent filters hook
+  const {
+    selectedView,
+    setSelectedView,
+    reportDate,
+    setReportDate,
+    selectedComparison,
+    setSelectedComparison,
+    selectedProperty,
+    setSelectedProperty,
+  } = usePersistentPickupAnalyticsFilters();
 
   // State for fetched KPI data
   const [kpiData, setKpiData] = useState<PickupKpiResponse | null>(null);
@@ -190,9 +193,7 @@ export function PickupAnalytics() {
 
   // Handle report date change
   const handleDateChange = (newDate: Date | undefined) => {
-    if (newDate) {
-      setReportDate(newDate);
-    }
+    setReportDate(newDate);
   };
 
   // Function to calculate percentage change
@@ -538,6 +539,7 @@ export function PickupAnalytics() {
               )}
               prefix={getKpiValue("cancellations")?.prefix ?? ""}
               color="blue"
+              flipColors={true} // Flip colors: increase = red, decrease = green
               chartData={getKpiValue("cancellations")?.fluctuation ?? []} // Pass fluctuation data
             />
             <Kpi
@@ -549,6 +551,7 @@ export function PickupAnalytics() {
               )}
               prefix={getKpiValue("revenueLost")?.prefix ?? "€"}
               color="blue"
+              flipColors={true} // Flip colors: increase = red, decrease = green
               chartData={getKpiValue("revenueLost")?.fluctuation ?? []} // Pass fluctuation data
             />
           </div>

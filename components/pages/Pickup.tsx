@@ -54,6 +54,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
+import { usePersistentPickupFilters } from "@/hooks/usePersistentPickupFilters";
 
 // Add the COLORS constant
 const COLORS = [
@@ -767,12 +768,19 @@ const YearlyPickupTable = ({
 };
 
 export function PickupDashboard() {
-  const [selectedMetric, setSelectedMetric] = useState<MetricType>("soldRooms");
-  const [selectedView, setSelectedView] = useState<ViewType>("month");
-  const [selectedProperty, setSelectedProperty] =
-    useState<PropertyCode>(DEFAULT_PROPERTY);
+  // Use persistent filters hook
+  const {
+    businessDate,
+    setBusinessDate,
+    selectedProperty,
+    setSelectedProperty,
+    selectedView,
+    setSelectedView,
+    selectedMetric,
+    setSelectedMetric,
+  } = usePersistentPickupFilters();
+
   const [selectedDate, setSelectedDate] = useState(new Date());
-  const [businessDate, setBusinessDate] = useState<Date>(new Date());
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const [showStatsModal, setShowStatsModal] = useState(false);
   const [selectedCell, setSelectedCell] = useState<{

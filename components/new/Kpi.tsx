@@ -1,41 +1,43 @@
-"use client"
+"use client";
 
-import * as React from "react"
-import { Card, CardHeader, CardTitle } from "@/components/ui/card"
-import { ChevronRight } from "lucide-react"
-import { MainTimeSeriesDialog } from "./dialogs/MainTimeSeriesDialog"
+import * as React from "react";
+import { Card, CardHeader, CardTitle } from "@/components/ui/card";
+import { ChevronRight } from "lucide-react";
+import { MainTimeSeriesDialog } from "./dialogs/MainTimeSeriesDialog";
 
 interface KpiProps {
-  title: string
-  currentValue: number
-  percentageChange: number
-  prefix?: string
-  suffix?: string
-  color?: 'green' | 'blue'
+  title: string;
+  currentValue: number;
+  percentageChange: number;
+  prefix?: string;
+  suffix?: string;
+  color?: "green" | "blue";
+  flipColors?: boolean; // When true, positive change = red, negative change = green
   chartData?: {
-    date: string
-    current: number
-    previous: number
-  }[]
+    date: string;
+    current: number;
+    previous: number;
+  }[];
 }
 
-export function Kpi({ 
-  title, 
+export function Kpi({
+  title,
   currentValue,
   percentageChange,
   prefix = "€",
   suffix,
-  color = 'green',
-  chartData
+  color = "green",
+  flipColors = false,
+  chartData,
 }: KpiProps) {
-  const [showDetails, setShowDetails] = React.useState(false)
-  const formattedValue = Math.round(currentValue).toLocaleString()
-  const changePercent = Math.round(percentageChange * 10) / 10
-  const isPositive = changePercent > 0
+  const [showDetails, setShowDetails] = React.useState(false);
+  const formattedValue = Math.round(currentValue).toLocaleString();
+  const changePercent = Math.round(percentageChange * 10) / 10;
+  const isPositive = changePercent > 0;
 
   return (
     <>
-      <Card 
+      <Card
         className="cursor-pointer border-gray-300"
         onClick={() => setShowDetails(true)}
       >
@@ -47,14 +49,23 @@ export function Kpi({
               </CardTitle>
               <div className="flex flex-wrap items-center gap-2">
                 <span className="text-2xl font-bold leading-none">
-                  {prefix && prefix}{formattedValue}{suffix && suffix}
+                  {prefix && prefix}
+                  {formattedValue}
+                  {suffix && suffix}
                 </span>
-                <span className={`text-xs px-2 py-0.5 rounded ${
-                  isPositive 
-                    ? 'text-green-600 bg-green-100/50 border border-green-600' 
-                    : 'text-red-600 bg-red-100/50 border border-red-600'
-                }`}>
-                  {isPositive ? '+' : ''}{changePercent}%
+                <span
+                  className={`text-xs px-2 py-0.5 rounded ${
+                    flipColors
+                      ? isPositive
+                        ? "text-red-600 bg-red-100/50 border border-red-600"
+                        : "text-green-600 bg-green-100/50 border border-green-600"
+                      : isPositive
+                      ? "text-green-600 bg-green-100/50 border border-green-600"
+                      : "text-red-600 bg-red-100/50 border border-red-600"
+                  }`}
+                >
+                  {isPositive ? "+" : ""}
+                  {changePercent}%
                 </span>
               </div>
             </div>
@@ -62,9 +73,9 @@ export function Kpi({
           </div>
         </CardHeader>
       </Card>
-      
+
       {chartData && (
-        <MainTimeSeriesDialog 
+        <MainTimeSeriesDialog
           open={showDetails}
           onOpenChange={setShowDetails}
           title={title}
@@ -76,5 +87,5 @@ export function Kpi({
         />
       )}
     </>
-  )
-} 
+  );
+}

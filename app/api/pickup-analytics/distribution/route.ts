@@ -4,6 +4,7 @@ import { getClickhouseConnection } from "@/lib/clickhouse";
 import { addDays, endOfMonth, endOfYear, format } from "date-fns";
 import * as fs from "fs";
 import * as path from "path";
+import { getFullNameFromCode, getCodeFromFullName } from "@/lib/countryUtils";
 
 // --- START CACHING LOGIC (Copied from overview/distribution) ---
 
@@ -132,7 +133,6 @@ interface AnalysisResponse {
       };
     };
   }>;
-  countryCodes?: { [countryName: string]: string };
 }
 
 // Fixed interface definitions for query results
@@ -153,42 +153,7 @@ interface RawTimeSeriesResult {
   booking_date_marker: string;
 }
 
-// --- Helper Functions (Adapted/Copied) ---
-const countryCodes: { [countryName: string]: string } = {
-  /* ... same as overview ... */ "United States": "us",
-  "United Kingdom": "gb",
-  Germany: "de",
-  France: "fr",
-  Spain: "es",
-  Italy: "it",
-  Netherlands: "nl",
-  Switzerland: "ch",
-  Canada: "ca",
-  Australia: "au",
-  Japan: "jp",
-  China: "cn",
-  India: "in",
-  Brazil: "br",
-  Mexico: "mx",
-  Russia: "ru",
-  "South Korea": "kr",
-  "United Arab Emirates": "ae",
-  "Saudi Arabia": "sa",
-  Sweden: "se",
-  Norway: "no",
-  Denmark: "dk",
-  Belgium: "be",
-  Austria: "at",
-  Portugal: "pt",
-  Greece: "gr",
-  Ireland: "ie",
-  Poland: "pl",
-  Finland: "fi",
-  Singapore: "sg",
-  Thailand: "th",
-  Malaysia: "my",
-  Indonesia: "id",
-};
+// --- Helper Functions (Using shared country utilities) ---
 
 function roundValue(value: number): number {
   if (typeof value !== "number") {
@@ -199,8 +164,8 @@ function roundValue(value: number): number {
 }
 
 function generateCode(name: string, field: string): string {
-  if (field === "guest_country" && countryCodes[name]) {
-    return countryCodes[name];
+  if (field === "guest_country") {
+    return getCodeFromFullName(name);
   }
   // Simple slugify: lowercase, replace space/non-alphanumeric with underscore
   return name
@@ -515,6 +480,10 @@ export async function GET(request: Request) {
 
     // Helper to get display name
     const getDisplayName = (fieldValue: any): string => {
+      if (field === "guest_country") {
+        // Convert country code to full name using the utility function
+        return getFullNameFromCode(String(fieldValue));
+      }
       if (isProducerRoute && producerMap.size > 0) {
         const producerId = parseInt(String(fieldValue));
         return producerMap.get(producerId) || `Producer ${fieldValue}`;
@@ -647,7 +616,7 @@ export async function GET(request: Request) {
     let mapData;
     if (field === "guest_country") {
       mapData = currentData.map((row) => ({
-        country: countryCodes[getDisplayName(row.field_name)] || "unknown",
+        country: getCodeFromFullName(getDisplayName(row.field_name)),
         value: roundValue(row.total_revenue),
       }));
     }
@@ -658,7 +627,7 @@ export async function GET(request: Request) {
       roomsSold,
       adr,
       timeSeriesData,
-      ...(field === "guest_country" && { mapData, countryCodes }), // Conditionally add map data and codes
+      ...(field === "guest_country" && { mapData }), // Conditionally add map data
     };
 
     // --- STORE IN CACHE ---
