@@ -189,7 +189,10 @@ export function MarketSegments() {
     periodType: selectedTimeFrame, // From hook
     viewType: selectedViewType, // From hook
     comparison: selectedComparison, // From hook
-    businessDate: date.toISOString().split("T")[0], // From hook
+    businessDate: `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(
+      2,
+      "0"
+    )}-${String(date.getDate()).padStart(2, "0")}`, // From hook - avoid timezone issues
     property: selectedProperty, // From hook
   };
 

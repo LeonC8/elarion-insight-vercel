@@ -148,44 +148,126 @@ export async function GET(request: NextRequest) {
     const propertyFilter = property ? `AND property = '${property}'` : "";
 
     // Query for current year data
+    // For pickup stats, we want to match the Overview "Day Actual" logic:
+    // - Show stats for the occupancy date (stay date)
+    // - As of the occupancy date itself (not the business date from pickup table)
+    // This matches Overview "Day Actual" behavior
+    const snapshotDate =
+      occupancyDateParam || occupancyDisplayDate.split(" ")[0]; // Use occupancy date as snapshot date
     const currentYearQuery = `
+      WITH insights_data AS (
+        SELECT
+          SUM(sold_rooms) AS rooms_sold,
+          SUM(roomRevenue) AS revenue,
+          SUM(cancelled_rooms) AS rooms_cancelled,
+          SUM(roomRevenue_lost) AS revenue_lost
+        FROM JADRANKA.insights
+        WHERE
+          ${occupancyClause}
+          AND scd_valid_from <= toDateTime('${snapshotDate}')
+          AND scd_valid_to > toDateTime('${snapshotDate}')
+          ${propertyFilter}
+      ),
+      room_capacity AS (
+        SELECT
+          SUM(physicalRooms) AS available_rooms
+        FROM JADRANKA.room_type_details
+        WHERE 
+          date(scd_valid_from) <= DATE('${snapshotDate}') 
+          AND DATE('${snapshotDate}') < date(scd_valid_to)
+          ${propertyFilter}
+      )
       SELECT
-        SUM(sold_rooms) AS rooms_sold,
-        SUM(roomRevenue) AS revenue,
-        SUM(roomRevenue) / NULLIF(SUM(sold_rooms), 0) AS adr,
-        SUM(sold_rooms) / NULLIF(SUM(sold_rooms + no_show_rooms + cancelled_rooms), 0) * 100 AS occupancy,
-        SUM(cancelled_rooms) AS rooms_cancelled,
-        SUM(roomRevenue_lost) AS revenue_lost,
-        SUM(sold_rooms + no_show_rooms + cancelled_rooms) AS rooms_available,
-        SUM(roomRevenue) / NULLIF(SUM(sold_rooms + no_show_rooms + cancelled_rooms), 0) AS revpar
-      FROM JADRANKA.insights
-      WHERE
-        ${occupancyClause}
-        AND scd_valid_from <= toDateTime('${bookingDate}')
-        AND scd_valid_to > toDateTime('${bookingDate}')
-        ${propertyFilter}
+        i.rooms_sold,
+        i.revenue,
+        i.revenue / NULLIF(i.rooms_sold, 0) AS adr,
+        (i.rooms_sold / NULLIF(r.available_rooms, 0)) * 100 AS occupancy,
+        i.rooms_cancelled,
+        i.revenue_lost,
+        r.available_rooms,
+        i.revenue / NULLIF(r.available_rooms, 0) AS revpar
+      FROM insights_data i
+      CROSS JOIN room_capacity r
     `;
 
     // Query for previous year data
+    // Calculate previous year snapshot date for comparison (same logic as current year)
+    const prevSnapshotDate = new Date(snapshotDate);
+    prevSnapshotDate.setFullYear(prevSnapshotDate.getFullYear() - 1);
+    const prevSnapshotDateStr = formatDateUTC(prevSnapshotDate);
+
+    // Calculate previous year business date for room capacity
+    const prevBusinessDate = new Date(businessDateParam);
+    prevBusinessDate.setFullYear(prevBusinessDate.getFullYear() - 1);
+    const prevBusinessDateStr = formatDateUTC(prevBusinessDate);
+
     const prevYearQuery = `
+      WITH insights_data AS (
+        SELECT
+          SUM(sold_rooms) AS rooms_sold,
+          SUM(roomRevenue) AS revenue,
+          SUM(cancelled_rooms) AS rooms_cancelled,
+          SUM(roomRevenue_lost) AS revenue_lost
+        FROM JADRANKA.insights
+        WHERE
+          ${occupancyClause.replace(/(\d{4})/g, (match) =>
+            (parseInt(match) - 1).toString()
+          )}
+          AND scd_valid_from <= toDateTime('${prevSnapshotDateStr}')
+          AND scd_valid_to > toDateTime('${prevSnapshotDateStr}')
+          ${propertyFilter}
+      ),
+      room_capacity AS (
+        SELECT
+          SUM(physicalRooms) AS available_rooms
+        FROM JADRANKA.room_type_details
+        WHERE 
+          date(scd_valid_from) <= DATE('${prevSnapshotDateStr}') 
+          AND DATE('${prevSnapshotDateStr}') < date(scd_valid_to)
+          ${propertyFilter}
+      )
       SELECT
-        SUM(sold_rooms) AS rooms_sold,
-        SUM(roomRevenue) AS revenue,
-        SUM(roomRevenue) / NULLIF(SUM(sold_rooms), 0) AS adr,
-        SUM(sold_rooms) / NULLIF(SUM(sold_rooms + no_show_rooms + cancelled_rooms), 0) * 100 AS occupancy,
-        SUM(cancelled_rooms) AS rooms_cancelled,
-        SUM(roomRevenue_lost) AS revenue_lost,
-        SUM(sold_rooms + no_show_rooms + cancelled_rooms) AS rooms_available,
-        SUM(roomRevenue) / NULLIF(SUM(sold_rooms + no_show_rooms + cancelled_rooms), 0) AS revpar
-      FROM JADRANKA.insights
-      WHERE
-        ${occupancyClause.replace(/(\d{4})/g, (match) =>
-          (parseInt(match) - 1).toString()
-        )}
-        AND scd_valid_from <= toDateTime('${bookingDate}')
-        AND scd_valid_to > toDateTime('${bookingDate}')
+        i.rooms_sold,
+        i.revenue,
+        i.revenue / NULLIF(i.rooms_sold, 0) AS adr,
+        (i.rooms_sold / NULLIF(r.available_rooms, 0)) * 100 AS occupancy,
+        i.rooms_cancelled,
+        i.revenue_lost,
+        r.available_rooms,
+        i.revenue / NULLIF(r.available_rooms, 0) AS revpar
+      FROM insights_data i
+      CROSS JOIN room_capacity r
+    `;
+
+    console.log("🔍 DEBUG: Property filter:", property);
+    console.log("🔍 DEBUG: businessDateParam:", businessDateParam);
+    console.log("🔍 DEBUG: snapshotDate:", snapshotDate);
+    console.log("🔍 DEBUG: occupancyDateParam:", occupancyDateParam);
+    console.log("🔍 DEBUG: occupancyDisplayDate:", occupancyDisplayDate);
+
+    // Debug room capacity separately
+    const debugRoomCapacityQuery = `
+      SELECT 
+        SUM(physicalRooms) AS available_rooms,
+        COUNT(*) AS record_count
+      FROM JADRANKA.room_type_details
+      WHERE 
+        date(scd_valid_from) <= DATE('${snapshotDate}') 
+        AND DATE('${snapshotDate}') < date(scd_valid_to)
         ${propertyFilter}
     `;
+    console.log("🔍 DEBUG: Room capacity query:", debugRoomCapacityQuery);
+
+    try {
+      const debugResult = await client.query({
+        query: debugRoomCapacityQuery,
+        format: "JSONEachRow",
+      });
+      const debugData = await debugResult.json();
+      console.log("🔍 DEBUG: Room capacity result:", debugData);
+    } catch (error) {
+      console.error("🔍 DEBUG: Room capacity query failed:", error);
+    }
 
     console.log("Current Year Query:", currentYearQuery);
     console.log("Previous Year Query:", prevYearQuery);
@@ -205,6 +287,9 @@ export async function GET(request: NextRequest) {
     const currentYearData = await currentYearResult.json();
     const prevYearData = await prevYearResult.json();
 
+    console.log("🔍 DEBUG: Current year raw data:", currentYearData);
+    console.log("🔍 DEBUG: Previous year raw data:", prevYearData);
+
     // Default values if no data is found
     const defaultStats = {
       rooms_sold: 0,
@@ -213,7 +298,7 @@ export async function GET(request: NextRequest) {
       occupancy: 0,
       rooms_cancelled: 0,
       revenue_lost: 0,
-      rooms_available: 0,
+      available_rooms: 0,
       revpar: 0,
     };
 
@@ -238,7 +323,11 @@ export async function GET(request: NextRequest) {
       ),
       revenueLost: Math.round(ensureNumber(typedCurrentStats.revenue_lost)),
       roomsAvailable: Math.round(
-        ensureNumber(typedCurrentStats.rooms_available)
+        Math.max(
+          0,
+          ensureNumber(typedCurrentStats.available_rooms) -
+            ensureNumber(typedCurrentStats.rooms_sold)
+        )
       ),
       revPAR: Math.round(ensureNumber(typedCurrentStats.revpar)),
 
@@ -254,7 +343,11 @@ export async function GET(request: NextRequest) {
         ensureNumber(typedPrevStats.revenue_lost)
       ),
       prevYearRoomsAvailable: Math.round(
-        ensureNumber(typedPrevStats.rooms_available)
+        Math.max(
+          0,
+          ensureNumber(typedPrevStats.available_rooms) -
+            ensureNumber(typedPrevStats.rooms_sold)
+        )
       ),
       prevYearRevPAR: Math.round(ensureNumber(typedPrevStats.revpar)),
 
@@ -297,8 +390,8 @@ export async function GET(request: NextRequest) {
       ),
       roomsAvailableVariance: Math.round(
         calculateVariance(
-          ensureNumber(typedCurrentStats.rooms_available),
-          ensureNumber(typedPrevStats.rooms_available)
+          ensureNumber(typedCurrentStats.available_rooms),
+          ensureNumber(typedPrevStats.available_rooms)
         )
       ),
       revPARVariance: Math.round(

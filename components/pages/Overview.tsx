@@ -106,7 +106,10 @@ export function Overview() {
 
   // Keep analysisApiParams state and its useEffect (it now depends on the hook's state)
   const [analysisApiParams, setAnalysisApiParams] = useState({
-    businessDate: date.toISOString().split("T")[0],
+    businessDate: `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(
+      2,
+      "0"
+    )}-${String(date.getDate()).padStart(2, "0")}`,
     periodType: selectedTimeFrame,
     viewType: selectedViewType,
     comparison: selectedComparison,
@@ -114,8 +117,13 @@ export function Overview() {
   });
 
   useEffect(() => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    const formattedDate = `${year}-${month}-${day}`;
+
     setAnalysisApiParams({
-      businessDate: date.toISOString().split("T")[0], // Uses date from the hook
+      businessDate: formattedDate, // Uses properly formatted date
       periodType: selectedTimeFrame, // Uses selectedTimeFrame from the hook
       viewType: selectedViewType, // Uses selectedViewType from the hook
       comparison: selectedComparison, // Uses selectedComparison from the hook
@@ -136,8 +144,16 @@ export function Overview() {
       setPrimaryDataLoaded(false);
       setError(null);
 
-      // Format the date for the API
-      const formattedDate = date.toISOString().split("T")[0];
+      // Format the date for the API - avoid timezone issues
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, "0");
+      const day = String(date.getDate()).padStart(2, "0");
+      const formattedDate = `${year}-${month}-${day}`;
+      console.log("🔍 DEBUG: Overview fetchKpiData - original date:", date);
+      console.log(
+        "🔍 DEBUG: Overview fetchKpiData - formatted date:",
+        formattedDate
+      );
 
       // Construct the query parameters
       const params = new URLSearchParams({
@@ -147,6 +163,11 @@ export function Overview() {
         comparison: selectedComparison,
         property: selectedProperty,
       });
+
+      console.log(
+        "🔍 DEBUG: Overview fetchKpiData - API URL:",
+        `/api/overview/general?${params.toString()}`
+      );
 
       // Fetch data from the API
       const response = await fetch(
@@ -229,7 +250,9 @@ export function Overview() {
   const fetchWorldMapData = async (metric: string = selectedMapMetric) => {
     try {
       const params = new URLSearchParams({
-        businessDate: date.toISOString().split("T")[0],
+        businessDate: `${date.getFullYear()}-${String(
+          date.getMonth() + 1
+        ).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`,
         periodType: selectedTimeFrame,
         viewType: selectedViewType,
         comparison: selectedComparison,

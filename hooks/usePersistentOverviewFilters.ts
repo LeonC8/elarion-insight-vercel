@@ -66,8 +66,26 @@ export const usePersistentOverviewFilters = (
 
   const [date, setDateState] = useState<Date>(() =>
     getLocalStorageItem(DATE_KEY, defaultDate, (storedValue) => {
+      console.log("🔍 DEBUG: Loading date from localStorage:", storedValue);
+      // Parse YYYY-MM-DD format to avoid timezone issues
+      const dateMatch = storedValue.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+      if (dateMatch) {
+        const [, year, month, day] = dateMatch;
+        const parsedDate = new Date(
+          parseInt(year),
+          parseInt(month) - 1,
+          parseInt(day)
+        );
+        console.log(
+          "🔍 DEBUG: Parsed date from YYYY-MM-DD format:",
+          parsedDate
+        );
+        return !isNaN(parsedDate.getTime()) ? parsedDate : defaultDate;
+      }
+      // Fallback for old format
+      console.log("🔍 DEBUG: Using fallback date parsing for:", storedValue);
       const parsedDate = new Date(storedValue);
-      // Check if the parsed date is valid
+      console.log("🔍 DEBUG: Fallback parsed date:", parsedDate);
       return !isNaN(parsedDate.getTime()) ? parsedDate : defaultDate;
     })
   );
@@ -97,8 +115,20 @@ export const usePersistentOverviewFilters = (
   }, [selectedComparison]);
 
   useEffect(() => {
-    // Store date as ISO string for better compatibility
-    setLocalStorageItem(DATE_KEY, date, (d) => d.toISOString());
+    // Store date as YYYY-MM-DD string to avoid timezone issues
+    setLocalStorageItem(DATE_KEY, date, (d) => {
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, "0");
+      const day = String(d.getDate()).padStart(2, "0");
+      const dateString = `${year}-${month}-${day}`;
+      console.log(
+        "🔍 DEBUG: Storing date to localStorage:",
+        d,
+        "->",
+        dateString
+      );
+      return dateString;
+    });
   }, [date]);
 
   useEffect(() => {
@@ -108,8 +138,17 @@ export const usePersistentOverviewFilters = (
   // Wrap the date setter to ensure it only updates if the date actually changes
   const setDate = useCallback(
     (newDate: Date | undefined) => {
+      console.log(
+        "🔍 DEBUG: setDate called with:",
+        newDate,
+        "current date:",
+        date
+      );
       if (newDate && newDate.getTime() !== date.getTime()) {
+        console.log("🔍 DEBUG: Date is different, updating state");
         setDateState(newDate);
+      } else {
+        console.log("🔍 DEBUG: Date is same or undefined, not updating");
       }
     },
     [date]

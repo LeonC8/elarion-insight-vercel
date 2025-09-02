@@ -61,8 +61,21 @@ export const usePersistentPickupFilters = (
       BUSINESS_DATE_KEY,
       defaultBusinessDate,
       (storedValue) => {
+        // Parse YYYY-MM-DD format to avoid timezone issues
+        const dateMatch = storedValue.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+        if (dateMatch) {
+          const [, year, month, day] = dateMatch;
+          const parsedDate = new Date(
+            parseInt(year),
+            parseInt(month) - 1,
+            parseInt(day)
+          );
+          return !isNaN(parsedDate.getTime())
+            ? parsedDate
+            : defaultBusinessDate;
+        }
+        // Fallback for old format
         const parsedDate = new Date(storedValue);
-        // Check if the parsed date is valid
         return !isNaN(parsedDate.getTime()) ? parsedDate : defaultBusinessDate;
       }
     )
@@ -98,10 +111,13 @@ export const usePersistentPickupFilters = (
 
   // Persist changes to localStorage
   useEffect(() => {
-    // Store date as ISO string for better compatibility
-    setLocalStorageItem(BUSINESS_DATE_KEY, businessDate, (d) =>
-      d.toISOString()
-    );
+    // Store date as YYYY-MM-DD string to avoid timezone issues
+    setLocalStorageItem(BUSINESS_DATE_KEY, businessDate, (d) => {
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, "0");
+      const day = String(d.getDate()).padStart(2, "0");
+      return `${year}-${month}-${day}`;
+    });
   }, [businessDate]);
 
   useEffect(() => {
@@ -180,6 +196,18 @@ export const usePersistentPickupAnalyticsFilters = (
       ANALYTICS_REPORT_DATE_KEY,
       defaultReportDate,
       (storedValue) => {
+        // Parse YYYY-MM-DD format to avoid timezone issues
+        const dateMatch = storedValue.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+        if (dateMatch) {
+          const [, year, month, day] = dateMatch;
+          const parsedDate = new Date(
+            parseInt(year),
+            parseInt(month) - 1,
+            parseInt(day)
+          );
+          return !isNaN(parsedDate.getTime()) ? parsedDate : defaultReportDate;
+        }
+        // Fallback for old format
         const parsedDate = new Date(storedValue);
         return !isNaN(parsedDate.getTime()) ? parsedDate : defaultReportDate;
       }
@@ -210,9 +238,12 @@ export const usePersistentPickupAnalyticsFilters = (
   }, [selectedView]);
 
   useEffect(() => {
-    setLocalStorageItem(ANALYTICS_REPORT_DATE_KEY, reportDate, (d) =>
-      d.toISOString()
-    );
+    setLocalStorageItem(ANALYTICS_REPORT_DATE_KEY, reportDate, (d) => {
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, "0");
+      const day = String(d.getDate()).padStart(2, "0");
+      return `${year}-${month}-${day}`;
+    });
   }, [reportDate]);
 
   useEffect(() => {

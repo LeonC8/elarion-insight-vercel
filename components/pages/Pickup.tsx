@@ -1079,7 +1079,7 @@ export function PickupDashboard() {
 
               <div className="rounded-lg border border-gray-100 p-3 sm:p-5 flex flex-col items-center text-center">
                 <div className="text-xs sm:text-sm text-gray-500 font-medium">
-                  Revenue
+                  Room Revenue
                 </div>
                 <div className="text-xl sm:text-3xl font-bold mt-2 sm:mt-4 mb-4 sm:mb-8">
                   €{statsData.revenue}
@@ -1168,7 +1168,7 @@ export function PickupDashboard() {
 
               <div className="rounded-lg border border-gray-100 p-3 sm:p-5 flex flex-col items-center text-center">
                 <div className="text-xs sm:text-sm text-gray-500 font-medium">
-                  Revenue Lost
+                  Room Revenue Lost
                 </div>
                 <div className="text-xl sm:text-3xl font-bold mt-2 sm:mt-4 mb-4 sm:mb-8">
                   €{statsData.revenueLost}
