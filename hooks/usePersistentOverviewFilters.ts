@@ -5,12 +5,18 @@ import {
   type PropertyCode,
 } from "@/lib/property";
 
+export type DateRange = {
+  from: Date | undefined;
+  to: Date | undefined;
+};
+
 // Define keys for localStorage
 const TIME_FRAME_KEY = "overview_timeFrame";
 const VIEW_TYPE_KEY = "overview_viewType";
 const COMPARISON_KEY = "overview_comparison";
 const DATE_KEY = "overview_date";
 const PROPERTY_KEY = "overview_property";
+const CUSTOM_DATE_RANGE_KEY = "overview_customDateRange";
 
 // Helper function to safely get item from localStorage
 const getLocalStorageItem = <T>(
@@ -101,6 +107,29 @@ export const usePersistentOverviewFilters = (
       })
   );
 
+  // Custom date range state
+  const [customDateRange, setCustomDateRangeState] = useState<
+    DateRange | undefined
+  >(() =>
+    getLocalStorageItem(CUSTOM_DATE_RANGE_KEY, undefined, (storedValue) => {
+      try {
+        const parsed = JSON.parse(storedValue);
+        if (parsed && parsed.from && parsed.to) {
+          return {
+            from: new Date(parsed.from),
+            to: new Date(parsed.to),
+          };
+        }
+      } catch (error) {
+        console.error(
+          "Error parsing custom date range from localStorage:",
+          error
+        );
+      }
+      return undefined;
+    })
+  );
+
   // Persist changes to localStorage
   useEffect(() => {
     setLocalStorageItem(TIME_FRAME_KEY, selectedTimeFrame);
@@ -135,6 +164,18 @@ export const usePersistentOverviewFilters = (
     setLocalStorageItem(PROPERTY_KEY, selectedProperty);
   }, [selectedProperty]);
 
+  useEffect(() => {
+    setLocalStorageItem(CUSTOM_DATE_RANGE_KEY, customDateRange, (range) => {
+      if (range && range.from && range.to) {
+        return JSON.stringify({
+          from: range.from.toISOString(),
+          to: range.to.toISOString(),
+        });
+      }
+      return "";
+    });
+  }, [customDateRange]);
+
   // Wrap the date setter to ensure it only updates if the date actually changes
   const setDate = useCallback(
     (newDate: Date | undefined) => {
@@ -160,6 +201,10 @@ export const usePersistentOverviewFilters = (
     );
   }, []);
 
+  const setCustomDateRange = useCallback((range: DateRange | undefined) => {
+    setCustomDateRangeState(range);
+  }, []);
+
   return {
     selectedTimeFrame,
     setSelectedTimeFrame,
@@ -171,5 +216,7 @@ export const usePersistentOverviewFilters = (
     setDate, // Use the wrapped setter
     selectedProperty,
     setSelectedProperty,
+    customDateRange,
+    setCustomDateRange,
   };
 };

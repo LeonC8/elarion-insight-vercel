@@ -49,11 +49,17 @@ export async function GET(request: Request) {
   const comparisonType = searchParams.get("comparison") || "Last year - OTB";
   const property = searchParams.get("property");
 
+  // Custom date range parameters
+  const customStartDate = searchParams.get("customStartDate") || undefined;
+  const customEndDate = searchParams.get("customEndDate") || undefined;
+
   // Calculate date ranges
   const { startDate, endDate } = calculateDateRanges(
     businessDateParam,
     periodType,
-    viewType
+    viewType,
+    customStartDate,
+    customEndDate
   );
 
   // Calculate comparison period date ranges

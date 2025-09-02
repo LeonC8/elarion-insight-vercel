@@ -1,7 +1,24 @@
-import Link from 'next/link'
-import { motion } from 'framer-motion'
-import { BarChart2Icon, HomeIcon, GlobeIcon, UsersIcon, BedDoubleIcon, MapPinIcon, UserIcon, LogOutIcon, CalendarIcon, TrendingUpIcon, Settings, BarChart3Icon, MenuIcon, XIcon } from 'lucide-react'
-import { usePathname } from 'next/navigation'
+import Link from "next/link";
+import Image from "next/image";
+import { motion } from "framer-motion";
+import {
+  BarChart2Icon,
+  HomeIcon,
+  GlobeIcon,
+  UsersIcon,
+  BedDoubleIcon,
+  MapPinIcon,
+  UserIcon,
+  LogOutIcon,
+  CalendarIcon,
+  TrendingUpIcon,
+  Settings,
+  BarChart3Icon,
+  MenuIcon,
+  XIcon,
+} from "lucide-react";
+import { usePathname } from "next/navigation";
+import logoImage from "@/assets/logo.png";
 
 interface SidebarProps {
   onLogout: () => void;
@@ -16,27 +33,30 @@ const sidebarLinks = [
   { name: "Pickup", icon: CalendarIcon, path: "/pickup" },
   { name: "Pickup Analytics", icon: BarChart3Icon, path: "/pickup-analytics" },
   { name: "Pace", icon: TrendingUpIcon, path: "/pace" },
-]
+];
 
 export function Sidebar({ onLogout, onClose }: SidebarProps) {
-  const pathname = usePathname()
+  const pathname = usePathname();
 
   return (
     <div className="w-64 bg-slate-900 text-white flex flex-col h-screen relative">
-      <button 
-        onClick={onClose} 
+      <button
+        onClick={onClose}
         className="absolute top-4 right-4 p-2 text-gray-400 hover:text-white lg:hidden"
       >
         <XIcon className="h-6 w-6" />
       </button>
 
       <div className="py-4 px-6 flex-grow overflow-y-auto">
-        <div className="flex items-center mb-8 mt-4">
-          <BarChart2Icon className="h-12 w-11 text-blue-400 mr-2 pr-1" />
-          <div className="flex flex-col">
-            <span className="text-md font-bold">Elarion Insights</span>
-            <span className="text-sm text-gray-400">Hospitality</span>
-          </div>
+        <div className=" items-left justify-center mb-8 mt-4">
+          <Image
+            src={logoImage}
+            alt="Elarion Insights"
+            width={120}
+            height={35}
+            className="object-contain"
+            priority
+          />
         </div>
         <nav>
           <ul>
@@ -48,16 +68,20 @@ export function Sidebar({ onLogout, onClose }: SidebarProps) {
                 transition={{ delay: index * 0.1 }}
                 onClick={onClose}
               >
-                <Link 
+                <Link
                   href={link.path}
                   className={`flex items-center py-2 px-4 pl-1 rounded transition duration-200 ease-in-out hover:bg-blue-900 ${
-                    pathname === link.path ? 'text-blue-400 font-semibold' : 'text-white'
+                    pathname === link.path
+                      ? "text-blue-400 font-semibold"
+                      : "text-white"
                   }`}
                 >
                   {link.icon && (
-                    <link.icon className={`h-5 w-5 mr-3 ${
-                      pathname === link.path ? 'text-blue-400' : 'text-white'
-                    }`} />
+                    <link.icon
+                      className={`h-5 w-5 mr-3 ${
+                        pathname === link.path ? "text-blue-400" : "text-white"
+                      }`}
+                    />
                   )}
                   {link.name}
                 </Link>
@@ -81,5 +105,5 @@ export function Sidebar({ onLogout, onClose }: SidebarProps) {
         </button>
       </div>
     </div>
-  )
+  );
 }

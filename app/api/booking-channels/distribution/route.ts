@@ -99,6 +99,10 @@ export async function GET(request: Request) {
   const viewType = searchParams.get("viewType") || "Actual"; // Actual, OTB, Projected
   const comparisonType = searchParams.get("comparison") || "Last year - OTB";
 
+  // Custom date range parameters
+  const customStartDate = searchParams.get("customStartDate") || undefined;
+  const customEndDate = searchParams.get("customEndDate") || undefined;
+
   // Get the field to analyze - this is the key parameter for this generic route
   const field = searchParams.get("field") || "guest_country";
 
@@ -114,7 +118,9 @@ export async function GET(request: Request) {
   const { startDate, endDate } = calculateDateRanges(
     businessDateParam,
     periodType,
-    viewType
+    viewType,
+    customStartDate,
+    customEndDate
   );
 
   // Calculate comparison period date ranges

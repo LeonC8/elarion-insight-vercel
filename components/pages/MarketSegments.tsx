@@ -36,7 +36,11 @@ import { HorizontalBarChartMultipleDatasets } from "../new/HorizontalBarChartMul
 import { HorizontalBarChartMultipleDatasetsUpgraded } from "../new/HorizontalBarChartMultipleDatasetsUpgraded";
 import { TopFiveUpgraded } from "@/components/new/TopFiveUpgraded";
 import eventBus from "@/utils/eventBus";
-import { usePersistentOverviewFilters } from "@/hooks/usePersistentOverviewFilters";
+import {
+  usePersistentOverviewFilters,
+  type DateRange,
+} from "@/hooks/usePersistentOverviewFilters";
+import { SeparateDatePickers } from "@/components/ui/separate-date-pickers";
 
 // Dynamic import for WorldMap with loading state
 const WorldMap = dynamic(
@@ -80,6 +84,8 @@ export function MarketSegments() {
     setDate, // Use the setter from the hook
     selectedProperty,
     setSelectedProperty,
+    customDateRange,
+    setCustomDateRange,
   } = usePersistentOverviewFilters();
 
   // Remove legacy hotel selection functions as they're handled by the new HotelSelector
@@ -88,6 +94,34 @@ export function MarketSegments() {
   const handleDateChange = (newDate: Date | undefined) => {
     // The hook's setDate handles the undefined case and checks for actual change
     setDate(newDate);
+  };
+
+  // Helper function to get display text for selected period
+  const getSelectedPeriodDisplay = () => {
+    if (customDateRange?.from && customDateRange?.to) {
+      return `${customDateRange.from.toLocaleDateString()} - ${customDateRange.to.toLocaleDateString()}`;
+    }
+    return `${selectedTimeFrame} ${selectedViewType}`;
+  };
+
+  // Handler for custom date range selection
+  const handleCustomDateRangeChange = (range: DateRange | undefined) => {
+    setCustomDateRange(range);
+    if (range?.from && range?.to) {
+      // Set timeframe to "Custom" when a custom range is selected
+      setSelectedTimeFrame("Custom");
+    }
+  };
+
+  // Handler for predefined period selection
+  const handlePredefinedPeriodSelect = (
+    timeFrame: string,
+    viewType: string
+  ) => {
+    setSelectedTimeFrame(timeFrame);
+    setSelectedViewType(viewType);
+    // Clear custom date range when selecting predefined periods
+    setCustomDateRange(undefined);
   };
 
   // Sample metrics for producers by Market Group
@@ -194,13 +228,30 @@ export function MarketSegments() {
       "0"
     )}-${String(date.getDate()).padStart(2, "0")}`, // From hook - avoid timezone issues
     property: selectedProperty, // From hook
+    ...(customDateRange?.from &&
+      customDateRange?.to && {
+        customStartDate: (() => {
+          const date = customDateRange.from;
+          return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(
+            2,
+            "0"
+          )}-${String(date.getDate()).padStart(2, "0")}`;
+        })(),
+        customEndDate: (() => {
+          const date = customDateRange.to;
+          return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(
+            2,
+            "0"
+          )}-${String(date.getDate()).padStart(2, "0")}`;
+        })(),
+      }),
   };
 
   const metricOptions = [
     {
       label: "Revenue",
       key: "revenue",
-      prefix: "$",
+      prefix: "€",
       data: [],
     },
     {
@@ -211,7 +262,7 @@ export function MarketSegments() {
     {
       label: "ADR",
       key: "adr",
-      prefix: "$",
+      prefix: "€",
       data: [],
     },
   ];
@@ -284,37 +335,31 @@ export function MarketSegments() {
                   variant="ghost"
                   className="bg-[#f2f8ff] hover:bg-[#f2f8ff] text-[#342630] rounded-full px-4"
                 >
-                  {`${selectedTimeFrame} ${selectedViewType}`}{" "}
-                  <TriangleDown className="ml-2" />
+                  {getSelectedPeriodDisplay()} <TriangleDown className="ml-2" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent className="w-56">
+              <DropdownMenuContent className="w-80">
                 {/* Day Group */}
                 <div className="px-2 py-2 text-sm font-semibold text-gray-800  border-b border-gray-300">
                   Day
                 </div>
                 <div className="p-1 text-gray-600">
                   <DropdownMenuItem
-                    onSelect={() => {
-                      setSelectedTimeFrame("Day");
-                      setSelectedViewType("Actual");
-                    }}
+                    onSelect={() =>
+                      handlePredefinedPeriodSelect("Day", "Actual")
+                    }
                   >
                     Actual
                   </DropdownMenuItem>
                   <DropdownMenuItem
-                    onSelect={() => {
-                      setSelectedTimeFrame("Day");
-                      setSelectedViewType("OTB");
-                    }}
+                    onSelect={() => handlePredefinedPeriodSelect("Day", "OTB")}
                   >
                     OTB
                   </DropdownMenuItem>
                   <DropdownMenuItem
-                    onSelect={() => {
-                      setSelectedTimeFrame("Day");
-                      setSelectedViewType("Projected");
-                    }}
+                    onSelect={() =>
+                      handlePredefinedPeriodSelect("Day", "Projected")
+                    }
                   >
                     Projected
                   </DropdownMenuItem>
@@ -326,26 +371,23 @@ export function MarketSegments() {
                 </div>
                 <div className="p-1 text-gray-600">
                   <DropdownMenuItem
-                    onSelect={() => {
-                      setSelectedTimeFrame("Month");
-                      setSelectedViewType("Actual");
-                    }}
+                    onSelect={() =>
+                      handlePredefinedPeriodSelect("Month", "Actual")
+                    }
                   >
                     Actual
                   </DropdownMenuItem>
                   <DropdownMenuItem
-                    onSelect={() => {
-                      setSelectedTimeFrame("Month");
-                      setSelectedViewType("OTB");
-                    }}
+                    onSelect={() =>
+                      handlePredefinedPeriodSelect("Month", "OTB")
+                    }
                   >
                     OTB
                   </DropdownMenuItem>
                   <DropdownMenuItem
-                    onSelect={() => {
-                      setSelectedTimeFrame("Month");
-                      setSelectedViewType("Projected");
-                    }}
+                    onSelect={() =>
+                      handlePredefinedPeriodSelect("Month", "Projected")
+                    }
                   >
                     Projected
                   </DropdownMenuItem>
@@ -357,29 +399,36 @@ export function MarketSegments() {
                 </div>
                 <div className="p-1">
                   <DropdownMenuItem
-                    onSelect={() => {
-                      setSelectedTimeFrame("Year");
-                      setSelectedViewType("Actual");
-                    }}
+                    onSelect={() =>
+                      handlePredefinedPeriodSelect("Year", "Actual")
+                    }
                   >
                     Actual
                   </DropdownMenuItem>
                   <DropdownMenuItem
-                    onSelect={() => {
-                      setSelectedTimeFrame("Year");
-                      setSelectedViewType("OTB");
-                    }}
+                    onSelect={() => handlePredefinedPeriodSelect("Year", "OTB")}
                   >
                     OTB
                   </DropdownMenuItem>
                   <DropdownMenuItem
-                    onSelect={() => {
-                      setSelectedTimeFrame("Year");
-                      setSelectedViewType("Projected");
-                    }}
+                    onSelect={() =>
+                      handlePredefinedPeriodSelect("Year", "Projected")
+                    }
                   >
                     Projected
                   </DropdownMenuItem>
+                </div>
+
+                {/* Custom Date Range Group */}
+                <div className="px-2 py-2 text-sm font-semibold text-gray-800  border-t border-gray-300">
+                  Custom Period
+                </div>
+                <div className="p-3">
+                  <SeparateDatePickers
+                    dateRange={customDateRange}
+                    onDateRangeChange={handleCustomDateRangeChange}
+                    className="w-full"
+                  />
                 </div>
               </DropdownMenuContent>
             </DropdownMenu>

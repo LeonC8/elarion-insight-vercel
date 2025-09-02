@@ -160,7 +160,7 @@ export async function GET(request: NextRequest) {
           SUM(sold_rooms) AS rooms_sold,
           SUM(roomRevenue) AS revenue,
           SUM(cancelled_rooms) AS rooms_cancelled,
-          SUM(roomRevenue_lost) AS revenue_lost
+          SUM(totalRevenue_lost) AS revenue_lost
         FROM JADRANKA.insights
         WHERE
           ${occupancyClause}
@@ -207,7 +207,7 @@ export async function GET(request: NextRequest) {
           SUM(sold_rooms) AS rooms_sold,
           SUM(roomRevenue) AS revenue,
           SUM(cancelled_rooms) AS rooms_cancelled,
-          SUM(roomRevenue_lost) AS revenue_lost
+          SUM(totalRevenue_lost) AS revenue_lost
         FROM JADRANKA.insights
         WHERE
           ${occupancyClause.replace(/(\d{4})/g, (match) =>

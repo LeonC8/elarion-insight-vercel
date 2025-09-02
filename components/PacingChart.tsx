@@ -70,7 +70,7 @@ export function PacingChart({
 
       if (viewType === 'Month') {
         const dayOfMonth = getDate(itemDate);
-        id = `Day ${dayOfMonth}`;
+        id = dayOfMonth.toString();
         baseDateForSort = new Date(currentYear, today.getMonth(), dayOfMonth);
       } else { // Year view
         const monthIndex = getMonth(itemDate);

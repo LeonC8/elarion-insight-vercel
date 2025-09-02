@@ -1,14 +1,25 @@
-import { ArrowUpIcon, ArrowDownIcon, PercentIcon, HashIcon } from "lucide-react"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
-import { useState, useEffect } from "react"
+import {
+  ArrowUpIcon,
+  ArrowDownIcon,
+  PercentIcon,
+  HashIcon,
+} from "lucide-react";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
+import { useState, useEffect } from "react";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { Button } from "@/components/ui/button"
-import { CategoriesDetailsDialog } from "./CategoriesDetailsDialog"
+} from "@/components/ui/dropdown-menu";
+import { Button } from "@/components/ui/button";
+import { CategoriesDetailsDialog } from "./CategoriesDetailsDialog";
 import {
   Table,
   TableBody,
@@ -16,34 +27,34 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table"
+} from "@/components/ui/table";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog"
-import eventBus from '@/utils/eventBus'
+} from "@/components/ui/dialog";
+import eventBus from "@/utils/eventBus";
 
 interface MetricData {
-  name: string
-  value: number
-  change: number
-  prevValue?: number
-  code: string
+  name: string;
+  value: number;
+  change: number;
+  prevValue?: number;
+  code: string;
 }
 
 interface MetricOption {
-  label: string
-  key: string
-  data: MetricData[]
-  prefix?: string
-  suffix?: string
+  label: string;
+  key: string;
+  data: MetricData[];
+  prefix?: string;
+  suffix?: string;
 }
 
 interface CategoryOption {
-  label: string
-  key: string
+  label: string;
+  key: string;
 }
 
 interface GroupedData {
@@ -60,67 +71,67 @@ interface GroupedData {
         };
       };
     }>;
-  }
+  };
 }
 
 interface TopFiveUpgradedProps {
-  title: string
-  subtitle?: string
-  metrics: MetricOption[]
-  categories?: CategoryOption[]
-  primaryGroups?: { label: string; key: string; }[]
-  defaultMetric?: string
-  defaultCategory?: string
-  defaultPrimaryGroup?: string
-  defaultPrimaryValue?: string
-  color?: 'green' | 'blue'
-  withBorder?: boolean
+  title: string;
+  subtitle?: string;
+  metrics: MetricOption[];
+  categories?: CategoryOption[];
+  primaryGroups?: { label: string; key: string }[];
+  defaultMetric?: string;
+  defaultCategory?: string;
+  defaultPrimaryGroup?: string;
+  defaultPrimaryValue?: string;
+  color?: "green" | "blue";
+  withBorder?: boolean;
   distributionData?: Array<{
-    name: string
-    value: number
-    percentage: number
-    fill: string
-  }>
+    name: string;
+    value: number;
+    percentage: number;
+    fill: string;
+  }>;
   categoryTimeSeriesData?: Array<{
-    date: string
+    date: string;
     categories: {
       [key: string]: {
-        current: number
-        previous: number
-      }
-    }
-  }>
-  chartConfig?: any
-  apiEndpoint?: string
-  apiParams?: Record<string, string>
-  primaryField?: string
-  secondaryField?: string
-  onMetricChange?: (metric: string) => void
-  id?: string
-  useCategoriesDialog?: boolean
+        current: number;
+        previous: number;
+      };
+    };
+  }>;
+  chartConfig?: any;
+  apiEndpoint?: string;
+  apiParams?: Record<string, string>;
+  primaryField?: string;
+  secondaryField?: string;
+  onMetricChange?: (metric: string) => void;
+  id?: string;
+  useCategoriesDialog?: boolean;
 }
 
-type FilterType = 'top' | 'bottom' | 'rising' | 'falling';
+type FilterType = "top" | "bottom" | "rising" | "falling";
 
 const filterDisplayNames: Record<FilterType, string> = {
-  'top': 'Top 5',
-  'bottom': 'Bottom 5',
-  'rising': 'Top Rising',
-  'falling': 'Top Falling'
+  top: "Top 5",
+  bottom: "Bottom 5",
+  rising: "Top Rising",
+  falling: "Top Falling",
 };
 
 function TriangleDown({ className }: { className?: string }) {
   return (
-    <svg 
-      width="8" 
-      height="6" 
-      viewBox="0 0 8 6" 
-      fill="currentColor" 
+    <svg
+      width="8"
+      height="6"
+      viewBox="0 0 8 6"
+      fill="currentColor"
       className={className}
     >
       <path d="M4 6L0 0L8 0L4 6Z" />
     </svg>
-  )
+  );
 }
 
 // Helper function to format numbers consistently
@@ -130,12 +141,12 @@ function formatNumber(value: number): number {
 
 // Helper function to format numbers with commas
 function formatNumberWithCommas(value: number | undefined): string {
-  if (value === undefined) return '';
-  return value.toLocaleString('en-US');
+  if (value === undefined) return "";
+  return value.toLocaleString("en-US");
 }
 
-export function TopFiveUpgraded({ 
-  title, 
+export function TopFiveUpgraded({
+  title,
   subtitle,
   metrics = [],
   categories,
@@ -144,92 +155,101 @@ export function TopFiveUpgraded({
   defaultCategory,
   defaultPrimaryGroup,
   defaultPrimaryValue,
-  color = 'green',
+  color = "green",
   withBorder = true,
   distributionData,
   categoryTimeSeriesData,
   chartConfig,
   apiEndpoint,
   apiParams = {},
-  primaryField = 'booking_channel',
-  secondaryField = 'producer',
+  primaryField = "booking_channel",
+  secondaryField = "producer",
   onMetricChange,
-  id = 'default',
+  id = "default",
   useCategoriesDialog = false,
 }: TopFiveUpgradedProps) {
-  const [showPercentage, setShowPercentage] = useState(false)
-  const [filterType, setFilterType] = useState<FilterType>('top')
-  const [selectedMetric, setSelectedMetric] = useState(defaultMetric)
-  const [selectedCategory, setSelectedCategory] = useState(defaultCategory || categories?.[0]?.key)
-  const [selectedPrimaryGroup, setSelectedPrimaryGroup] = useState(defaultPrimaryGroup || '')
-  const [showDetails, setShowDetails] = useState(false)
-  const [showDetailsTable, setShowDetailsTable] = useState(false)
-  
+  const [showPercentage, setShowPercentage] = useState(false);
+  const [filterType, setFilterType] = useState<FilterType>("top");
+  const [selectedMetric, setSelectedMetric] = useState(defaultMetric);
+  const [selectedCategory, setSelectedCategory] = useState(
+    defaultCategory || categories?.[0]?.key
+  );
+  const [selectedPrimaryGroup, setSelectedPrimaryGroup] = useState(
+    defaultPrimaryGroup || ""
+  );
+  const [showDetails, setShowDetails] = useState(false);
+  const [showDetailsTable, setShowDetailsTable] = useState(false);
+
   // Add state for API-loaded data
-  const [apiData, setApiData] = useState<GroupedData | null>(null)
-  const [apiLoading, setApiLoading] = useState(false)
-  const [apiError, setApiError] = useState<null | string>(null)
-  const [availablePrimaryGroups, setAvailablePrimaryGroups] = useState<{ label: string; key: string }[]>([])
-  
+  const [apiData, setApiData] = useState<GroupedData | null>(null);
+  const [apiLoading, setApiLoading] = useState(false);
+  const [apiError, setApiError] = useState<null | string>(null);
+  const [availablePrimaryGroups, setAvailablePrimaryGroups] = useState<
+    { label: string; key: string }[]
+  >([]);
+
   // Fetch data from API if endpoint is provided
   useEffect(() => {
     if (!apiEndpoint) return;
-    
+
     const fetchData = async () => {
       try {
         setApiLoading(true);
         setApiError(null);
-        
+
         // Construct URL with query parameters
         const url = new URL(apiEndpoint, window.location.origin);
-        
+
         // Add primary and secondary fields
-        url.searchParams.append('primaryField', primaryField);
-        url.searchParams.append('secondaryField', secondaryField);
-        
+        url.searchParams.append("primaryField", primaryField);
+        url.searchParams.append("secondaryField", secondaryField);
+
         // Add other query parameters
         if (apiParams) {
           Object.entries(apiParams).forEach(([key, value]) => {
             url.searchParams.append(key, value);
           });
         }
-        
+
         const response = await fetch(url.toString());
-        
+
         if (!response.ok) {
           throw new Error(`API request failed with status ${response.status}`);
         }
-        
-        const data = await response.json() as GroupedData;
+
+        const data = (await response.json()) as GroupedData;
         setApiData(data);
-        
+
         // Extract and format primary groups from the data
-        const groups = Object.keys(data).map(key => ({
+        const groups = Object.keys(data).map((key) => ({
           label: key,
-          key: key
+          key: key,
         }));
-        
+
         setAvailablePrimaryGroups(groups);
-        
+
         // Set default primary group if not already set
         if (!selectedPrimaryGroup) {
-          if (defaultPrimaryValue && groups.some(g => g.key === defaultPrimaryValue)) {
+          if (
+            defaultPrimaryValue &&
+            groups.some((g) => g.key === defaultPrimaryValue)
+          ) {
             setSelectedPrimaryGroup(defaultPrimaryValue);
           } else if (groups.length > 0) {
             setSelectedPrimaryGroup(groups[0].key);
           }
         }
       } catch (error) {
-        console.error('Error fetching data from API:', error);
-        setApiError(error instanceof Error ? error.message : 'Unknown error');
+        console.error("Error fetching data from API:", error);
+        setApiError(error instanceof Error ? error.message : "Unknown error");
       } finally {
         setApiLoading(false);
       }
     };
-    
+
     fetchData();
   }, [apiEndpoint, JSON.stringify(apiParams), primaryField, secondaryField]);
-  
+
   // Handle changes when primary group changes
   useEffect(() => {
     if (selectedPrimaryGroup && apiData && apiData[selectedPrimaryGroup]) {
@@ -238,7 +258,7 @@ export function TopFiveUpgraded({
       // but with data from the selected primary group
     }
   }, [selectedPrimaryGroup, apiData]);
-  
+
   // Determine effective metrics to use
   let effectiveMetrics = metrics || [];
   let currentGroupData: MetricData[] = []; // Store the data for the selected group/metric here
@@ -247,16 +267,16 @@ export function TopFiveUpgraded({
   if (apiData && selectedPrimaryGroup && apiData[selectedPrimaryGroup]) {
     const groupData = apiData[selectedPrimaryGroup];
 
-    effectiveMetrics = metrics.map(metric => {
+    effectiveMetrics = metrics.map((metric) => {
       let data: MetricData[] = [];
-      switch(metric.key) {
-        case 'revenue':
+      switch (metric.key) {
+        case "revenue":
           data = groupData.revenue;
           break;
-        case 'rooms':
+        case "rooms":
           data = groupData.roomsSold; // Assuming 'roomsSold' is the key in your API data
           break;
-        case 'adr':
+        case "adr":
           data = groupData.adr;
           break;
         default:
@@ -272,39 +292,48 @@ export function TopFiveUpgraded({
   }
 
   // Get current metric data (use the already processed effectiveMetrics)
-  const currentMetric = effectiveMetrics.find(m => m.key === selectedMetric) || effectiveMetrics[0]
+  const currentMetric =
+    effectiveMetrics.find((m) => m.key === selectedMetric) ||
+    effectiveMetrics[0];
   // currentData should now correctly reflect the selected primary group and metric
-  const currentData = currentMetric?.data || []
+  const currentData = currentMetric?.data || [];
 
   // Find the maximum value to calculate percentages
-  const maxValue = currentData.length > 0
-    ? Math.max(...currentData.map(item => item.value))
-    : 0
+  const maxValue =
+    currentData.length > 0
+      ? Math.max(...currentData.map((item) => item.value))
+      : 0;
 
   // Filter and sort data based on selected filter
-  const filteredData = [...currentData].sort((a, b) => {
-    switch (filterType) {
-      case 'top':
-        return b.value - a.value
-      case 'bottom':
-        return a.value - b.value
-      case 'rising':
-        return b.change - a.change
-      case 'falling':
-        return a.change - b.change
-      default:
-        return 0
-    }
-  }).slice(0, 5)
+  const filteredData = [...currentData]
+    .sort((a, b) => {
+      switch (filterType) {
+        case "top":
+          return b.value - a.value;
+        case "bottom":
+          return a.value - b.value;
+        case "rising":
+          return b.change - a.change;
+        case "falling": // Sort by absolute amount of change (largest negative changes first)
+          // For falling, we want the most negative changes first (largest absolute decline)
+          return a.change - b.change;
+        default:
+          return 0;
+      }
+    })
+    .slice(0, 5);
 
-  // NEW: Reverse the display order for bottom/falling lists
-  const displayData = (filterType === 'bottom' || filterType === 'falling') 
-    ? [...filteredData].reverse() 
-    : filteredData;
+  // Display order logic:
+  // - Top/Rising/Falling: Show as sorted (highest values/changes first)
+  // - Bottom: Show from lowest to highest (ascending)
+  const displayData = filteredData;
 
   // Add function to calculate percentage change - MODIFIED
   // Returns percentage change as a number, or null if undefined (e.g., 0 vs 0)
-  const calculatePercentageChange = (current: number, change: number): number | null => {
+  const calculatePercentageChange = (
+    current: number,
+    change: number
+  ): number | null => {
     // Derive previous value. Ensure inputs are numbers.
     const currentNum = Number(current);
     const changeNum = Number(change);
@@ -313,7 +342,7 @@ export function TopFiveUpgraded({
     const previous = currentNum - changeNum;
 
     if (!isFinite(currentNum) || !isFinite(previous)) {
-       return null; // Handle non-finite inputs
+      return null; // Handle non-finite inputs
     }
 
     // Case: 0 vs 0
@@ -322,15 +351,15 @@ export function TopFiveUpgraded({
     }
 
     // Case: X vs 0 (Previous was 0)
-    if (previous === 0) { 
-       // Follow MainTimeSeriesDialog: +100% / -100%
-       return currentNum > 0 ? 100.0 : -100.0; 
+    if (previous === 0) {
+      // Follow MainTimeSeriesDialog: +100% / -100%
+      return currentNum > 0 ? 100.0 : -100.0;
     }
-    
+
     // Case: 0 vs X (Current is 0, Previous was non-zero)
     // This is always a -100% change
-    if (currentNum === 0) { 
-        return -100.0;
+    if (currentNum === 0) {
+      return -100.0;
     }
 
     // Standard case: Both previous and current are non-zero and finite
@@ -338,78 +367,105 @@ export function TopFiveUpgraded({
 
     // Handle potential NaN/Infinity from extremely small 'previous' values if necessary
     if (!isFinite(percentage)) {
-        // Fallback for safety
-        return previous > 0 ? (change > 0 ? 100.0 : -100.0) : (change > 0 ? -100.0 : 100.0); 
+      // Fallback for safety
+      return previous > 0
+        ? change > 0
+          ? 100.0
+          : -100.0
+        : change > 0
+        ? -100.0
+        : 100.0;
     }
-    
+
     // Return the calculated percentage, rounded to one decimal place
     return Number(percentage.toFixed(1));
-  }
+  };
 
   // Format change value based on the metric and display mode
   const formatChange = (item: MetricData): string => {
     const value = Number(item.value);
     const change = Number(item.change);
-    if (isNaN(value) || isNaN(change)) return '-';
+    if (isNaN(value) || isNaN(change)) return "-";
 
     if (showPercentage) {
       const percentChange = calculatePercentageChange(value, change);
       if (percentChange === null) {
-        return '-'; // Handle undefined change (0 vs 0)
+        return "-"; // Handle undefined change (0 vs 0)
       }
       // Format the number with sign and percentage
-      return `${percentChange > 0 ? '+' : ''}${Math.abs(percentChange).toFixed(1)}%`; 
+      return `${percentChange > 0 ? "+" : ""}${Math.abs(percentChange).toFixed(
+        1
+      )}%`;
     }
     // For absolute changes, return the formatted absolute change number
     return `${formatNumberWithCommas(Math.abs(change))}`;
-  }
+  };
 
   // Helper function to format percentage display string
   const formatPercentageDisplay = (percentChange: number | null): string => {
-      if (percentChange === null) {
-          return '-';
-      }
-      // Use toFixed(1) for one decimal place
-      return `${percentChange > 0 ? '+' : ''}${percentChange.toFixed(1)}%`;
+    if (percentChange === null) {
+      return "-";
+    }
+    // Use toFixed(1) for one decimal place
+    return `${percentChange > 0 ? "+" : ""}${percentChange.toFixed(1)}%`;
   };
 
   // Modify the getColorClass function to only handle bg color
-  const getColorClass = (type: 'bg') => {
-    return color === 'green' ? 'bg-emerald-500' : 'bg-blue-500'
-  }
+  const getColorClass = (type: "bg") => {
+    return color === "green" ? "bg-emerald-500" : "bg-blue-500";
+  };
 
   // Get current category label if categories exist
-  const currentCategoryLabel = categories?.find(c => c.key === selectedCategory)?.label || 'All Categories'
-  
+  const currentCategoryLabel =
+    categories?.find((c) => c.key === selectedCategory)?.label ||
+    "All Categories";
+
   // Get current primary group label
-  const currentPrimaryGroupLabel = availablePrimaryGroups.find(g => g.key === selectedPrimaryGroup)?.label || 'All Groups'
+  const currentPrimaryGroupLabel =
+    availablePrimaryGroups.find((g) => g.key === selectedPrimaryGroup)?.label ||
+    "All Groups";
 
   // NEW useEffect to emit data updates for listeners (like the map)
   useEffect(() => {
     // Ensure we have valid data before emitting
-    if (!apiLoading && apiData && selectedPrimaryGroup && selectedMetric && currentData.length > 0) {
-      console.log(`TopFive (${id}): Emitting dataUpdated event for ${selectedPrimaryGroup} / ${selectedMetric}`);
+    if (
+      !apiLoading &&
+      apiData &&
+      selectedPrimaryGroup &&
+      selectedMetric &&
+      currentData.length > 0
+    ) {
+      console.log(
+        `TopFive (${id}): Emitting dataUpdated event for ${selectedPrimaryGroup} / ${selectedMetric}`
+      );
       eventBus.publish(`topfive:${id}:dataUpdated`, {
         id,
         primaryGroup: selectedPrimaryGroup,
         metric: selectedMetric,
-        data: currentData // Send the *full* current data list, not just the filtered top 5
+        data: currentData, // Send the *full* current data list, not just the filtered top 5
       });
     }
     // Trigger this effect when selections change or API data is loaded/updated
-  }, [id, selectedPrimaryGroup, selectedMetric, currentData, apiLoading, apiData]);
+  }, [
+    id,
+    selectedPrimaryGroup,
+    selectedMetric,
+    currentData,
+    apiLoading,
+    apiData,
+  ]);
 
   // Modify the metric selection handler
   const handleMetricChange = (metric: string) => {
     setSelectedMetric(metric);
-    
+
     // Publish event when metric changes
     eventBus.publish(`topfive:${id}:metricChange`, {
       id,
       metric,
-      componentTitle: title
+      componentTitle: title,
     });
-    
+
     onMetricChange?.(metric); // Call the callback if provided
   };
 
@@ -419,38 +475,50 @@ export function TopFiveUpgraded({
       eventBus.publish(`topfive:${id}:metricChange`, {
         id,
         metric: selectedMetric,
-        componentTitle: title
+        componentTitle: title,
       });
     }
   }, []);
-  
+
   // Modify the primary group selection handler
   const handlePrimaryGroupChange = (groupKey: string) => {
     setSelectedPrimaryGroup(groupKey);
-    
+
     // Publish event when primary group changes
     eventBus.publish(`topfive:${id}:primaryGroupChange`, {
       id,
       primaryGroup: groupKey,
-      componentTitle: title
+      componentTitle: title,
     });
   };
 
   return (
     <>
-      <Card className={`${withBorder ? 'bg-white border-gray-300 ' : 'bg-transparent shadow-none border-0'}`}>
+      <Card
+        className={`${
+          withBorder
+            ? "bg-white border-gray-300 "
+            : "bg-transparent shadow-none border-0"
+        }`}
+      >
         <CardHeader className="flex flex-col md:flex-row items-start justify-between pb-2">
           <div className="flex flex-col w-full md:w-auto">
-            <CardTitle className="text-lg font-semibold text-gray-800">{title}</CardTitle>
-            {subtitle && <CardDescription className="text-sm text-gray-500 mt-1">{subtitle}</CardDescription>}
+            <CardTitle className="text-lg font-semibold text-gray-800">
+              {title}
+            </CardTitle>
+            {subtitle && (
+              <CardDescription className="text-sm text-gray-500 mt-1">
+                {subtitle}
+              </CardDescription>
+            )}
           </div>
-          
+
           <div className="flex items-center flex-wrap gap-2 w-full md:w-auto mt-6 pt-3 md:mt-0 justify-start md:justify-end">
             {availablePrimaryGroups.length > 0 && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button 
-                    variant="ghost" 
+                  <Button
+                    variant="ghost"
                     size="sm"
                     className="bg-[#f2f8ff] hover:bg-[#f2f8ff] text-[#342630] rounded-full px-4 font-semibold flex-shrink-0"
                   >
@@ -458,8 +526,8 @@ export function TopFiveUpgraded({
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent className="max-h-[300px] overflow-y-auto">
-                  {availablePrimaryGroups.map(group => (
-                    <DropdownMenuItem 
+                  {availablePrimaryGroups.map((group) => (
+                    <DropdownMenuItem
                       key={group.key}
                       onClick={() => handlePrimaryGroupChange(group.key)}
                     >
@@ -469,12 +537,12 @@ export function TopFiveUpgraded({
                 </DropdownMenuContent>
               </DropdownMenu>
             )}
-            
+
             {categories && categories.length > 0 && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button 
-                    variant="ghost" 
+                  <Button
+                    variant="ghost"
                     size="sm"
                     className="bg-[#f2f8ff] hover:bg-[#f2f8ff] text-[#342630] rounded-full px-4 font-semibold flex-shrink-0"
                   >
@@ -482,8 +550,8 @@ export function TopFiveUpgraded({
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent>
-                  {categories.map(category => (
-                    <DropdownMenuItem 
+                  {categories.map((category) => (
+                    <DropdownMenuItem
                       key={category.key}
                       onClick={() => setSelectedCategory(category.key)}
                     >
@@ -493,7 +561,7 @@ export function TopFiveUpgraded({
                 </DropdownMenuContent>
               </DropdownMenu>
             )}
-            
+
             <Button
               variant="ghost"
               size="sm"
@@ -506,46 +574,48 @@ export function TopFiveUpgraded({
                 <HashIcon className="h-4 w-4" />
               )}
             </Button>
-            
+
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button 
-                  variant="ghost" 
+                <Button
+                  variant="ghost"
                   size="sm"
                   className="bg-[#f2f8ff] hover:bg-[#f2f8ff] text-[#342630] rounded-full px-4 font-semibold flex-shrink-0"
                 >
-                  {filterDisplayNames[filterType]} <TriangleDown className="ml-2" />
+                  {filterDisplayNames[filterType]}{" "}
+                  <TriangleDown className="ml-2" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent>
-                <DropdownMenuItem onClick={() => setFilterType('top')}>
+                <DropdownMenuItem onClick={() => setFilterType("top")}>
                   {filterDisplayNames.top}
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setFilterType('bottom')}>
+                <DropdownMenuItem onClick={() => setFilterType("bottom")}>
                   {filterDisplayNames.bottom}
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setFilterType('rising')}>
+                <DropdownMenuItem onClick={() => setFilterType("rising")}>
                   {filterDisplayNames.rising}
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setFilterType('falling')}>
+                <DropdownMenuItem onClick={() => setFilterType("falling")}>
                   {filterDisplayNames.falling}
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
-            
+
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button 
-                  variant="ghost" 
+                <Button
+                  variant="ghost"
                   size="sm"
                   className="bg-[#f2f8ff] hover:bg-[#f2f8ff] text-[#342630] rounded-full px-4 flex-shrink-0"
                 >
-                  {currentMetric?.label || 'Select Metric'} <TriangleDown className="ml-2" />
+                  {currentMetric?.label || "Select Metric"}{" "}
+                  <TriangleDown className="ml-2" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent>
-                {effectiveMetrics.map(metric => (
-                  <DropdownMenuItem 
+                {effectiveMetrics.map((metric) => (
+                  <DropdownMenuItem
                     key={metric.key}
                     onClick={() => handleMetricChange(metric.key)}
                   >
@@ -556,33 +626,36 @@ export function TopFiveUpgraded({
             </DropdownMenu>
           </div>
         </CardHeader>
-        
+
         <CardContent className="pt-3">
           {apiLoading && (
             <div className="flex justify-center items-center py-4">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
             </div>
           )}
-          
+
           {apiError && (
             <div className="bg-red-50 text-red-700 p-3 rounded-md mb-4">
               <p>Error loading data: {apiError}</p>
             </div>
           )}
-          
+
           {!apiLoading && !apiError && apiData && !selectedPrimaryGroup && (
             <div className="text-center py-6 text-gray-500">
-              Please select a {primaryField.replace('_', ' ')} from the dropdown
+              Please select a {primaryField.replace("_", " ")} from the dropdown
             </div>
           )}
-          
-          {!apiLoading && !apiError && apiData && selectedPrimaryGroup && 
-           (!apiData[selectedPrimaryGroup] || filteredData.length === 0) && (
-            <div className="text-center py-6 text-gray-500">
-              No data available for {selectedPrimaryGroup}
-            </div>
-          )}
-          
+
+          {!apiLoading &&
+            !apiError &&
+            apiData &&
+            selectedPrimaryGroup &&
+            (!apiData[selectedPrimaryGroup] || filteredData.length === 0) && (
+              <div className="text-center py-6 text-gray-500">
+                No data available for {selectedPrimaryGroup}
+              </div>
+            )}
+
           {!apiLoading && !apiError && (
             <>
               {displayData.map((item, index) => (
@@ -594,11 +667,17 @@ export function TopFiveUpgraded({
                     <span className="text-gray-600 text-sm">{item.name}</span>
                     <div className="flex items-center">
                       <span className="text-sm font-medium w-16 text-right mr-8">
-                        {currentMetric?.prefix || ''}{formatNumberWithCommas(item.value)}{currentMetric?.suffix || ''}
+                        {currentMetric?.prefix || ""}
+                        {formatNumberWithCommas(item.value)}
+                        {currentMetric?.suffix || ""}
                       </span>
-                      <span 
+                      <span
                         className={`flex items-center text-sm ${
-                          item.change > 0 ? 'text-green-500' : item.change < 0 ? 'text-red-500' : 'text-gray-500'
+                          item.change > 0
+                            ? "text-green-500"
+                            : item.change < 0
+                            ? "text-red-500"
+                            : "text-gray-500"
                         } w-20 justify-end`}
                       >
                         {item.change !== 0 ? (
@@ -607,53 +686,67 @@ export function TopFiveUpgraded({
                           ) : (
                             <ArrowDownIcon className="h-4 w-4 mr-1" />
                           )
-                        ) : null } 
+                        ) : null}
                         {formatChange(item)}
                       </span>
                     </div>
                   </div>
                   <div className="absolute bottom-0 left-0 right-0 h-1 bg-gray-100">
-                    <div 
-                      className={`h-full ${getColorClass('bg')} transition-all duration-300`}
-                      style={{ 
-                        width: `${(item.value / maxValue) * 100}%`
-                      }} 
+                    <div
+                      className={`h-full ${getColorClass(
+                        "bg"
+                      )} transition-all duration-300`}
+                      style={{
+                        width: `${(item.value / maxValue) * 100}%`,
+                      }}
                     />
                   </div>
                 </div>
               ))}
-              
-              {Array.from({ length: Math.max(0, 5 - displayData.length) }).map((_, index) => (
-                <div
-                  key={`empty-${index}`}
-                  className="relative mb-4 last:mb-0"
-                >
-                  <div className="flex items-center justify-between py-4">
-                    <span className="text-gray-400 text-sm italic">No data</span>
-                    <div className="flex items-center">
-                      <span className="text-sm font-medium w-16 text-right mr-8 text-gray-300">
-                        {currentMetric?.prefix || ''}0{currentMetric?.suffix || ''}
+
+              {Array.from({ length: Math.max(0, 5 - displayData.length) }).map(
+                (_, index) => (
+                  <div
+                    key={`empty-${index}`}
+                    className="relative mb-4 last:mb-0"
+                  >
+                    <div className="flex items-center justify-between py-4">
+                      <span className="text-gray-400 text-sm italic">
+                        No data
                       </span>
-                      <span className="flex items-center text-sm text-gray-300 w-20 justify-end">
-                        0
-                      </span>
+                      <div className="flex items-center">
+                        <span className="text-sm font-medium w-16 text-right mr-8 text-gray-300">
+                          {currentMetric?.prefix || ""}0
+                          {currentMetric?.suffix || ""}
+                        </span>
+                        <span className="flex items-center text-sm text-gray-300 w-20 justify-end">
+                          0
+                        </span>
+                      </div>
+                    </div>
+                    <div className="absolute bottom-0 left-0 right-0 h-1 bg-gray-100">
+                      <div
+                        className="h-full bg-gray-100"
+                        style={{ width: "0%" }}
+                      />
                     </div>
                   </div>
-                  <div className="absolute bottom-0 left-0 right-0 h-1 bg-gray-100">
-                    <div className="h-full bg-gray-100" style={{ width: "0%" }} />
-                  </div>
-                </div>
-              ))}
+                )
+              )}
             </>
           )}
-          
+
           {!apiLoading && !apiError && displayData.length > 0 && (
             <div className="mt-4 pt-4 border-t border-gray-200">
               <div className="flex justify-end">
                 <Button
                   variant="ghost"
                   className="text-blue-600 hover:text-blue-800 font-medium text-sm"
-                  onClick={() => useCategoriesDialog ? setShowDetails(true) : setShowDetailsTable(true)}
+                  onClick={() =>
+                    useCategoriesDialog
+                      ? setShowDetails(true)
+                      : setShowDetailsTable(true)
+                  }
                 >
                   View Details
                 </Button>
@@ -664,11 +757,11 @@ export function TopFiveUpgraded({
       </Card>
 
       {useCategoriesDialog && (
-        <CategoriesDetailsDialog 
+        <CategoriesDetailsDialog
           open={showDetails}
           onOpenChange={setShowDetails}
           title={`${title} - ${currentPrimaryGroupLabel}`}
-          prefix={currentMetric?.prefix || ''}
+          prefix={currentMetric?.prefix || ""}
           apiEndpoint={apiEndpoint}
           apiParams={{
             ...apiParams,
@@ -677,7 +770,7 @@ export function TopFiveUpgraded({
             field: secondaryField,
             primaryGroup: selectedPrimaryGroup,
             primaryValue: selectedPrimaryGroup,
-            primaryFilterField: primaryField
+            primaryFilterField: primaryField,
           }}
         />
       )}
@@ -689,51 +782,86 @@ export function TopFiveUpgraded({
               {title} - {currentPrimaryGroupLabel}
             </DialogTitle>
           </DialogHeader>
-          
+
           <div className="flex-1 overflow-y-auto pr-6 bg-[#f2f8ff] px-4 pb-4 pt-4">
             <div className="flex flex-col gap-6">
               <div className="bg-white rounded-lg p-6 shadow-sm border border-gray-300">
-                <h3 className="text-base mb-6 font-medium">Details for {currentMetric?.label || 'Metric'}</h3>
+                <h3 className="text-base mb-6 font-medium">
+                  Details for {currentMetric?.label || "Metric"}
+                </h3>
                 <div className="border rounded-lg">
                   <Table>
                     <TableHeader>
                       <TableRow className="hover:bg-transparent">
-                        <TableHead className="bg-[#f0f4fa]/60 w-[40%] text-left">Name</TableHead>
-                        <TableHead className="bg-[#f0f4fa]/60 w-[30%] text-left">Value</TableHead>
-                        <TableHead className="bg-[#f0f4fa]/60 w-[30%] text-left">Change</TableHead>
+                        <TableHead className="bg-[#f0f4fa]/60 w-[40%] text-left">
+                          Name
+                        </TableHead>
+                        <TableHead className="bg-[#f0f4fa]/60 w-[30%] text-left">
+                          Value
+                        </TableHead>
+                        <TableHead className="bg-[#f0f4fa]/60 w-[30%] text-left">
+                          Change
+                        </TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {currentData.sort((a, b) => {
-                        switch (filterType) {
-                          case 'top':
-                            return b.value - a.value
-                          case 'bottom':
-                            return a.value - b.value
-                          case 'rising':
-                            return b.change - a.change
-                          case 'falling':
-                            return a.change - b.change
-                          default:
-                            return 0
-                        }
-                      }).map((item, idx) => (
-                        <TableRow key={item.code || `all-${idx}`} className="border-b border-[#d0d7e3] last:border-0">
-                          <TableCell className="bg-[#f0f4fa]/40 border-r border-[#d0d7e3]">
-                            {item.name}
-                          </TableCell>
-                          <TableCell className="border-r border-[#d0d7e3]">
-                            {currentMetric?.prefix || ''}{formatNumberWithCommas(item.value)}{currentMetric?.suffix || ''}
-                          </TableCell>
-                          <TableCell className={item.change > 0 ? "text-emerald-500" : item.change < 0 ? "text-red-500" : "text-gray-700"}>
-                            {item.change >= 0 ? '+' : ''}{formatNumberWithCommas(item.change)} 
-                            &nbsp;({formatPercentageDisplay(calculatePercentageChange(item.value, item.change))})
-                          </TableCell>
-                        </TableRow>
-                      ))}
+                      {currentData
+                        .sort((a, b) => {
+                          switch (filterType) {
+                            case "top":
+                              return b.value - a.value;
+                            case "bottom":
+                              return a.value - b.value;
+                            case "rising":
+                              return b.change - a.change;
+                            case "falling": // Sort by absolute amount of change (largest negative changes first)
+                              // For falling, we want the most negative changes first (largest absolute decline)
+                              return a.change - b.change;
+                            default:
+                              return 0;
+                          }
+                        })
+                        .map((item, idx) => (
+                          <TableRow
+                            key={item.code || `all-${idx}`}
+                            className="border-b border-[#d0d7e3] last:border-0"
+                          >
+                            <TableCell className="bg-[#f0f4fa]/40 border-r border-[#d0d7e3]">
+                              {item.name}
+                            </TableCell>
+                            <TableCell className="border-r border-[#d0d7e3]">
+                              {currentMetric?.prefix || ""}
+                              {formatNumberWithCommas(item.value)}
+                              {currentMetric?.suffix || ""}
+                            </TableCell>
+                            <TableCell
+                              className={
+                                item.change > 0
+                                  ? "text-emerald-500"
+                                  : item.change < 0
+                                  ? "text-red-500"
+                                  : "text-gray-700"
+                              }
+                            >
+                              {item.change >= 0 ? "+" : ""}
+                              {formatNumberWithCommas(item.change)}
+                              &nbsp;(
+                              {formatPercentageDisplay(
+                                calculatePercentageChange(
+                                  item.value,
+                                  item.change
+                                )
+                              )}
+                              )
+                            </TableCell>
+                          </TableRow>
+                        ))}
                       {currentData.length === 0 && (
                         <TableRow>
-                          <TableCell colSpan={3} className="text-center py-4 text-gray-500">
+                          <TableCell
+                            colSpan={3}
+                            className="text-center py-4 text-gray-500"
+                          >
                             No data available
                           </TableCell>
                         </TableRow>
@@ -747,5 +875,5 @@ export function TopFiveUpgraded({
         </DialogContent>
       </Dialog>
     </>
-  )
-} 
+  );
+}

@@ -50,6 +50,9 @@ function generateCacheKey(params: URLSearchParams): string {
     "periodType",
     "viewType",
     "comparison",
+    "property",
+    "customStartDate",
+    "customEndDate",
   ];
   const keyParts: string[] = [];
 
@@ -188,11 +191,19 @@ export async function GET(request: NextRequest) {
   const viewType = searchParams.get("viewType") || "Actual"; // Actual, OTB, Projected
   const comparisonType = searchParams.get("comparison") || "Last year - OTB";
 
+  // Custom date range parameters
+  const customStartDate = searchParams.get("customStartDate") || undefined;
+  const customEndDate = searchParams.get("customEndDate") || undefined;
+
   // Define date ranges based on selected period
   const businessDate = new Date(businessDateParam);
   let startDate: string, endDate: string;
 
-  if (periodType === "Day") {
+  // Check if custom date range is provided
+  if (customStartDate && customEndDate && periodType === "Custom") {
+    startDate = customStartDate;
+    endDate = customEndDate;
+  } else if (periodType === "Day") {
     // For Day, always use business date
     startDate = businessDateParam;
     endDate = startDate;

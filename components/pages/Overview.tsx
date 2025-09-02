@@ -34,8 +34,12 @@ import { addDays } from "date-fns";
 import { OccupancyAnalysisChart } from "../new/OccupancyAnalysisChart";
 type KpiResponse = any;
 import { KpiWithAlignedChart } from "../new/KpiWithAlignedChart";
-import { usePersistentOverviewFilters } from "@/hooks/usePersistentOverviewFilters"; // Import the custom hook
+import {
+  usePersistentOverviewFilters,
+  type DateRange,
+} from "@/hooks/usePersistentOverviewFilters"; // Import the custom hook
 import { getCodeFromFullName } from "@/lib/countryUtils"; // <-- Import the utility function
+import { SeparateDatePickers } from "@/components/ui/separate-date-pickers";
 
 // Dynamic import for WorldMap with loading state
 const WorldMap = dynamic(
@@ -90,6 +94,8 @@ export function Overview() {
     setDate, // Use the setter from the hook
     selectedProperty,
     setSelectedProperty,
+    customDateRange,
+    setCustomDateRange,
   } = usePersistentOverviewFilters();
 
   // Remove dummy hotels; using property selector instead
@@ -122,19 +128,35 @@ export function Overview() {
     const day = String(date.getDate()).padStart(2, "0");
     const formattedDate = `${year}-${month}-${day}`;
 
-    setAnalysisApiParams({
+    const params: any = {
       businessDate: formattedDate, // Uses properly formatted date
       periodType: selectedTimeFrame, // Uses selectedTimeFrame from the hook
       viewType: selectedViewType, // Uses selectedViewType from the hook
       comparison: selectedComparison, // Uses selectedComparison from the hook
       property: selectedProperty,
-    });
+    };
+
+    // Add custom date range parameters if available
+    if (customDateRange?.from && customDateRange?.to) {
+      // Use timezone-safe date formatting to avoid UTC conversion issues
+      const formatDateSafe = (date: Date) => {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, "0");
+        const day = String(date.getDate()).padStart(2, "0");
+        return `${year}-${month}-${day}`;
+      };
+      params.customStartDate = formatDateSafe(customDateRange.from);
+      params.customEndDate = formatDateSafe(customDateRange.to);
+    }
+
+    setAnalysisApiParams(params);
   }, [
     date,
     selectedTimeFrame,
     selectedViewType,
     selectedComparison,
     selectedProperty,
+    customDateRange,
   ]); // Dependencies are now from the hook
 
   // Modify the fetchKpiData function to mark primary data as loaded
@@ -163,6 +185,19 @@ export function Overview() {
         comparison: selectedComparison,
         property: selectedProperty,
       });
+
+      // Add custom date range parameters if available
+      if (customDateRange?.from && customDateRange?.to) {
+        // Use timezone-safe date formatting to avoid UTC conversion issues
+        const formatDateSafe = (date: Date) => {
+          const year = date.getFullYear();
+          const month = String(date.getMonth() + 1).padStart(2, "0");
+          const day = String(date.getDate()).padStart(2, "0");
+          return `${year}-${month}-${day}`;
+        };
+        params.append("customStartDate", formatDateSafe(customDateRange.from));
+        params.append("customEndDate", formatDateSafe(customDateRange.to));
+      }
 
       console.log(
         "🔍 DEBUG: Overview fetchKpiData - API URL:",
@@ -203,6 +238,7 @@ export function Overview() {
     selectedViewType,
     selectedComparison,
     selectedProperty,
+    customDateRange,
   ]);
 
   // remove legacy toggleHotel/toggleAllHotels
@@ -246,6 +282,34 @@ export function Overview() {
     // Data fetching is handled by the main useEffect dependency change
   };
 
+  // Helper function to get display text for selected period
+  const getSelectedPeriodDisplay = () => {
+    if (customDateRange?.from && customDateRange?.to) {
+      return `${customDateRange.from.toLocaleDateString()} - ${customDateRange.to.toLocaleDateString()}`;
+    }
+    return `${selectedTimeFrame} ${selectedViewType}`;
+  };
+
+  // Handler for custom date range selection
+  const handleCustomDateRangeChange = (range: DateRange | undefined) => {
+    setCustomDateRange(range);
+    if (range?.from && range?.to) {
+      // Set timeframe to "Custom" when a custom range is selected
+      setSelectedTimeFrame("Custom");
+    }
+  };
+
+  // Handler for predefined period selection
+  const handlePredefinedPeriodSelect = (
+    timeFrame: string,
+    viewType: string
+  ) => {
+    setSelectedTimeFrame(timeFrame);
+    setSelectedViewType(viewType);
+    // Clear custom date range when selecting predefined periods
+    setCustomDateRange(undefined);
+  };
+
   // Modify the fetchWorldMapData function to use the mapping and convert country names
   const fetchWorldMapData = async (metric: string = selectedMapMetric) => {
     try {
@@ -260,6 +324,19 @@ export function Overview() {
         limit: "50",
         property: selectedProperty,
       });
+
+      // Add custom date range parameters if available
+      if (customDateRange?.from && customDateRange?.to) {
+        // Use timezone-safe date formatting to avoid UTC conversion issues
+        const formatDateSafe = (date: Date) => {
+          const year = date.getFullYear();
+          const month = String(date.getMonth() + 1).padStart(2, "0");
+          const day = String(date.getDate()).padStart(2, "0");
+          return `${year}-${month}-${day}`;
+        };
+        params.append("customStartDate", formatDateSafe(customDateRange.from));
+        params.append("customEndDate", formatDateSafe(customDateRange.to));
+      }
 
       const response = await fetch(`/api/overview/distribution?${params}`);
       if (!response.ok) throw new Error("Failed to fetch world map data");
@@ -299,6 +376,7 @@ export function Overview() {
     selectedComparison,
     selectedMapMetric,
     selectedProperty,
+    customDateRange,
   ]);
 
   return (
@@ -329,37 +407,31 @@ export function Overview() {
                   variant="ghost"
                   className="bg-[#f2f8ff] hover:bg-[#f2f8ff] text-[#342630] rounded-full px-4"
                 >
-                  {`${selectedTimeFrame} ${selectedViewType}`}{" "}
-                  <TriangleDown className="ml-2" />
+                  {getSelectedPeriodDisplay()} <TriangleDown className="ml-2" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent className="w-56">
+              <DropdownMenuContent className="w-65">
                 {/* Day Group */}
                 <div className="px-2 py-2 text-sm font-semibold text-gray-800  border-b border-gray-300">
                   Day
                 </div>
                 <div className="p-1 text-gray-600">
                   <DropdownMenuItem
-                    onSelect={() => {
-                      setSelectedTimeFrame("Day");
-                      setSelectedViewType("Actual");
-                    }}
+                    onSelect={() =>
+                      handlePredefinedPeriodSelect("Day", "Actual")
+                    }
                   >
                     Actual
                   </DropdownMenuItem>
                   <DropdownMenuItem
-                    onSelect={() => {
-                      setSelectedTimeFrame("Day");
-                      setSelectedViewType("OTB");
-                    }}
+                    onSelect={() => handlePredefinedPeriodSelect("Day", "OTB")}
                   >
                     OTB
                   </DropdownMenuItem>
                   <DropdownMenuItem
-                    onSelect={() => {
-                      setSelectedTimeFrame("Day");
-                      setSelectedViewType("Projected");
-                    }}
+                    onSelect={() =>
+                      handlePredefinedPeriodSelect("Day", "Projected")
+                    }
                   >
                     Projected
                   </DropdownMenuItem>
@@ -371,26 +443,23 @@ export function Overview() {
                 </div>
                 <div className="p-1 text-gray-600">
                   <DropdownMenuItem
-                    onSelect={() => {
-                      setSelectedTimeFrame("Month");
-                      setSelectedViewType("Actual");
-                    }}
+                    onSelect={() =>
+                      handlePredefinedPeriodSelect("Month", "Actual")
+                    }
                   >
                     Actual
                   </DropdownMenuItem>
                   <DropdownMenuItem
-                    onSelect={() => {
-                      setSelectedTimeFrame("Month");
-                      setSelectedViewType("OTB");
-                    }}
+                    onSelect={() =>
+                      handlePredefinedPeriodSelect("Month", "OTB")
+                    }
                   >
                     OTB
                   </DropdownMenuItem>
                   <DropdownMenuItem
-                    onSelect={() => {
-                      setSelectedTimeFrame("Month");
-                      setSelectedViewType("Projected");
-                    }}
+                    onSelect={() =>
+                      handlePredefinedPeriodSelect("Month", "Projected")
+                    }
                   >
                     Projected
                   </DropdownMenuItem>
@@ -402,29 +471,36 @@ export function Overview() {
                 </div>
                 <div className="p-1">
                   <DropdownMenuItem
-                    onSelect={() => {
-                      setSelectedTimeFrame("Year");
-                      setSelectedViewType("Actual");
-                    }}
+                    onSelect={() =>
+                      handlePredefinedPeriodSelect("Year", "Actual")
+                    }
                   >
                     Actual
                   </DropdownMenuItem>
                   <DropdownMenuItem
-                    onSelect={() => {
-                      setSelectedTimeFrame("Year");
-                      setSelectedViewType("OTB");
-                    }}
+                    onSelect={() => handlePredefinedPeriodSelect("Year", "OTB")}
                   >
                     OTB
                   </DropdownMenuItem>
                   <DropdownMenuItem
-                    onSelect={() => {
-                      setSelectedTimeFrame("Year");
-                      setSelectedViewType("Projected");
-                    }}
+                    onSelect={() =>
+                      handlePredefinedPeriodSelect("Year", "Projected")
+                    }
                   >
                     Projected
                   </DropdownMenuItem>
+                </div>
+
+                {/* Custom Date Range Group */}
+                <div className="px-2 py-2 text-sm font-semibold text-gray-800  border-t border-gray-300">
+                  Custom Period
+                </div>
+                <div className="p-3">
+                  <SeparateDatePickers
+                    dateRange={customDateRange}
+                    onDateRangeChange={handleCustomDateRangeChange}
+                    className="w-full"
+                  />
                 </div>
               </DropdownMenuContent>
             </DropdownMenu>
