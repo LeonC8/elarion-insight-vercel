@@ -136,9 +136,11 @@ export function calculateComparisonDateRanges(
   // Determine which business date to use for the previous period
   let prevBusinessDateParam: string;
   if (useOTBBusinessDate) {
-    // For OTB comparisons, always use the current business date for SCD lookup
-    // This ensures we're seeing the data as it existed on the current business date
-    prevBusinessDateParam = businessDateParam;
+    // For OTB comparisons, use the business date from one year ago
+    // This shows what was "on the books" at that time last year
+    const prevBusinessDate = new Date(businessDateParam);
+    prevBusinessDate.setFullYear(prevBusinessDate.getFullYear() - 1);
+    prevBusinessDateParam = prevBusinessDate.toISOString().split("T")[0];
   } else {
     // For Actual comparisons, use the current business date for consistency
     // This ensures we're comparing data from the same SCD perspective
