@@ -639,12 +639,12 @@ export async function GET(request: NextRequest) {
       return currentDailyData.map((currentDay) => {
         const date = new Date(currentDay.occupancy_date);
 
-        // Format the date as DD/MM for display
+        // Format the date as DD/MM/YYYY for proper year handling
         const formattedDate = `${date.getDate().toString().padStart(2, "0")}/${(
           date.getMonth() + 1
         )
           .toString()
-          .padStart(2, "0")}`;
+          .padStart(2, "0")}/${date.getFullYear()}`;
 
         // Create the key for lookup as MM/DD to match the map
         const lookupKey = `${(date.getMonth() + 1)

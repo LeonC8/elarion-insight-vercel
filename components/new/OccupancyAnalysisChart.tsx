@@ -150,39 +150,31 @@ export function OccupancyAnalysisChart({
     };
 
     // Process each data point
-    console.log(
-      "🔍 DEBUG: Starting to process occupancy data for DOW calculation"
-    );
-    console.log("🔍 DEBUG: Total data points:", occupancyData.length);
-    console.log("🔍 DEBUG: Sample data points:", occupancyData.slice(0, 3));
-
     occupancyData.forEach((dataPoint, index) => {
       try {
-        console.log(`🔍 DEBUG: Processing dataPoint ${index}:`, dataPoint);
-
         // Parse the date
         let date;
 
         if (dataPoint.date.includes("-")) {
-          console.log(`🔍 DEBUG: Parsing ISO format date: ${dataPoint.date}`);
           // ISO format (YYYY-MM-DD)
           date = parseISO(dataPoint.date);
-          console.log(`🔍 DEBUG: Parsed ISO date result:`, date);
         } else if (dataPoint.date.includes("/")) {
-          console.log(`🔍 DEBUG: Parsing DD/MM format date: ${dataPoint.date}`);
-          // DD/MM format (European format) - swapped the order
-          const [day, month] = dataPoint.date.split("/").map(Number);
-          const year = new Date().getFullYear();
-          console.log(
-            `🔍 DEBUG: Extracted day: ${day}, month: ${month}, year: ${year}`
-          );
-          date = new Date(year, month - 1, day);
-          console.log(`🔍 DEBUG: Parsed DD/MM date result:`, date);
+          // DD/MM/YYYY format (European format with year)
+          const dateParts = dataPoint.date.split("/").map(Number);
+
+          if (dateParts.length === 3) {
+            // DD/MM/YYYY format
+            const [day, month, year] = dateParts;
+            date = new Date(year, month - 1, day);
+          } else if (dateParts.length === 2) {
+            // DD/MM format (fallback for backward compatibility)
+            const [day, month] = dateParts;
+            const currentYear = new Date().getFullYear();
+            date = new Date(currentYear, month - 1, day);
+          }
         } else {
-          console.log(`🔍 DEBUG: Trying to parse directly: ${dataPoint.date}`);
           // Try to parse directly
           date = new Date(dataPoint.date);
-          console.log(`🔍 DEBUG: Direct parse result:`, date);
         }
 
         // Check if date is valid
@@ -191,23 +183,9 @@ export function OccupancyAnalysisChart({
           const dayIndex = date.getDay();
           const dayOfWeek = daysOfWeek[dayIndex];
 
-          console.log(
-            `🔍 DEBUG: Date ${
-              dataPoint.date
-            } -> ${date.toISOString()} -> dayIndex: ${dayIndex} -> dayOfWeek: ${dayOfWeek}`
-          );
-          console.log(`🔍 DEBUG: Date object details: ${date.toString()}`);
-          console.log(
-            `🔍 DEBUG: Date getDay() result: ${dayIndex} (0=Sunday, 1=Monday, etc.)`
-          );
-
           // Add to accumulator
           dowAccumulator[dayOfWeek].sum += dataPoint.current;
           dowAccumulator[dayOfWeek].count += 1;
-
-          console.log(
-            `🔍 DEBUG: Added to ${dayOfWeek}: sum=${dowAccumulator[dayOfWeek].sum}, count=${dowAccumulator[dayOfWeek].count}`
-          );
         } else {
           console.warn(`❌ Could not parse date: ${dataPoint.date}`, date);
         }
@@ -218,8 +196,6 @@ export function OccupancyAnalysisChart({
         );
       }
     });
-
-    console.log("🔍 DEBUG: Final DOW accumulator:", dowAccumulator);
 
     // Calculate averages and create final data
     const result = daysOfWeek.map((day) => {
