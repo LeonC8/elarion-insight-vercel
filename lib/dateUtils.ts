@@ -136,16 +136,13 @@ export function calculateComparisonDateRanges(
   // Determine which business date to use for the previous period
   let prevBusinessDateParam: string;
   if (useOTBBusinessDate) {
-    // Use the business date from the beginning of the previous period
-    prevBusinessDateParam = prevStartDate.toISOString().split("T")[0];
+    // For OTB comparisons, always use the current business date for SCD lookup
+    // This ensures we're seeing the data as it existed on the current business date
+    prevBusinessDateParam = businessDateParam;
   } else {
-    // For single day ranges, use the exact previous period date
-    if (isSingleDayRange) {
-      prevBusinessDateParam = prevStartDate.toISOString().split("T")[0];
-    } else {
-      // Use the same business date as the current period for multi-day ranges
-      prevBusinessDateParam = businessDateParam;
-    }
+    // For Actual comparisons, use the current business date for consistency
+    // This ensures we're comparing data from the same SCD perspective
+    prevBusinessDateParam = businessDateParam;
   }
 
   return {

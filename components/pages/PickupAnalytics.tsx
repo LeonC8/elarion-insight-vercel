@@ -388,7 +388,11 @@ export function PickupAnalytics() {
           {/* Add flex-shrink-0 */}
           <div className="flex flex-col flex-shrink-0">
             <span className="text-xs text-gray-500 mb-2">Report date</span>
-            <DatePicker date={reportDate} onDateChange={handleDateChange} />
+            <DatePicker
+              date={reportDate}
+              onDateChange={handleDateChange}
+              maxDate={new Date()}
+            />
           </div>
 
           {/* Comparison Dropdown */}

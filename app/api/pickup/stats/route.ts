@@ -191,15 +191,8 @@ export async function GET(request: NextRequest) {
     `;
 
     // Query for previous year data
-    // Calculate previous year snapshot date for comparison (same logic as current year)
-    const prevSnapshotDate = new Date(snapshotDate);
-    prevSnapshotDate.setFullYear(prevSnapshotDate.getFullYear() - 1);
-    const prevSnapshotDateStr = formatDateUTC(prevSnapshotDate);
-
-    // Calculate previous year business date for room capacity
-    const prevBusinessDate = new Date(businessDateParam);
-    prevBusinessDate.setFullYear(prevBusinessDate.getFullYear() - 1);
-    const prevBusinessDateStr = formatDateUTC(prevBusinessDate);
+    // Keep the same snapshot date (don't shift it back)
+    // Only shift the occupancy dates for comparison
 
     const prevYearQuery = `
       WITH insights_data AS (
@@ -213,8 +206,8 @@ export async function GET(request: NextRequest) {
           ${occupancyClause.replace(/(\d{4})/g, (match) =>
             (parseInt(match) - 1).toString()
           )}
-          AND scd_valid_from <= toDateTime('${prevSnapshotDateStr}')
-          AND scd_valid_to > toDateTime('${prevSnapshotDateStr}')
+          AND scd_valid_from <= toDateTime('${snapshotDate}')
+          AND scd_valid_to > toDateTime('${snapshotDate}')
           ${propertyFilter}
       ),
       room_capacity AS (
@@ -222,8 +215,8 @@ export async function GET(request: NextRequest) {
           SUM(physicalRooms) AS available_rooms
         FROM JADRANKA.room_type_details
         WHERE 
-          date(scd_valid_from) <= DATE('${prevSnapshotDateStr}') 
-          AND DATE('${prevSnapshotDateStr}') < date(scd_valid_to)
+          date(scd_valid_from) <= DATE('${snapshotDate}') 
+          AND DATE('${snapshotDate}') < date(scd_valid_to)
           ${propertyFilter}
       )
       SELECT

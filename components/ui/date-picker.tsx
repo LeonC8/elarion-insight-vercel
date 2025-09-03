@@ -1,25 +1,30 @@
-"use client"
+"use client";
 
-import * as React from "react"
-import { format } from "date-fns"
-import { Calendar as CalendarIcon } from "lucide-react"
+import * as React from "react";
+import { format } from "date-fns";
+import { Calendar as CalendarIcon } from "lucide-react";
 
-import { cn } from "@/lib/utils"
-import { Button } from "@/components/ui/button"
-import { Calendar } from "@/components/ui/calendar"
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-} from "@/components/ui/popover"
+} from "@/components/ui/popover";
 
 interface DatePickerProps {
   date?: Date;
   onDateChange?: (date: Date | undefined) => void;
+  maxDate?: Date;
 }
 
-export function DatePickerDemo({ date, onDateChange }: DatePickerProps) {
-  const [isOpen, setIsOpen] = React.useState(false)
+export function DatePickerDemo({
+  date,
+  onDateChange,
+  maxDate,
+}: DatePickerProps) {
+  const [isOpen, setIsOpen] = React.useState(false);
 
   return (
     <Popover open={isOpen} onOpenChange={setIsOpen}>
@@ -40,12 +45,13 @@ export function DatePickerDemo({ date, onDateChange }: DatePickerProps) {
           mode="single"
           selected={date}
           onSelect={(newDate) => {
-            onDateChange?.(newDate)
-            setIsOpen(false)
+            onDateChange?.(newDate);
+            setIsOpen(false);
           }}
+          disabled={(date) => (maxDate ? date > maxDate : false)}
           initialFocus
         />
       </PopoverContent>
     </Popover>
-  )
+  );
 }

@@ -431,7 +431,11 @@ export async function GET(request: Request) {
             new Date(prevStartDate).getTime()) /
           (1000 * 60 * 60 * 24);
 
-        if (dayDiff === prevDayDiff) {
+        // Handle single day periods (when dayDiff = 0)
+        if (dayDiff === 0 && prevDayDiff === 0) {
+          // For single day periods, map the previous date directly to the current date
+          mappedDate = startDate;
+        } else if (dayDiff === prevDayDiff) {
           // If periods are same length, map directly
           const prevIdx = datesToIndex(prevStartDate, prevEndDate, datePeriod);
           if (prevIdx !== -1) {
@@ -443,16 +447,22 @@ export async function GET(request: Request) {
         } else {
           // If periods have different lengths, use relative positioning
           const prevDate = new Date(datePeriod);
-          const relativePosition =
-            (prevDate.getTime() - new Date(prevStartDate).getTime()) /
-            (new Date(prevEndDate).getTime() -
-              new Date(prevStartDate).getTime());
-
+          const prevSpan =
+            new Date(prevEndDate).getTime() - new Date(prevStartDate).getTime();
           const currentSpan =
             new Date(endDate).getTime() - new Date(startDate).getTime();
-          const mappedMsec =
-            new Date(startDate).getTime() + relativePosition * currentSpan;
-          mappedDate = new Date(mappedMsec).toISOString().split("T")[0];
+
+          // Handle case where previous span is 0 (single day)
+          if (prevSpan === 0) {
+            mappedDate = startDate;
+          } else {
+            const relativePosition =
+              (prevDate.getTime() - new Date(prevStartDate).getTime()) /
+              prevSpan;
+            const mappedMsec =
+              new Date(startDate).getTime() + relativePosition * currentSpan;
+            mappedDate = new Date(mappedMsec).toISOString().split("T")[0];
+          }
         }
       } else {
         // For year, just add the difference between periods
@@ -1042,7 +1052,11 @@ export async function GET(request: Request) {
             new Date(prevStartDate).getTime()) /
           (1000 * 60 * 60 * 24);
 
-        if (dayDiff === prevDayDiff) {
+        // Handle single day periods (when dayDiff = 0)
+        if (dayDiff === 0 && prevDayDiff === 0) {
+          // For single day periods, map the previous date directly to the current date
+          mappedDate = startDate;
+        } else if (dayDiff === prevDayDiff) {
           // If periods are same length, map directly
           const prevIdx = datesToIndex(prevStartDate, prevEndDate, datePeriod);
           if (prevIdx !== -1) {
@@ -1054,16 +1068,22 @@ export async function GET(request: Request) {
         } else {
           // If periods have different lengths, use relative positioning
           const prevDate = new Date(datePeriod);
-          const relativePosition =
-            (prevDate.getTime() - new Date(prevStartDate).getTime()) /
-            (new Date(prevEndDate).getTime() -
-              new Date(prevStartDate).getTime());
-
+          const prevSpan =
+            new Date(prevEndDate).getTime() - new Date(prevStartDate).getTime();
           const currentSpan =
             new Date(endDate).getTime() - new Date(startDate).getTime();
-          const mappedMsec =
-            new Date(startDate).getTime() + relativePosition * currentSpan;
-          mappedDate = new Date(mappedMsec).toISOString().split("T")[0];
+
+          // Handle case where previous span is 0 (single day)
+          if (prevSpan === 0) {
+            mappedDate = startDate;
+          } else {
+            const relativePosition =
+              (prevDate.getTime() - new Date(prevStartDate).getTime()) /
+              prevSpan;
+            const mappedMsec =
+              new Date(startDate).getTime() + relativePosition * currentSpan;
+            mappedDate = new Date(mappedMsec).toISOString().split("T")[0];
+          }
         }
       } else {
         // For year, just add the difference between periods
@@ -1309,7 +1329,11 @@ export async function GET(request: Request) {
             new Date(prevStartDate).getTime()) /
           (1000 * 60 * 60 * 24);
 
-        if (dayDiff === prevDayDiff) {
+        // Handle single day periods (when dayDiff = 0)
+        if (dayDiff === 0 && prevDayDiff === 0) {
+          // For single day periods, map the previous date directly to the current date
+          mappedDate = startDate;
+        } else if (dayDiff === prevDayDiff) {
           // If periods are same length, map directly
           const prevIdx = datesToIndex(prevStartDate, prevEndDate, datePeriod);
           if (prevIdx !== -1) {
@@ -1321,16 +1345,22 @@ export async function GET(request: Request) {
         } else {
           // If periods have different lengths, use relative positioning
           const prevDate = new Date(datePeriod);
-          const relativePosition =
-            (prevDate.getTime() - new Date(prevStartDate).getTime()) /
-            (new Date(prevEndDate).getTime() -
-              new Date(prevStartDate).getTime());
-
+          const prevSpan =
+            new Date(prevEndDate).getTime() - new Date(prevStartDate).getTime();
           const currentSpan =
             new Date(endDate).getTime() - new Date(startDate).getTime();
-          const mappedMsec =
-            new Date(startDate).getTime() + relativePosition * currentSpan;
-          mappedDate = new Date(mappedMsec).toISOString().split("T")[0];
+
+          // Handle case where previous span is 0 (single day)
+          if (prevSpan === 0) {
+            mappedDate = startDate;
+          } else {
+            const relativePosition =
+              (prevDate.getTime() - new Date(prevStartDate).getTime()) /
+              prevSpan;
+            const mappedMsec =
+              new Date(startDate).getTime() + relativePosition * currentSpan;
+            mappedDate = new Date(mappedMsec).toISOString().split("T")[0];
+          }
         }
       } else {
         // For year, just add the difference between periods

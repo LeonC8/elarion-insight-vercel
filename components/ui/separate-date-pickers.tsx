@@ -22,12 +22,14 @@ interface SeparateDatePickersProps {
   dateRange?: DateRange;
   onDateRangeChange?: (dateRange: DateRange | undefined) => void;
   className?: string;
+  maxDate?: Date;
 }
 
 export function SeparateDatePickers({
   dateRange,
   onDateRangeChange,
   className,
+  maxDate,
 }: SeparateDatePickersProps) {
   const [isStartOpen, setIsStartOpen] = React.useState(false);
   const [isEndOpen, setIsEndOpen] = React.useState(false);
@@ -76,6 +78,7 @@ export function SeparateDatePickers({
               mode="single"
               selected={dateRange?.from}
               onSelect={handleStartDateChange}
+              disabled={(date) => (maxDate ? date > maxDate : false)}
               initialFocus
             />
           </PopoverContent>
@@ -106,9 +109,10 @@ export function SeparateDatePickers({
               mode="single"
               selected={dateRange?.to}
               onSelect={handleEndDateChange}
-              disabled={(date) =>
-                dateRange?.from ? date < dateRange.from : false
-              }
+              disabled={(date) => {
+                if (maxDate && date > maxDate) return true;
+                return dateRange?.from ? date < dateRange.from : false;
+              }}
               initialFocus
             />
           </PopoverContent>

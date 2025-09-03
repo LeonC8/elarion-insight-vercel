@@ -23,6 +23,7 @@ interface DateRangePickerProps {
   onDateRangeChange?: (dateRange: DateRange | undefined) => void;
   placeholder?: string;
   className?: string;
+  maxDate?: Date;
 }
 
 export function DateRangePicker({
@@ -30,6 +31,7 @@ export function DateRangePicker({
   onDateRangeChange,
   placeholder = "Pick a date range",
   className,
+  maxDate,
 }: DateRangePickerProps) {
   const [isOpen, setIsOpen] = React.useState(false);
 
@@ -68,6 +70,7 @@ export function DateRangePicker({
               setIsOpen(false);
             }
           }}
+          disabled={(date) => (maxDate ? date > maxDate : false)}
           numberOfMonths={2}
           initialFocus
         />
