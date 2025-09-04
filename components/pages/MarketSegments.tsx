@@ -99,7 +99,9 @@ export function MarketSegments() {
   // Helper function to get display text for selected period
   const getSelectedPeriodDisplay = () => {
     if (customDateRange?.from && customDateRange?.to) {
-      return `${customDateRange.from.toLocaleDateString()} - ${customDateRange.to.toLocaleDateString()}`;
+      return `${customDateRange.from.toLocaleDateString(
+        "hr-HR"
+      )} - ${customDateRange.to.toLocaleDateString("hr-HR")}`;
     }
     return `${selectedTimeFrame} ${selectedViewType}`;
   };
@@ -428,7 +430,6 @@ export function MarketSegments() {
                     dateRange={customDateRange}
                     onDateRangeChange={handleCustomDateRangeChange}
                     className="w-full"
-                    maxDate={new Date()} // Prevent future date selection
                   />
                 </div>
               </DropdownMenuContent>
@@ -486,7 +487,6 @@ export function MarketSegments() {
             <DatePicker
               date={date} // Uses date from the hook
               onDateChange={handleDateChange} // Uses the updated handler
-              maxDate={new Date()} // Prevent future date selection
             />
           </div>
 

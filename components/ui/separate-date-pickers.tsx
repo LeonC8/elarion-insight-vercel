@@ -52,7 +52,7 @@ export function SeparateDatePickers({
   };
 
   const formatDate = (date: Date | undefined) => {
-    return date ? format(date, "dd MMM yy") : "Select";
+    return date ? format(date, "dd.MM.yy") : "Select";
   };
 
   return (
@@ -111,6 +111,7 @@ export function SeparateDatePickers({
               onSelect={handleEndDateChange}
               disabled={(date) => {
                 if (maxDate && date > maxDate) return true;
+                // Ensure end date is not before start date
                 return dateRange?.from ? date < dateRange.from : false;
               }}
               initialFocus

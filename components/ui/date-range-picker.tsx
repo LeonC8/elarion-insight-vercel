@@ -37,10 +37,10 @@ export function DateRangePicker({
 
   const formatDateRange = (range: DateRange | undefined) => {
     if (!range?.from) return placeholder;
-    if (!range.to) return `${format(range.from, "dd MMM yyyy")} - ...`;
-    return `${format(range.from, "dd MMM yyyy")} - ${format(
+    if (!range.to) return `${format(range.from, "dd.MM.yyyy")} - ...`;
+    return `${format(range.from, "dd.MM.yyyy")} - ${format(
       range.to,
-      "dd MMM yyyy"
+      "dd.MM.yyyy"
     )}`;
   };
 

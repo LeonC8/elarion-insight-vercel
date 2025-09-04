@@ -3,9 +3,11 @@
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { LockIcon, UserIcon, BarChart2Icon } from "lucide-react";
+import { LockIcon, UserIcon } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import loginImage from "@/assets/2.jpg";
+import logoImage from "@/assets/logo-black.png";
+import Image from "next/image";
 
 export function LoginScreen() {
   const [email, setEmail] = useState("");
@@ -48,13 +50,14 @@ export function LoginScreen() {
           <CardHeader className="space-y-1 pt-8 pb-4">
             {/* Updated Logo positioning - now left-aligned */}
             <div className="flex items-center mb-6">
-              <BarChart2Icon className="h-12 w-11 text-slate-900 mr-2 pr-1" />
-              <div className="flex flex-col text-left">
-                <span className="text-xl font-bold text-slate-900">
-                  Elarion Insights
-                </span>
-                <span className="text-sm text-gray-500">Hospitality</span>
-              </div>
+              <Image
+                src={logoImage}
+                alt="Elarion Insights"
+                width={120}
+                height={35}
+                className="object-contain"
+                priority
+              />
             </div>
             {/* Removed "Welcome Back" heading */}
             <p className="text-sm text-gray-500">
